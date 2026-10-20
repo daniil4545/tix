@@ -316,6 +316,78 @@ t_existing_own_hook_survives_undo() {
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'свой хук tk ctx не должен меняться'
 }
 
+t_modified_own_files_skipped_without_force() {
+  new_home
+  apply
+  local f
+  echo '# mine' >>"$HOME/.codex/rules/tk.rules"
+  echo 'mine' >>"$HOME/.claude/skills/tk/SKILL.md"
+  echo 'mine' >>"$HOME/.agents/skills/tk/SKILL.md"
+  local before
+  before=$(snap)
+  apply "$NOW2"
+  [ "$before" = "$(snap)" ] || fail "apply без --force перезаписал изменённые файлы"
+  for f in "$HOME/.codex/rules/tk.rules" "$HOME/.claude/skills/tk" "$HOME/.agents/skills/tk"; do
+    all_out | grep -iF 'warn' | grep -qF "$f" || fail "нет warn с путём $f: $(all_out | head -6)"
+  done
+  [ -z "$(baks)" ] || fail "бэкапы после apply: $(baks)"
+  run apply --agent all --now "$NOW2" --force
+  [ "$RC" -eq 0 ] || fail "apply --force: код $RC: $(all_out | head -5)"
+  same_bytes "$HOME/.codex/rules/tk.rules" "$CONN/codex/tk.rules" 'tk.rules после --force'
+  diff -r "$SKILL_SRC" "$HOME/.claude/skills/tk" >/dev/null || fail "скилл Claude после --force отличается от источника"
+  diff -r "$SKILL_SRC" "$HOME/.agents/skills/tk" >/dev/null || fail "скилл Codex после --force отличается от источника"
+}
+
+t_undo_removes_only_manifest_files() {
+  new_home
+  apply
+  echo mine >"$HOME/.claude/skills/tk/extra.txt"
+  mkdir -p "$HOME/.agents/skills/tk/sub"
+  echo mine >"$HOME/.agents/skills/tk/sub/note.txt"
+  run undo --agent all --now "$NOW2"
+  [ "$RC" -eq 0 ] || fail "undo: код $RC: $(all_out | head -5)"
+  must_exist "$HOME/.claude/skills/tk/extra.txt"
+  must_exist "$HOME/.agents/skills/tk/sub/note.txt"
+  must_absent "$HOME/.claude/skills/tk/SKILL.md"
+  must_absent "$HOME/.agents/skills/tk/SKILL.md"
+  must_absent "$HOME/.codex/rules/tk.rules"
+  all_out | grep -qF "$HOME/.claude/skills/tk" || fail "undo не назвал оставленный каталог: $(all_out | head -6)"
+}
+
+t_undo_skips_paths_outside_whitelist() {
+  new_home
+  mkdir -p "$HOME/tasks/.tracker" "$HOME/victimdir"
+  echo keep >"$HOME/victim.txt"
+  echo keep >"$HOME/victimdir/a.txt"
+  echo '{"keep":1}' >"$HOME/other.json"
+  jq -n --arg h "$HOME" '{version:1, dirs_created:[($h + "/victimdir")], entries:[
+    {key:"k1", agent:"codex", kind:"file", path:($h + "/victim.txt"), dirs_created:[]},
+    {key:"k2", agent:"claude", kind:"dir", path:($h + "/victimdir"), files:["a.txt"], dirs_created:[]},
+    {key:"k3", agent:"claude", kind:"json", op:"arr", file:($h + "/other.json"), path:["keep"], value:1, created:[], file_created:true, dirs_created:[]},
+    {key:"k4", agent:"claude", kind:"file", path:"/etc/hosts", dirs_created:["/etc"]}]}' >"$(MANIFEST)"
+  run undo --agent all --now "$NOW2"
+  [ "$RC" -ne 0 ] || fail "undo с чужими путями вернул 0"
+  must_exist "$HOME/victim.txt"
+  must_exist "$HOME/victimdir/a.txt"
+  jq_ok "$HOME/other.json" '.keep == 1' 'other.json изменён'
+  [ -e /etc/hosts ] || fail "нет /etc/hosts?"
+  local p
+  for p in "$HOME/victim.txt" "$HOME/victimdir" "$HOME/other.json" /etc/hosts; do
+    all_out | grep -iF 'warn' | grep -qF "$p" || fail "нет warn с путём $p: $(all_out | head -8)"
+  done
+  must_exist "$(MANIFEST)"
+}
+
+t_undo_without_manifest_says_so() {
+  new_home
+  undo
+  [ "$OUT" = "nothing to undo: no manifest at $HOME/tasks/.tracker/connect-state.json" ] || fail "вывод: '$OUT'"
+  RUN_ENV=("TRACKER_HOME=$H/alt")
+  undo
+  RUN_ENV=()
+  [ "$OUT" = "nothing to undo: no manifest at $H/alt/.tracker/connect-state.json" ] || fail "вывод с TRACKER_HOME: '$OUT'"
+}
+
 t_symlinked_configs_stay_symlinks() {
   new_home; seed_codex
   mkdir -p "$HOME/dotfiles" "$HOME/.claude"
@@ -494,6 +566,10 @@ TESTS=(
   t_undo_on_pristine_home_leaves_no_trace
   t_existing_tk_permission_survives_undo
   t_existing_own_hook_survives_undo
+  t_modified_own_files_skipped_without_force
+  t_undo_removes_only_manifest_files
+  t_undo_without_manifest_says_so
+  t_undo_skips_paths_outside_whitelist
   t_symlinked_configs_stay_symlinks
   t_symlinked_skill_dir_target_untouched
   t_permissions_600_preserved

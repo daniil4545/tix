@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Установка коннекторов агентов (Claude Code, Codex) для tk.
 #
-#   connect.sh plan|apply|undo [--agent claude|codex|all] [--now ISO]
+#   connect.sh plan|apply|undo [--agent claude|codex|all] [--now ISO] [--force]
 #
 # plan (по умолчанию) печатает, что изменит apply, и ничего не пишет; повторный plan пуст.
 # apply добавляет недостающее и записывает добавленное в манифест; чужое не трогает.
 # Бэкапы <файл>.tk-bak-<время> живут только на время apply; при сбое остаются и называются.
-# undo снимает только записи манифеста и сам манифест.
+# Наш файл или скилл уже есть и отличается от источника: warn и пропуск; перезапись только с --force.
+# undo снимает только записи манифеста (файлы скилла по списку) и сам манифест.
 # Манифест: ${TRACKER_HOME:-$HOME/tasks}/.tracker/connect-state.json. Других следов нет.
 # HOME берётся из окружения. Нужны bash, jq; для apply ещё tk.
 # shellcheck disable=SC2016  # $p, $v в программах jq - переменные jq, не shell
@@ -23,6 +24,7 @@ CODEX_RULES_SRC="$CONN/codex/tk.rules"
 CMD=plan
 AGENT=all
 NOW=""
+FORCE=0
 DRY=1
 QUIET=0
 BAKED=""
@@ -34,7 +36,7 @@ act() { [ "$QUIET" = 1 ] || printf '%s\n' "$*"; }
 want() { [ "$AGENT" = all ] || [ "$AGENT" = "$1" ]; }
 
 usage() {
-  printf 'usage: %s plan|apply|undo [--agent claude|codex|all] [--now ISO]\n' "$0" >&2
+  printf 'usage: %s plan|apply|undo [--agent claude|codex|all] [--now ISO] [--force]\n' "$0" >&2
   exit 2
 }
 
@@ -53,6 +55,7 @@ while [ $# -gt 0 ]; do
     --now)
       [ $# -ge 2 ] || usage
       NOW=$2; shift 2 ;;
+    --force) FORCE=1; shift ;;
     *) usage ;;
   esac
 done
@@ -246,49 +249,52 @@ jedit_apply() {
 
 # put_file KEY REAL SRC LABEL AGENT
 put_file() {
-  local key=$1 real=$2 src=$3 label=$4 ag=$5 same=0 exists=0 tracked=0
+  local key=$1 real=$2 src=$3 label=$4 ag=$5 exists=0
   [ -e "$real" ] || [ -L "$real" ] && exists=1
-  man_has "$key" && tracked=1
   if [ "$exists" = 1 ]; then
-    cmp -s "$src" "$real" && same=1
-    [ "$same" = 1 ] && return 0
-    [ "$tracked" = 1 ] || die "$real уже есть и отличается от коннектора; запись не сделана"
-    act "$label: обновить $real"
+    cmp -s "$src" "$real" && return 0
+    if [ "$FORCE" = 0 ]; then
+      [ "$QUIET" = 1 ] || warn "$label: $real отличается от коннектора; пропуск (перезапись: --force)"
+      return 0
+    fi
+    act "$label: перезаписать $real"
   else
     act "$label: создать $real"
   fi
   [ "$DRY" = 1 ] && return 0
-  if [ "$exists" = 0 ]; then
-    man_add "$(jq -nc --arg key "$key" --arg ag "$ag" --arg p "$real" --argjson md "$(missing_dirs "$real")" \
-      '{key:$key, agent:$ag, kind:"file", path:$p, dirs_created:$md}')"
-  fi
+  man_add "$(jq -nc --arg key "$key" --arg ag "$ag" --arg p "$real" --argjson md "$(missing_dirs "$real")" \
+    '{key:$key, agent:$ag, kind:"file", path:$p, dirs_created:$md}')"
+  [ "$exists" = 1 ] && backup_once "$real"
   write_atomic "$real" <"$src"
 }
 
 put_skill() { # $1 = каталог скилла у агента, $2 = агент
-  local src real key tmp exists=0 tracked=0
-  src=$SKILL_SRC
+  local src=$SKILL_SRC real key tmp exists=0 files
   real=$(resolve "$1")
   key="dir|$real"
   [ -e "$real" ] && exists=1
-  man_has "$key" && tracked=1
   if [ "$exists" = 1 ]; then
     [ -d "$real" ] || die "$real не каталог; запись не сделана"
     diff -r -q "$src" "$real" >/dev/null 2>&1 && return 0
-    [ "$tracked" = 1 ] || die "$real уже есть и отличается от скилла коннектора; запись не сделана"
-    act "skill: обновить $real"
+    if [ "$FORCE" = 0 ]; then
+      [ "$QUIET" = 1 ] || warn "skill: $real отличается от скилла коннектора; пропуск (перезапись: --force)"
+      return 0
+    fi
+    act "skill: перезаписать $real"
   else
     act "skill: создать $real"
   fi
   [ "$DRY" = 1 ] && return 0
-  if [ "$exists" = 0 ]; then
-    man_add "$(jq -nc --arg key "$key" --arg ag "$2" --arg p "$real" --argjson md "$(missing_dirs "$real")" \
-      '{key:$key, agent:$ag, kind:"dir", path:$p, dirs_created:$md}')"
+  files=$(cd "$src" && find . -type f | jq -Rsc 'split("\n") | map(select(length > 0) | ltrimstr("./"))')
+  man_add "$(jq -nc --arg key "$key" --arg ag "$2" --arg p "$real" --argjson f "$files" --argjson md "$(missing_dirs "$real")" \
+    '{key:$key, agent:$ag, kind:"dir", path:$p, files:$f, dirs_created:$md}')"
+  if [ "$exists" = 1 ]; then
+    cp -R "$src/." "$real/" || die "не удалось скопировать скилл в $real"
+    return 0
   fi
   mkdir -p "$(dirname "$real")"
   tmp=$(mktemp -d "$(dirname "$real")/.tk-tmp.XXXXXX")
   cp -R "$src/." "$tmp/" || { rm -r "$tmp"; die "не удалось скопировать скилл"; }
-  [ "$exists" = 1 ] && rm -r "$real"
   mv "$tmp" "$real"
   chmod 755 "$real"
 }
@@ -344,10 +350,36 @@ run_agents() {
 
 # ---------- откат ----------
 
+# Белый список целей undo: манифест - данные, пути из него не доверяем.
+dir_ok() { # каталог внутри HOME или корня задач, без ..
+  local r roots d
+  case $1 in /*) ;; *) return 1 ;; esac
+  case $1 in */../*|*/..) return 1 ;; esac
+  r=$(resolve "$1")
+  roots="$(resolve "$HOME")/ $(resolve "$(dirname "$(dirname "$MAN")")")/"
+  for d in $roots; do
+    case $r in "$d"*) return 0 ;; esac
+  done
+  return 1
+}
+target_ok() { # $1 = kind, $2 = путь из манифеста
+  local r
+  case $2 in /*) ;; *) return 1 ;; esac
+  case $2 in */../*|*/..) return 1 ;; esac
+  r=$(resolve "$2")
+  case $1 in
+    json) [ "$r" = "$(resolve "$SETTINGS")" ] || [ "$r" = "$(resolve "$CODEX_HOOKS")" ] ;;
+    file) [ "$r" = "$(resolve "$CODEX_RULES")" ] ;;
+    dir) [ "$r" = "$(resolve "$CLAUDE_SKILL")" ] || [ "$r" = "$(resolve "$CODEX_SKILL")" ] ;;
+    *) return 1 ;;
+  esac
+}
+
 rmdirs() { # $1 = JSON-массив каталогов, самый глубокий первым
   local d
   while IFS= read -r d; do
-    [ -n "$d" ] && rmdir "$d" 2>/dev/null || true
+    [ -n "$d" ] || continue
+    if dir_ok "$d"; then rmdir "$d" 2>/dev/null || true; else warn "undo: каталог вне белого списка, пропуск: $d"; fi
   done < <(jq -r '.[]' <<<"$1")
 }
 
@@ -366,8 +398,19 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
   key=$(jq -r .key <<<"$e")
   md=$(jq -c '.dirs_created // []' <<<"$e")
   case $kind in
+    json) f=$(jq -r '.file // ""' <<<"$e") ;;
+    file|dir) f=$(jq -r '.path // ""' <<<"$e") ;;
+    *) f="" ;;
+  esac
+  if ! target_ok "$kind" "$f"; then
+    warn "undo: путь вне белого списка, пропуск: ${f:-<пусто>} (kind=$kind)"
+    return 1
+  fi
+  case $kind in
     json)
       f=$(jq -r .file <<<"$e"); p=$(jq -c .path <<<"$e"); v=$(jq -c .value <<<"$e")
+      jq -e '.path == ["hooks","SessionStart"] or .path == ["permissions","allow"]' <<<"$e" >/dev/null \
+        || { warn "undo: ключ вне белого списка, пропуск: $p в $f"; return 1; }
       op=$(jq -r .op <<<"$e"); c=$(jq -c .created <<<"$e"); fc=$(jq -r .file_created <<<"$e")
       case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
       if [ -e "$f" ]; then
@@ -386,7 +429,15 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
       ;;
     dir)
       f=$(jq -r .path <<<"$e")
-      if [ -d "$f" ]; then act "undo: удалить $f"; rm -r "$f"; fi
+      if [ -d "$f" ]; then
+        act "undo: удалить файлы скилла в $f"
+        while IFS= read -r p; do
+          case $p in ''|/*|*..*) continue ;; esac
+          rm -f -- "$f/$p"
+        done < <(jq -r '.files // [] | .[]' <<<"$e")
+        find "$f" -depth -type d -empty -exec rmdir {} + 2>/dev/null || true
+        [ ! -d "$f" ] || warn "в $f остались чужие файлы; каталог не удалён"
+      fi
       rmdirs "$md"
       ;;
     *) die "манифест: неизвестный kind $kind" ;;
@@ -397,7 +448,10 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
 run_undo() {
   local e ag left=0 real md
   man_check
-  [ -e "$MAN" ] || return 0
+  if [ ! -e "$MAN" ]; then
+    printf 'nothing to undo: no manifest at %s\n' "$MAN"
+    return 0
+  fi
   while IFS= read -r e; do
     ag=$(jq -r .agent <<<"$e")
     if [ "$AGENT" != all ] && [ "$ag" != "$AGENT" ]; then left=1; continue; fi
