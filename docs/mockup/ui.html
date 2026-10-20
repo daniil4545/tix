@@ -35,6 +35,7 @@ pre{margin:0;padding:14px 16px;font:13px/1.55 var(--mono);min-width:1080px;min-h
 <body>
 <div class="wrap">
   <h1>tracker: макет в стиле ASCII</h1>
+  <p class="lead"><strong>Образец смысла, не точный текст.</strong> Отклонения от спеки: интерфейс и разделы файла на английском (Р46); личность в <code>Actor:</code> и <code>claim</code> - полный id сессии, на экране 8 знаков (Р56); Kaiten, GitHub и <code>external_state</code> - после MVP (<code>docs/specs/integrations.md</code>).</p>
   <p class="lead">Пять экранов терминала: доска, карточка, что видит агент, файл задачи, интеграции. Доска живая: кликните по терминалу и нажимайте h j k l, enter, m и M, p, s, esc. Жёлтая звёздочка - нужно ваше действие. Перенос карточки сразу пишет коммит, а для связанной задачи в фоне отправляет статус в Kaiten или GitHub; нижняя строка показывает оба шага. Кнопка «агент работает» по шагам показывает, как агенты меняют доску, пока вы смотрите. Данные выдуманные.</p>
   <div class="tabs" role="tablist">
     <button role="tab" aria-selected="true" data-tab="board">доска</button>
@@ -217,7 +218,7 @@ const SYNC=`<span class="a">как вы двигаете связанную ка
   4. ответ ok: external_state = doing                  <span class="d">kai:ok</span>
      нет сети или 5xx: локально остаётся doing         <span class="w">kai:!</span>  <span class="d">повтор по s и при следующем запуске</span>
 
-<span class="a">как приходят изменения снаружи</span>  <span class="d">(s в TUI, tracker sync, старт TUI)</span>
+<span class="a">как приходят изменения снаружи</span>  <span class="d">(s в TUI, tk pull, старт TUI)</span>
 
   коллега перенёс карточку в Kaiten в "Готово"
   - у нас задача не менялась: переносим в done, в историю "kaiten: перенесено в Готово"

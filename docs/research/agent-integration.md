@@ -1,4 +1,7 @@
 # Трекер и три агента: факты для `tracker setup <agent>`
+
+> Устарело частично (20.10.2026): команда - `tk`, не `tracker` (Р43); коннектор Claude Code - плагин (Р49, спека 2.4); песочница Codex - `docs/api/codex.md`. Удалить после З3.
+
 Дата: 2026-10-20. Версии на машине: claude 2.1.304, codex-cli 0.163.0, opencode 1.19.3.
 Источники: code.claude.com/docs/en/{memory,hooks,skills,permissions}; learn.chatgpt.com/docs/ (бывший developers.openai.com/codex/*): agent-configuration/agents-md, hooks, build-skills, agent-configuration/rules, sandboxing, agent-approvals-security; opencode.ai/docs/{rules,skills,plugins,permissions}. [L] = проверено локально на машине.
 
