@@ -1,0 +1,8 @@
+{
+  "permissions": {"allow": ["Bash(git status)"]},
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "tk ctx"}]}
+    ]
+  }
+}
