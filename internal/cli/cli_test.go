@@ -444,3 +444,19 @@ func TestCLI_BrokenConfig_ErrPathLine_NothingWritten(t *testing.T) {
 		t.Errorf("битый конфиг: база изменена:\n%s\nпосле:\n%s", before, after)
 	}
 }
+
+// Спека 2.2 и 2.5: new без --to кладёт задачу в колонку роли inbox, какое бы имя и место
+// в конфиге у неё ни было. Краснеет, если колонка ищется по имени или берётся первая.
+func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	cfg := filepath.Join(b.home, ".tracker", "config.toml")
+	data := "[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n[[column]]\nname = \"ideas\"\nrole = \"inbox\"\n"
+	if err := os.WriteFile(cfg, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if r := b.ok("", "new", "Beta"); r.out != "ok T-2 ideas\n" {
+		t.Errorf("tk new Beta: stdout %q, ждали %q", r.out, "ok T-2 ideas\n")
+	}
+}

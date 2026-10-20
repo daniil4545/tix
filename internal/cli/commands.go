@@ -72,19 +72,16 @@ func (a *app) cmdNew(args []string) error {
 	return nil
 }
 
-// column возвращает колонку новой задачи: --to, иначе inbox, иначе первая.
+// column возвращает колонку новой задачи: --to по имени, иначе колонка роли inbox, иначе первая.
 func (a *app) column(p *parsed) (string, error) {
 	cols := a.store.Config().Columns
 	if len(cols) == 0 {
 		return "", errors.New("config.toml has no columns")
 	}
 	want := p.vals["to"]
-	if !p.set["to"] {
-		want = "inbox"
-	}
 	for _, c := range cols {
-		if c.Name == want {
-			return want, nil
+		if p.set["to"] && c.Name == want || !p.set["to"] && c.Role == "inbox" {
+			return c.Name, nil
 		}
 	}
 	if !p.set["to"] {
