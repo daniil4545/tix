@@ -1,0 +1,1 @@
+{"hooks": {"SessionStart": "echo not-an-array"}}
