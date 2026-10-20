@@ -103,15 +103,14 @@ func (m *Model) editFinished(msg editorDone) tea.Cmd {
 		return nil
 	}
 	text := string(data)
-	// Копия не изменена - отмена, в том числе после конфликта с нетронутыми маркерами.
+	// После конфликта нетронутая копия - отмена, но в маркерах правка человека: копия остаётся.
 	switch {
+	case same(text, s.orig) && s.conflicted:
+		m.keepCopy(s, "edit cancelled")
+		return nil
 	case same(text, s.orig):
 		_ = os.Remove(s.path)
-		if s.conflicted {
-			m.setStatus(s.id+": edit cancelled", false)
-		} else {
-			m.setStatus(s.id+" no changes", false)
-		}
+		m.setStatus(s.id+" no changes", false)
 		return nil
 	case strings.Contains(text, conflictMarker):
 		m.keepCopy(s, "conflict markers left")

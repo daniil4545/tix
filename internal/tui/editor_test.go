@@ -156,7 +156,7 @@ func TestEditor_Conflict_ReopensWithMarkersAndRetrySaves(t *testing.T) {
 	e.until("копия удалена", func() bool { return len(copies(e)) == 0 })
 }
 
-func TestEditor_Conflict_SecondRunUnchanged_Cancels(t *testing.T) {
+func TestEditor_Conflict_SecondRunUnchanged_CancelsCopyKept(t *testing.T) {
 	st := newStub(t)
 	st.plan(1, true, `printf 'line1\nUSER\nline3\n' > "$1"`)
 	e := openEditor(t, st)
@@ -167,7 +167,10 @@ func TestEditor_Conflict_SecondRunUnchanged_Cancels(t *testing.T) {
 	n := e.gitOut("rev-list", "--count", "HEAD")
 	st.touch("go.1")
 	e.until("второй запуск", func() bool { return st.calls() == 2 })
-	e.until("копия удалена", func() bool { return len(copies(e)) == 0 })
+	e.screenHas("edit cancelled, copy kept")
+	if len(copies(e)) != 1 {
+		t.Errorf("копия с правкой человека не сохранена: %v", copies(e))
+	}
 	if _, _, body, _ := e.get("T-1"); strings.Contains(body, "USER") || !strings.Contains(body, "AGENT") {
 		t.Errorf("отмена изменила файл:\n%s", body)
 	}

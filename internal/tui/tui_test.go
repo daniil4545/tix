@@ -113,6 +113,24 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 	})
 }
 
+func TestMove_AgentMovedDuringPrompt_HumanMoveRefused(t *testing.T) {
+	e := newEnv(t, moveCfg)
+	e.create("Alpha", "p", "work")
+	e.start("", 140, 30)
+	e.screenHas("Alpha")
+	e.key("m")
+	e.screenHas("waiting for:")
+	if _, err := e.store.Move("T-1", "fin", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
+		t.Fatal(err)
+	}
+	e.tm.Type("human reason")
+	e.key("enter")
+	e.screenHas("meanwhile")
+	if st, _, _, _ := e.get("T-1"); st != "fin" {
+		t.Errorf("перенос человека перезаписал перенос агента: fin -> %s", st)
+	}
+}
+
 func TestMove_RuleViolation_ShownInStatusLine(t *testing.T) {
 	e := newEnv(t, "")
 	e.create("Alpha", "p", "idea") // в todo нужен критерий

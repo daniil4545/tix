@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"tracker/internal/core"
+	"tracker/internal/task"
 )
 
 // queueSize - ёмкость очереди записи; полная очередь отвечает queue full (Р44).
@@ -113,6 +114,18 @@ func firstLine(s string) string {
 	return line
 }
 
+// checkStatus отказывает, если задачу перенесли, пока была открыта строка ввода.
+func (m *Model) checkStatus(id, status string) error {
+	cur, _, err := m.d.Store.Get(id)
+	if err != nil {
+		return err
+	}
+	if cur.Status != status {
+		return fmt.Errorf("moved to %s meanwhile, not moved", cur.Status)
+	}
+	return nil
+}
+
 // startMove переносит текущую задачу в соседнюю колонку: dir 1 вправо, -1 влево.
 // В waiting и closed ядро требует причину, её спрашивает строка ввода.
 func (m *Model) startMove(dir int) tea.Cmd {
@@ -138,6 +151,9 @@ func (m *Model) startMove(dir int) tea.Cmd {
 	target := cols[to]
 	move := func(opts core.MoveOpts) tea.Cmd {
 		return m.submit(t.ID, t.Status+" > "+target.Name, nil, func() (core.Result, error) {
+			if err := m.checkStatus(t.ID, t.Status); err != nil {
+				return core.Result{}, err
+			}
 			return m.d.Store.Move(t.ID, target.Name, opts, m.d.Actor)
 		})
 	}
@@ -148,14 +164,8 @@ func (m *Model) startMove(dir int) tea.Cmd {
 			return nil
 		}
 	case "closed":
-		crit := t.Criteria()
-		open := 0
-		for _, c := range crit {
-			if !c.Done {
-				open++
-			}
-		}
-		if len(crit) == 0 || open > 0 {
+		total, open := countCriteria(t)
+		if total == 0 || open > 0 {
 			m.ask("close reason:", func(text string) tea.Cmd {
 				return move(core.MoveOpts{Message: text, Force: open > 0})
 			})
@@ -204,4 +214,15 @@ func (m *Model) startComment() tea.Cmd {
 		})
 	})
 	return nil
+}
+
+// countCriteria возвращает число критериев и неотмеченных среди них.
+func countCriteria(t *task.Task) (total, open int) {
+	for _, c := range t.Criteria() {
+		total++
+		if !c.Done {
+			open++
+		}
+	}
+	return total, open
 }
