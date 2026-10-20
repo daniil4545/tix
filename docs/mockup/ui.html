@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+:root{
+  --ground:#F3F5F2; --ink:#18221F; --muted:#56635E; --line:#D5DCD7; --accent:#1E6C63;
+  --t-bg:#111416; --t-ink:#C9D1CD; --t-dim:#69756F; --t-acc:#7FD1C3; --t-warn:#E8A06A; --t-new:#E9CF6A;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--ground:#0C0F10; --ink:#E4EAE6; --muted:#9AA8A2; --line:#2E3A36; --accent:#6CC2B6}
+}
+:root[data-theme="dark"]{--ground:#0C0F10; --ink:#E4EAE6; --muted:#9AA8A2; --line:#2E3A36; --accent:#6CC2B6}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font:14px/1.6 var(--mono);margin:0;padding-inline:16px}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 56px}
+h1{font:700 18px/1.3 var(--mono);margin:0 0 8px}
+.lead{max-width:900px;color:var(--muted);margin:0 0 18px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tabs button{font:13px/1 var(--mono);padding:7px 10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.tabs button[aria-selected="true"]{border-color:var(--accent);color:var(--accent)}
+.term{background:var(--t-bg);color:var(--t-ink);border:1px solid var(--line);overflow-x:auto;outline:none}
+.term:focus-visible{outline:2px solid var(--accent)}
+pre{margin:0;padding:14px 16px;font:13px/1.55 var(--mono);min-width:1080px;min-height:640px;white-space:pre}
+.d{color:var(--t-dim)} .a{color:var(--t-acc)} .w{color:var(--t-warn)} .n{color:var(--t-new)}
+.s{background:var(--t-acc);color:var(--t-bg)}
+.hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+[hidden]{display:none!important}
+</style>
+<body>
+<div class="wrap">
+  <h1>tracker: макет в стиле ASCII</h1>
+  <p class="lead">Пять экранов терминала: доска, карточка, что видит агент, файл задачи, интеграции. Доска живая: кликните по терминалу и нажимайте h j k l, enter, m и M, p, s, esc. Жёлтая звёздочка - нужно ваше действие. Перенос карточки сразу пишет коммит, а для связанной задачи в фоне отправляет статус в Kaiten или GitHub; нижняя строка показывает оба шага. Кнопка «агент работает» по шагам показывает, как агенты меняют доску, пока вы смотрите. Данные выдуманные.</p>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="board">доска</button>
+    <button role="tab" aria-selected="false" data-tab="card">карточка</button>
+    <button role="tab" aria-selected="false" data-tab="agent">агент</button>
+    <button role="tab" aria-selected="false" data-tab="file">файл</button>
+    <button role="tab" aria-selected="false" data-tab="sync">интеграции</button>
+    <button id="sim" type="button">агент работает</button>
+  </div>
+  <div class="term" id="term" tabindex="0" aria-label="Терминал">
+    <pre id="scr"></pre>
+  </div>
+  <p class="hint">h l колонка  j k карточка  enter открыть  m M перенести  p проект  s синхронизация  esc назад</p>
+</div>
+<script>
+const COLS=["idea","todo","doing","blocked","done"];
+const KAI={todo:"Очередь",doing:"В работе",blocked:"В работе",done:"Готово"};
+const T=[
+ {id:"T-21",p:"личное",t:"Трекер задач для агентов",s:"Собираем спеку и макет",st:"idea"},
+ {id:"T-23",p:"ST-project",t:"Замер Natasha на длинных звонках",s:"",st:"idea"},
+ {id:"T-9",p:"личное",t:"Прочитать про CRDT",s:"Отложено до зимы",st:"idea"},
+ {id:"T-17",p:"ST-project",t:"Очистка ПДн перед моделью",s:"Сначала телефон словами",st:"todo",ck:"0/3",due:"28.10",x:"kai",xs:"ok"},
+ {id:"T-19",p:"ST-project",t:"Сквозной прогон make e2e",s:"",st:"todo",ck:"0/2"},
+ {id:"T-20",p:"Galera",t:"Анонсы встреч на ноябрь",s:"Таблица спикеров на 80%",st:"todo",due:"01.11",x:"gh",xs:"ok"},
+ {id:"T-12",p:"ST-project",t:"Отчёт по тексту звонка",s:"Жду ответ по полю needs",st:"doing",ck:"1/3",cl:"@claude",x:"kai",xs:"ok",nw:1,ask:"решите: пустые потребности писать как \"-\" или опускать поле"},
+ {id:"T-18",p:"Galera",t:"Посещаемость встречи 10-011",s:"Осталось отметить 3 человек",st:"doing",ck:"2/3",cl:"@codex",x:"gh",xs:"!"},
+ {id:"T-15",p:"ST-project",t:"Доступ к GPU-серверу",s:"Ждём: оплату от бухгалтерии",st:"blocked",x:"kai",xs:"ok"},
+ {id:"T-8",p:"pii-scrub",t:"Каркас репозитория",s:"README и AGENTS.md готовы",st:"done",ck:"3/3"},
+ {id:"T-11",p:"Galera",t:"Пост недели 14-20.10",s:"Отправлен в три канала",st:"done",ck:"2/2",x:"gh",xs:"ok"}
+];
+const PROJ=["все","ST-project","Galera","личное","pii-scrub"];
+const HIST=[
+ ["18.10 09:40","claude","создал в idea",""],
+ ["18.10 09:52","claude","idea > todo",""],
+ ["19.10 09:00","claude","взял задачу, todo > doing","kaiten: В работе  ok"],
+ ["19.10 11:02","claude","сделал разбор полей отчёта",""],
+ ["19.10 14:03","claude","комментарий","Сделано: отчёт по 5 звонкам. Решено: нет. Ждём: ответ по needs."],
+ ["20.10 10:12","daniil","комментарий","Пустую строку в потребностях заменяем на \"-\"."]
+];
+let view="board",ci=2,ri=0,pi=0,status="",sha=0x5e2b8f,cur=null,simStep=0;
+const W=24,G="  ";
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const pad=(s,n)=>s.length>n?s.slice(0,n):s.padEnd(n);
+const sp=(c,t)=>c?`<span class="${c}">${esc(t)}</span>`:esc(t);
+const vis=c=>T.filter(x=>x.st===c&&(pi===0||x.p===PROJ[pi]));
+const hash=()=>{sha=(sha*7+12345)%0xffffff;return sha.toString(16).padStart(7,"0")};
+const rule=n=>"-".repeat(n);
+function syncTag(x){if(!x.x)return "";return x.x+(x.xs==="ok"?":ok":x.xs==="!"?":!":":..")}
+function board(){
+  const lines=[];
+  const tot=COLS.reduce((a,c)=>a+vis(c).length,0);
+  lines.push(sp("a","tracker")+sp("d","  ~/tasks  проект: ")+sp("a",PROJ[pi])+sp("d",`  ${tot} задач`)+" ".repeat(42)+sp("d","sync 12:40  backup 14:00"));
+  lines.push(sp("d",rule(W*5+G.length*4)));
+  lines.push(COLS.map(c=>pad(`${c} ${vis(c).length}`,W)).join(G));
+  lines.push(sp("d",COLS.map(()=>rule(W)).join(G)));
+  const cells=COLS.map((c,i)=>{
+    const out=[];
+    vis(c).forEach((x,j)=>{
+      const sel=i===ci&&j===ri;
+      const meta=[x.ck,x.due?"до "+x.due:"",x.cl,syncTag(x)].filter(Boolean).join(" ");
+      const rows=[[(sel?">":" ")+x.id+" "+x.p,x.nw?"n":""],[" "+x.t,""],[" "+(x.s||""),"d"],[" "+meta,x.xs==="!"?"w":"d"],["",""]];
+      rows.forEach(([t,c2],k)=>{
+        const txt=pad(t,W);
+        if(sel&&k<4)out.push(`<span class="s">${esc(txt)}</span>`);
+        else if(k===0&&x.nw)out.push(esc(pad(t,W-2))+sp("n"," *"));
+        else out.push(sp(c2,txt));
+      });
+    });
+    return out});
+  const h=Math.max(28,...cells.map(c=>c.length));
+  for(let r=0;r<h;r++)lines.push(cells.map(c=>c[r]||" ".repeat(W)).join(G));
+  lines.push(sp("d",rule(W*5+G.length*4)));
+  lines.push(status||sp("d","готово"));
+  return lines.join("\n");
+}
+function card(x){
+  const L=[],R=104;
+  const head=`${x.id}  ${x.t}`;
+  L.push(sp("a",head)+" ".repeat(Math.max(2,R-head.length-x.st.length-2))+"["+x.st+"]");
+  const meta=[x.p,x.x?(x.x==="kai"?"kaiten:71768617":"gh:galera/club#41")+(x.xs==="ok"?" sync ok 12:40":x.xs==="!"?" sync ошибка, повтор при s":" отправка..."):"",x.cl?x.cl+" до 18:00":"",x.due?"до "+x.due:"","#calls"].filter(Boolean).join("   ");
+  L.push(sp(x.xs==="!"?"w":"d",meta));
+  if(x.nw)L.push(sp("n","* нужно от вас: "+(x.ask||"")));
+  L.push(sp("d",rule(R)));
+  L.push("абстракт");
+  L.push("  Руководитель видит итог звонка без прослушивания. Делаем отчёт по тексту");
+  L.push("  расшифровки: итог, потребности, возражения.");
+  L.push("");
+  L.push("сводка");
+  L.push("  "+(x.s||"пока пусто"));
+  L.push(sp("d","  Готово 1 из 3: отчёты по 5 звонкам. Риск: пустая строка в потребностях."));
+  L.push("");
+  L.push("подробно"+" ".repeat(R-8-(x.ck||"").length)+(x.ck||""));
+  L.push("  [x] отчёт по 5 звонкам");
+  L.push("  [ ] все отчёты проходят схему");
+  L.push("  [ ] сравнение с эталоном");
+  L.push(sp("d","  спека: ~/Dev/ST-project/docs/plans/report.md"));
+  L.push("");
+  L.push("история");
+  (x.hist||HIST).forEach(([d,who,what,extra])=>{
+    const isC=what==="комментарий";
+    L.push(sp("d","  "+d+"  ")+pad(who,8)+(isC?sp("d",what):what)+(extra&&!isC?"   "+sp(extra.includes("!")?"w":"d",extra):""));
+    if(isC)L.push(" ".repeat(23)+extra);
+  });
+  L.push("");
+  L.push(sp("d",rule(R)));
+  L.push(status||sp("d","e редактор  c комментарий  m M перенести  o открыть в Kaiten  esc назад"));
+  return L.join("\n");
+}
+const AGENT=`<span class="d"># хук старта сессии сам вызывает tk ctx; агент получает это в контекст, ~120 токенов</span>
+<span class="a">$</span> tk ctx
+project ST-project   <span class="d">rules: ~/tasks/RULES.md</span>
+<span class="d">- взял задачу: tk take; сделал шаг: tk note; конец сессии: tk set summary=</span>
+doing   T-12 Отчёт по тексту звонка | Жду ответ по полю needs   @claude
+blocked T-15 Доступ к GPU-серверу | Ждём: оплату от бухгалтерии
+todo    T-17 Очистка ПДн перед моделью | 0/3  kai
+todo    T-19 Сквозной прогон make e2e | 0/2
+next    T-17
+
+<span class="a">$</span> tk take T-17
+ok T-17 todo > doing  @claude до 20:40  kaiten: В работе ok
+
+<span class="a">$</span> tk check T-17 1
+ok T-17 1/3
+
+<span class="a">$</span> tk note T-17 "маска телефона словами готова"
+ok T-17 note
+
+<span class="a">$</span> tk set T-17 summary="Телефон словами готов. Дальше ФИО в двух порядках."
+ok T-17 summary
+
+<span class="a">$</span> tk new "Замер Natasha на длинных звонках" --to idea
+ok T-23 idea
+
+<span class="a">$</span> tk done T-12 -m "все 5 отчётов проходят схему"
+<span class="w">err</span> T-12: отмечено 1/3 критериев; отметь: tk check T-12 2 3
+
+<span class="d"># ответ - одна строка; JSON только по флагу --json; хеш коммита по флагу -v</span>`;
+const FILE=`<span class="d">~/tasks/T-12 otchet-po-tekstu-zvonka.md   (так же его видит Obsidian)</span>
+
+---
+id: T-12
+title: Отчёт по тексту звонка
+project: ST-project
+status: doing
+rank: 1
+created: 2026-10-18T09:40:00
+updated: 2026-10-20T10:12:00
+external: kaiten:71768617
+external_state: doing        <span class="d"># что знает Kaiten; расходится с status - ждёт отправки</span>
+waiting:
+claim: agent:claude до 2026-10-20T18:00
+due: 2026-10-25
+tags: [calls]
+---
+## Абстракт
+Руководитель видит итог звонка без прослушивания. Делаем отчёт
+по тексту расшифровки: итог, потребности, возражения.
+
+## Сводка
+Жду ответ по полю needs.
+Готово 1 из 3: отчёты по 5 звонкам.
+
+## Подробно
+- [x] отчёт по 5 звонкам
+- [ ] все отчёты проходят схему
+- [ ] сравнение с эталоном
+Спека: ~/Dev/ST-project/docs/plans/report.md
+
+## Комментарии
+&lt;!-- c: 2026-10-19T14:03 | agent:claude --&gt;
+Сделано: отчёт по 5 звонкам. Решено: нет. Ждём: ответ по needs.
+
+<span class="d"># история шагов (взял, перенёс, "сделал разбор полей") живёт в git log:</span>
+<span class="d"># a91f3c2 T-12: note "сделал разбор полей отчёта" (agent:claude)</span>`;
+const SYNC=`<span class="a">как вы двигаете связанную карточку</span>
+
+  m на T-12 в TUI
+  1. ядро: status = doing, коммит                      <span class="d">сразу</span>
+  2. status != external_state, карточка ждёт отправки  <span class="d">kai:..</span>
+  3. адаптер в фоне: kaiten card move 71768617 --column "В работе"
+  4. ответ ok: external_state = doing                  <span class="d">kai:ok</span>
+     нет сети или 5xx: локально остаётся doing         <span class="w">kai:!</span>  <span class="d">повтор по s и при следующем запуске</span>
+
+<span class="a">как приходят изменения снаружи</span>  <span class="d">(s в TUI, tracker sync, старт TUI)</span>
+
+  коллега перенёс карточку в Kaiten в "Готово"
+  - у нас задача не менялась: переносим в done, в историю "kaiten: перенесено в Готово"
+  - у нас тоже перенесли: конфликт, карточка помечена !, решает правило из конфига
+  - карточка удалена в Kaiten (404): пометка, задачу не трогаем
+
+<span class="a">~/tasks/.tracker/config.toml</span>
+
+[adapters.kaiten]
+cmd = "tracker-ext-kaiten"              <span class="d"># скрипт поверх kaiten CLI, JSON в stdin и stdout</span>
+[adapters.kaiten.columns]               <span class="d"># наша колонка = колонка Kaiten</span>
+todo = "Очередь"
+doing = "В работе"
+blocked = "В работе"                    <span class="d"># в Kaiten ожидание - строка "Ждём" в карточке</span>
+done = "Готово"
+
+[adapters.gh]
+cmd = "tracker-ext-gh"                  <span class="d"># скрипт поверх gh</span>
+done = "close"                          <span class="d"># done закрывает issue, выход из done открывает</span>
+project = "galera/3"                    <span class="d"># если есть Projects v2: поле Status</span>
+[adapters.gh.status]
+todo = "Todo"
+doing = "In Progress"
+done = "Done"
+
+<span class="a">что отправляем наружу</span>
+  статус   да, всегда
+  заметки  нет по умолчанию: в рабочем трекере читают коллеги
+  итог     комментарием при done, если включено`;
+function render(){
+  const s=document.getElementById("scr");
+  if(view==="board")s.innerHTML=board();
+  else if(view==="card")s.innerHTML=card(cur||T.find(x=>x.id==="T-12"));
+  else if(view==="agent")s.innerHTML=AGENT;
+  else if(view==="file")s.innerHTML=FILE;
+  else s.innerHTML=SYNC;
+  document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===view));
+}
+function sel(){return vis(COLS[ci])[ri]}
+function moveCard(x,dir,who){
+  const from=COLS.indexOf(x.st),to=from+dir;if(to<0||to>=COLS.length)return;
+  x.st=COLS[to];
+  const h=hash();
+  let msg=sp("d",h)+`  ${x.id}: ${COLS[from]} > ${x.st}  `+sp("d","("+who+")");
+  if(x.x&&KAI[x.st]!==undefined){
+    x.xs="..";const name=x.x==="kai"?"kaiten: "+KAI[x.st]:"github: "+(x.st==="done"?"close":"Status "+x.st);
+    status=msg+"   "+sp("d",name+" ...");render();
+    setTimeout(()=>{x.xs=x.id==="T-18"?"!":"ok";status=msg+"   "+(x.xs==="ok"?sp("d",name+" ok"):sp("w",name+" нет сети, повтор по s"));render()},900);
+  }else{status=msg}
+  if(view==="board"){ci=to;ri=vis(x.st).indexOf(x)}
+  render();
+}
+document.addEventListener("keydown",e=>{
+  if(document.activeElement!==document.getElementById("term"))return;
+  const k=e.key;let used=true;
+  if(view==="board"){
+    if(k==="l"||k==="ArrowRight"){ci=Math.min(4,ci+1);ri=0}
+    else if(k==="h"||k==="ArrowLeft"){ci=Math.max(0,ci-1);ri=0}
+    else if(k==="j"||k==="ArrowDown"){ri=Math.min(vis(COLS[ci]).length-1,ri+1)}
+    else if(k==="k"||k==="ArrowUp"){ri=Math.max(0,ri-1)}
+    else if(k==="Enter"){const x=sel();if(x){cur=x;status="";view="card"}}
+    else if(k==="m"){const x=sel();if(x)return e.preventDefault(),moveCard(x,1,"daniil")}
+    else if(k==="M"){const x=sel();if(x)return e.preventDefault(),moveCard(x,-1,"daniil")}
+    else if(k==="p"){pi=(pi+1)%PROJ.length;ri=0}
+    else if(k==="s"){T.forEach(x=>{if(x.xs==="!")x.xs="ok"});status=sp("d","sync: отправлено 1, получено 0, конфликтов 0")}
+    else used=false;
+  }else if(view==="card"){
+    if(k==="Escape"||k==="q"){view="board";status=""}
+    else if(k==="m"||k==="M"){const x=cur;if(x){x.hist=(x.hist||HIST.slice());const from=x.st;moveCard(x,k==="m"?1:-1,"daniil");if(x.st!==from)x.hist.push(["20.10 12:40","daniil",`${from} > ${x.st}`,x.x?(x.x==="kai"?"kaiten: "+(KAI[x.st]||"-"):"github: "+x.st)+"  ok":""]);render()}}
+    else used=false;
+  }else used=false;
+  if(used){e.preventDefault();render()}
+});
+document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.addEventListener("click",()=>{view=b.dataset.tab;status="";render();document.getElementById("term").focus()}));
+document.getElementById("sim").addEventListener("click",()=>{
+  const steps=[
+    ()=>{const x=T.find(x=>x.id==="T-17");x.cl="@claude";x.s="Телефон словами в работе";moveCard(x,1,"agent:claude")},
+    ()=>{const x=T.find(x=>x.id==="T-17");x.ck="1/3";x.s="Телефон словами готов, дальше ФИО";status=sp("d",hash())+"  T-17: note \"маска телефона словами готова\"  "+sp("d","(agent:claude)")},
+    ()=>{const x=T.find(x=>x.id==="T-18");x.ck="3/3";x.cl="";x.s="Все отметки внесены";moveCard(x,2,"agent:codex")},
+    ()=>{T.push({id:"T-24",p:"Galera",t:"Баннер встречи 11-002",s:"Нужно фото спикера",st:"idea",nw:1,ask:"пришлите фото спикера"});status=sp("d",hash())+"  T-24: new idea  "+sp("d","(agent:opencode)")}
+  ];
+  view="board";if(simStep<steps.length)steps[simStep++]();render();document.getElementById("term").focus();
+});
+if(location.hash){const v=location.hash.slice(1);if(["card","agent","file","sync"].includes(v))view=v}
+render();
+</script>
+</body>
+</html>
