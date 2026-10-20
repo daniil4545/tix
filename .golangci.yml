@@ -1,0 +1,42 @@
+version: "2"
+
+# Шаблон для нового Go-проекта: числовые лимиты из ~/.claude/rules/go.md
+# держит линтер, а не память агента. В существующий проект вносится отдельной задачей.
+linters:
+  enable:
+    - funlen # функция длиннее 100 строк
+    - nestif # глубокая вложенность if
+    - gocognit # когнитивная сложность функции
+    - errorlint # сравнение и приведение ошибок без errors.Is/As
+    - noctx # HTTP и SQL без context: вызов нельзя отменить по таймауту
+    - bodyclose # незакрытое тело HTTP-ответа
+    - sqlclosecheck
+    - rowserrcheck
+    - gosec # опасные паттерны: SQL из строк, слабая крипта, права файлов, exec
+  settings:
+    funlen:
+      lines: 100
+      statements: -1
+    nestif:
+      min-complexity: 4
+    gocognit:
+      min-complexity: 20
+    staticcheck:
+      checks:
+        - all
+        # ST - оформление комментариев и имён, спорит с русскими комментариями
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -ST1023
+  exclusions:
+    rules:
+      # таблица сценариев делает тестовую функцию длинной, это не сложность
+      - path: _test\.go
+        linters:
+          - funlen
+          - errcheck
+          - gosec

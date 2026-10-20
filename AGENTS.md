@@ -17,11 +17,30 @@ Go, Bubble Tea, один бинарь `tk`. Версии - в `go.mod`.
 
 ## Структура
 
-Заполняет задача З1.
+Зависимости: `cli` - `core`, `project`; `core` - `task`, `gitx`, `config`.
+
+| Путь | Роль |
+|---|---|
+| `cmd/tk` | точка входа CLI |
+| `cmd/tkbench` | замер скорости `tk` для `make bench` |
+| `internal/cli` | разбор команд и печать ответа |
+| `internal/core` | единственный путь записи в `~/tasks`: лок, rename, коммит |
+| `internal/task` | разбор и печать файла задачи, без IO |
+| `internal/config` | `.tracker/config.toml` |
+| `internal/gitx` | все вызовы git, единственный `os/exec` |
+| `internal/project` | проект по рабочей папке, без git |
+| `e2e/` | сквозные тесты чёрного ящика |
 
 ## Команды
 
-Заполняет задача З1.
+| Команда | Что делает |
+|---|---|
+| `make check` | формат, vet, линтер, тесты, сборка; приёмка |
+| `make test-fast` | быстрый ярус (`-short`); `RUN=Имя` - один тест |
+| `make bench` | собирает `bin/tk`, замер скорости на 1000 задач |
+| `make build` | `go build ./...` и `bin/tk` |
+| `make fmt` | `gofmt -l -w .` |
+| `make e2e-agents` | заглушка до З3 |
 
 ## Workflow
 
