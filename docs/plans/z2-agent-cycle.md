@@ -8,7 +8,7 @@
 - Цель: агент проходит happy path раздела 3 командами `tk`.
 - Результат: работают `ctx`, `take`, `move`, `set`, `check`, `done`, `backup`, личность, `claim`, проверки 2.5, коды выхода; созданы `RULES.md` с шаблоном тикета, `docs/architecture.md`.
 - Не делаем: TUI, скилл и хуки, фоновый бэкап, снятие отметки.
-- Зависимость: З1 в `main` и переведена на английский (Р46, отдельный worker).
+- Зависимость: З1 в `main` (код З1 уже на английском, Р46).
 
 ## 2. Архитектура
 
@@ -113,7 +113,7 @@ func (s *Store) Backup(ctx context.Context) (Result, error)
 
 | Зона | Файлы | Зависит от | Проверка |
 |---|---|---|---|
-| 0 Каркас | заглушки, `internal/assets/`, `core/tx.go` | З1 по-английски | `go build ./...` |
+| 0 Каркас | заглушки, `internal/assets/`, `core/tx.go` | З1 в `main` | `go build ./...` |
 | A данные | `internal/{task,config,actor,brief}` | 0 | `go build`, тесты T |
 | B git, замер, текст | `internal/gitx`, `cmd/tkbench`, `assets/RULES.md` | 0 | то же |
 | C ядро | `internal/core` | 0 (A, B) | `go build`, тесты T |
