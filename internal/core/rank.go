@@ -52,7 +52,7 @@ func (s *Store) place(t *task.Task, column string, p Place) (placement, error) {
 		}
 		return placement{rank: col[0].Rank - 1}, nil
 	case p.After != "":
-		return s.placeAfter(t, col, same, p.After)
+		return s.placeAfter(t, col, column, same, p.After)
 	}
 	if same {
 		return placement{keep: true}, nil
@@ -63,7 +63,7 @@ func (s *Store) place(t *task.Task, column string, p Place) (placement, error) {
 	return placement{rank: col[len(col)-1].Rank + 1}, nil
 }
 
-func (s *Store) placeAfter(t *task.Task, col []*task.Task, same bool, after string) (placement, error) {
+func (s *Store) placeAfter(t *task.Task, col []*task.Task, column string, same bool, after string) (placement, error) {
 	i := -1
 	for k, c := range col {
 		if c.ID == after {
@@ -72,7 +72,7 @@ func (s *Store) placeAfter(t *task.Task, col []*task.Task, same bool, after stri
 		}
 	}
 	if i < 0 {
-		return placement{}, rule("%s is not in column %s", after, t.Status)
+		return placement{}, rule("%s is not in column %s", after, column)
 	}
 	lo := col[i].Rank
 	if i+1 == len(col) {

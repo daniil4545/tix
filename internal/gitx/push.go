@@ -17,7 +17,7 @@ import (
 const pushTimeout = 30 * time.Second
 
 // userinfoRe - "user:pass@" и "token@" в URL: в сообщения и лог не попадают.
-var userinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://)[^\s/@]+@`)
+var userinfoRe = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://)[^\s/]+@`)
 
 func scrub(s string) string { return userinfoRe.ReplaceAllString(s, "${1}") }
 
