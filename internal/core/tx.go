@@ -244,6 +244,10 @@ func (s *Store) modifyOnce(tx *txEnv, id, actor, op string, attempt int,
 	if bytes.Equal(out, data) {
 		return Result{ID: id, Rev: rev}, true, nil
 	}
+	// Продление claim (план З2, раздел 2): mutate изменил файл, ставим now+3 ч в том же коммите.
+	if s.extendClaim(t, actor, op) {
+		out = t.Render()
+	}
 	if s.afterRead != nil {
 		s.afterRead(path, attempt)
 	}
@@ -307,4 +311,10 @@ func nl(s string) string {
 		return ""
 	}
 	return s + "\n"
+}
+
+// extendClaim продлевает claim владельца: актор совпал, срок не важен; op "note" не продлевает.
+// true: задача изменена, нужен новый Render. Заглушка: логику пишет зона C.
+func (s *Store) extendClaim(t *task.Task, actor, op string) bool {
+	return false
 }

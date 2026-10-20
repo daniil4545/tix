@@ -61,10 +61,12 @@ type Options struct {
 	LockTimeout time.Duration
 	GitBin      string
 	Log         *slog.Logger
+	Now         func() time.Time // часы; nil - time.Now
 }
 
 // Result - ответ операции записи. Warning: коммит упал, правка в файле.
-type Result struct{ ID, Rev, Commit, Warning string }
+// Info - хвост строки ok ("todo > doing  @claude until 20:40").
+type Result struct{ ID, Rev, Commit, Warning, Info string }
 
 // Store - открытая база задач.
 type Store struct {
@@ -73,6 +75,7 @@ type Store struct {
 	wait time.Duration
 	bin  string
 	log  *slog.Logger
+	now  func() time.Time
 
 	// afterRead - шов для тестов: вызывается между чтением файла и сверкой перед rename
 	// (шаг 4 из 2.1). В работе nil.
@@ -94,7 +97,10 @@ func Open(root string, o Options) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{cfg: cfg, root: abs, wait: o.LockTimeout, bin: o.GitBin, log: o.Log}
+	s := &Store{cfg: cfg, root: abs, wait: o.LockTimeout, bin: o.GitBin, log: o.Log, now: o.Now}
+	if s.now == nil {
+		s.now = time.Now
+	}
 	if s.wait <= 0 {
 		s.wait = defaultLockTimeout
 	}

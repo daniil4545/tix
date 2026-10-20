@@ -129,3 +129,13 @@ func (c *Config) Render() []byte {
 	}
 	return b.Bytes()
 }
+
+// ByRole возвращает первую колонку с ролью role.
+func (c *Config) ByRole(role string) (Column, bool) {
+	return Column{}, false
+}
+
+// RoleOf возвращает роль колонки. Пусто: колонки нет или у неё нет роли.
+func (c *Config) RoleOf(column string) string {
+	return ""
+}
