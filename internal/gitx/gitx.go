@@ -333,6 +333,56 @@ func (r Repo) Commit(paths []string, subject, actor string) (string, error) {
 	return r.head()
 }
 
+// File - путь операции и байты, которые записало ядро. Data nil - путь удалён.
+type File struct {
+	Path string
+	Data []byte
+}
+
+// zeroID - id для строки удаления в update-index --index-info: важен только формат.
+const zeroID = "0000000000000000000000000000000000000000"
+
+// CommitFiles коммитит ровно байты ядра: hash-object -w на файл, update-index
+// --index-info, commit индекса. Файл из дерева в коммит не идёт: чужая запись после
+// rename остаётся правкой дерева и уходит следующим коммитом external edit.
+// Пустой список - пустой коммит, как Commit(nil, ...).
+func (r Repo) CommitFiles(files []File, subject, actor string) (string, error) {
+	if len(files) == 0 {
+		return r.Commit(nil, subject, actor)
+	}
+	var info bytes.Buffer
+	for _, f := range files {
+		if f.Data == nil {
+			fmt.Fprintf(&info, "0 %s\t%s\x00", zeroID, f.Path)
+			continue
+		}
+		id, err := r.HashObject(f.Data)
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&info, "%s %s\t%s\x00", r.fileMode(f.Path), id, f.Path)
+	}
+	if _, err := r.must(info.Bytes(), false, "update-index", "-z", "--index-info"); err != nil {
+		return "", err
+	}
+	args := []string{"commit", "-q", "-m", subject}
+	if actor != "" {
+		args = append(args, "-m", "Actor: "+actor)
+	}
+	if _, err := r.must(nil, false, args...); err != nil {
+		return "", err
+	}
+	return r.head()
+}
+
+// fileMode - режим записи индекса по биту исполнения файла в дереве.
+func (r Repo) fileMode(path string) string {
+	if fi, err := os.Lstat(filepath.Join(r.Dir, filepath.FromSlash(path))); err == nil && fi.Mode()&0o111 != 0 {
+		return "100755"
+	}
+	return "100644"
+}
+
 // head читает хеш HEAD из файлов refs (loose ref); иначе rev-parse.
 func (r Repo) head() (string, error) {
 	if id := r.looseHead(); id != "" {

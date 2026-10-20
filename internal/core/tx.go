@@ -18,7 +18,7 @@ import (
 // txEnv - состояние операции под локом.
 type txEnv struct {
 	repo  gitx.Repo
-	extra []string        // файлы, созданные подготовкой базы: идут в коммит операции
+	extra []gitx.File     // файлы, созданные подготовкой базы: идут в коммит операции
 	skip  map[string]bool // они же: не external edit
 }
 
@@ -122,7 +122,7 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 		if err := s.writeNew(path, f.data); err != nil {
 			return nil, err
 		}
-		tx.extra = append(tx.extra, f.rel)
+		tx.extra = append(tx.extra, gitx.File{Path: f.rel, Data: f.data})
 		tx.skip[f.rel] = true
 	}
 	return tx, nil
@@ -189,9 +189,10 @@ func sortedIDs(ids map[string]bool) []string {
 	return out
 }
 
-// commit коммитит пути операции. Отказ git - Warning в ответе, правка уже в файле.
-func (s *Store) commit(repo gitx.Repo, res *Result, paths []string, subject, actor string) {
-	h, err := repo.Commit(paths, subject, actor)
+// commit коммитит байты операции, а не файлы дерева: чужая запись после rename не уходит
+// под actor. Отказ git - Warning в ответе, правка уже в файле.
+func (s *Store) commit(repo gitx.Repo, res *Result, files []gitx.File, subject, actor string) {
+	h, err := repo.CommitFiles(files, subject, actor)
 	if err != nil {
 		s.log.Warn("commit not recorded", "op", "commit", "id", res.ID, "err", gitx.Detail(err))
 		res.Warning = warnCommit
@@ -251,8 +252,8 @@ func (s *Store) modifyOnce(tx *txEnv, id, actor, op string, attempt int,
 		return Result{}, false, err
 	}
 	res := Result{ID: id, Rev: blobID(out)}
-	paths := append([]string{filepath.Base(path)}, tx.extra...)
-	s.commit(tx.repo, &res, paths, id+": "+op, actor)
+	files := append([]gitx.File{{Path: filepath.Base(path), Data: out}}, tx.extra...)
+	s.commit(tx.repo, &res, files, id+": "+op, actor)
 	return res, true, nil
 }
 

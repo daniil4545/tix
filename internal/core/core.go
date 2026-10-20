@@ -182,15 +182,19 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	}
 	data := t.Render()
 	idPath := filepath.Join(s.root, trackerDir, nextIDFile)
-	if err := s.writeNew(idPath, []byte(fmt.Sprintf("%d\n", num+1))); err != nil {
+	nextID := []byte(fmt.Sprintf("%d\n", num+1))
+	if err := s.writeNew(idPath, nextID); err != nil {
 		return Result{}, err
 	}
 	if err := s.writeNew(path, data); err != nil {
 		return Result{}, err
 	}
 	res := Result{ID: id, Rev: blobID(data)}
-	paths := append([]string{name, filepath.ToSlash(filepath.Join(trackerDir, nextIDFile))}, tx.extra...)
-	s.commit(tx.repo, &res, paths, id+": new", actor)
+	written := append([]gitx.File{
+		{Path: name, Data: data},
+		{Path: filepath.ToSlash(filepath.Join(trackerDir, nextIDFile)), Data: nextID},
+	}, tx.extra...)
+	s.commit(tx.repo, &res, written, id+": new", actor)
 	return res, nil
 }
 
@@ -274,14 +278,13 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 		if err != nil {
 			return err
 		}
-		// os.Remove, а не gitx.Remove: после git rm путь нет ни в дереве, ни в индексе,
-		// и `add -A -- путь` в gitx.Commit падает (pathspec did not match).
+		// os.Remove, а не gitx.Remove: удаление из индекса пишет коммит операции.
 		if err := os.Remove(path); err != nil {
 			return fmt.Errorf("remove %s: %w", path, err)
 		}
 		res = Result{ID: id}
-		paths := append([]string{filepath.Base(path)}, tx.extra...)
-		s.commit(tx.repo, &res, paths, id+": rm", actor)
+		files := append([]gitx.File{{Path: filepath.Base(path)}}, tx.extra...)
+		s.commit(tx.repo, &res, files, id+": rm", actor)
 		return nil
 	})
 	return res, err

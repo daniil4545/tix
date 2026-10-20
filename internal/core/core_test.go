@@ -22,6 +22,9 @@ const commentsHeading = "## Comments"
 
 var gitBin string
 
+// injected - строка, которую обёртка git пишет в файл мимо ядра перед commit.
+const injected = "OUTSIDE-LINE"
+
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "tk-core-")
 	if err != nil {
@@ -61,6 +64,9 @@ func newEnv(t *testing.T) *env {
 	e := &env{t: t, root: filepath.Join(t.TempDir(), "tasks"), fake: t.TempDir(), log: &bytes.Buffer{}}
 	script := "#!/bin/sh\nD=" + e.fake + "\necho \"$*\" >> \"$D/calls.log\"\n" +
 		"if [ -f \"$D/failcommit\" ]; then for a in \"$@\"; do [ \"$a\" = commit ] && { echo 'fatal: boom' >&2; exit 128; }; done; fi\n" +
+		// inject: перед commit чужой процесс пишет файл через temp и rename (окно rename-commit).
+		"if [ -f \"$D/inject\" ]; then for a in \"$@\"; do if [ \"$a\" = commit ]; then f=$(cat \"$D/inject\"); rm \"$D/inject\"; " +
+		"{ echo " + injected + "; cat \"$f\" 2>/dev/null; } > \"$f.x\"; mv \"$f.x\" \"$f\"; break; fi; done; fi\n" +
 		"exec " + gitBin + " \"$@\"\n"
 	if err := os.WriteFile(filepath.Join(e.fake, "git"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -489,4 +495,121 @@ func TestStore_FileChangesEveryAttempt_ErrorAfterThree(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// Окно между rename ядра и git commit: чужой процесс пишет файл (temp и rename).
+// Коммит операции несёт ровно содержимое ядра под Actor операции; чужая правка
+// уходит следующей операцией с Actor: external. Краснеет, если коммит берёт файл из дерева.
+func TestStore_ExternalWriteBetweenRenameAndCommit_KeepsAuthor(t *testing.T) {
+	cases := []struct {
+		name, subject, file, want string // file пишет обёртка; want - правка операции в коммите
+		op                        func(s *core.Store) (core.Result, error)
+	}{
+		{"comment", "T-1: comment", "T-1 alpha.md", "наш комментарий", func(s *core.Store) (core.Result, error) {
+			return s.Comment("T-1", "наш комментарий", "agent-x")
+		}},
+		{"rm", "T-1: rm", "T-1 alpha.md", "", func(s *core.Store) (core.Result, error) {
+			return s.Remove("T-1", "agent-x")
+		}},
+		{"new", "T-2: new", "T-2 beta.md", "title: Beta", func(s *core.Store) (core.Result, error) {
+			return s.Create("Beta", "proj", "todo", "agent-x")
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer guard(t)
+			e := newEnv(t)
+			s := e.open(2 * time.Second)
+			mustCreate(t, s, "Alpha")
+			inject := filepath.Join(e.fake, "inject")
+			if err := os.WriteFile(inject, []byte(filepath.Join(e.root, tc.file)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			r, err := tc.op(s)
+			if err != nil || r.Warning != "" || r.Commit == "" {
+				t.Fatalf("операция: err=%v warning=%q commit=%q", err, r.Warning, r.Commit)
+			}
+			if _, err := os.Stat(inject); err == nil {
+				t.Fatal("обёртка не дошла до commit: окно не воспроизведено")
+			}
+			e.checkOwnCommit(r.Commit, tc.subject, tc.file, tc.want)
+			if _, err := s.Create("Gamma", "proj", "todo", "tester"); err != nil {
+				t.Fatal(err)
+			}
+			e.checkExternalCommitted()
+		})
+	}
+}
+
+// checkOwnCommit: коммит операции под Actor: agent-x несёт байты ядра, а не чужую правку.
+// want пусто - операция удаляет файл.
+func (e *env) checkOwnCommit(commit, subject, file, want string) {
+	e.t.Helper()
+	if msg := e.git("log", "-1", "--format=%s%n%b", commit); !strings.Contains(msg, subject) || !strings.Contains(msg, "Actor: agent-x") {
+		e.t.Fatalf("коммит операции %s:\n%s", commit, msg)
+	}
+	if want == "" {
+		if strings.Contains(e.git("ls-tree", "--name-only", commit), file) {
+			e.t.Errorf("коммит %q не удалил файл: в дереве чужая версия", subject)
+		}
+		return
+	}
+	blob := e.git("show", commit+":"+file)
+	if strings.Contains(blob, injected) || !strings.Contains(blob, want) {
+		e.t.Errorf("коммит %q под Actor: agent-x: ждали %q без чужой правки:\n%s", subject, want, blob)
+	}
+}
+
+// checkExternalCommitted: чужая правка ушла коммитом external edit, дерево чистое.
+func (e *env) checkExternalCommitted() {
+	e.t.Helper()
+	ext := strings.TrimSpace(e.git("log", "--format=%H", "--grep", "external edit", "-1"))
+	if ext == "" || !strings.Contains(e.git("show", ext), "+"+injected) ||
+		!strings.Contains(e.git("log", "-1", "--format=%b", ext), "Actor: external") {
+		e.t.Errorf("чужая правка не ушла коммитом external edit:\n%s", e.git("log", "--format=%h %s | %b"))
+	}
+	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
+		e.t.Errorf("дерево не чистое:\n%s", st)
+	}
+}
+
+// Спека 2.1 п.5 для rm и new: коммит упал - Warning, правка в дереве; следующая операция
+// коммитит её как external edit, дерево чистое. Краснеет, если индекс после отказа застрял.
+func TestStore_CommitFails_RemoveAndCreate_NextOpExternalEdit(t *testing.T) {
+	cases := []struct {
+		name string
+		op   func(s *core.Store) (core.Result, error)
+		want string // строка коммита external edit
+	}{
+		{"rm", func(s *core.Store) (core.Result, error) { return s.Remove("T-2", "a") }, "T-2: external edit"},
+		{"new", func(s *core.Store) (core.Result, error) { return s.Create("Gamma", "proj", "todo", "a") }, "T-3: external edit"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer guard(t)
+			e := newEnv(t)
+			s := e.open(2 * time.Second)
+			mustCreate(t, s, "Alpha")
+			mustCreate(t, s, "Beta")
+			fail := filepath.Join(e.fake, "failcommit")
+			if err := os.WriteFile(fail, nil, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if r, err := tc.op(s); err != nil || r.Warning == "" {
+				t.Fatalf("упавший коммит: err=%v warning=%q, ждали Warning без ошибки", err, r.Warning)
+			}
+			if err := os.Remove(fail); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.Note("T-1", "дальше", "a"); err != nil {
+				t.Fatal(err)
+			}
+			if log := e.git("log", "--format=%s"); !strings.Contains(log, tc.want) {
+				t.Errorf("нет коммита %q:\n%s", tc.want, log)
+			}
+			if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
+				t.Errorf("дерево не чистое:\n%s", st)
+			}
+		})
+	}
 }
