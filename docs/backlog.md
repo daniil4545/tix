@@ -32,7 +32,7 @@ flowchart LR
 ## З2. Рабочий цикл агента
 
 - Спека: 2.2 (`ctx`, `take`, `move`, `set`, `check`, `done`, `backup`), 2.4 (личность), 2.5
-  (проверки переноса), 5 (`claim`), 11; Р36-Р41, Р48 (короткий id), Р51, Р52.
+  (проверки переноса), 5 (`claim`), 11; Р36-Р41, Р48 (короткий id), Р51, Р52, Р54 (коды выхода), Р55.
 - Результат: агент проходит happy path раздела 3 одними командами `tk`. Захват, перехват, порядок
   в колонке, проверки `waiting` и закрытия работают. `backup` пушит в remote. Созданы `RULES.md`,
   шаблон тикета, `docs/architecture.md`.
@@ -43,7 +43,7 @@ flowchart LR
 
 ## З3. Коннекторы агентов
 
-- Спека: 2.4, 7 (`make e2e-agents`), Р7, Р8, Р17, Р49 (плагин Claude Code).
+- Спека: 2.4, 7 (`make e2e-agents`), Р7, Р8, Р17, Р49 (плагин Claude Code), Р54 (хук PreCompact).
 - Результат: скилл `tk`, хук старта `tk ctx` и разрешение `tk` стоят в Claude Code, Codex и
   OpenCode. Домашняя сессия в `~/tasks` записывает идею в `inbox`.
 - Не входит: команда `setup`, ассистент по расписанию.
@@ -66,10 +66,10 @@ flowchart LR
 
 ## З5. Публичный репозиторий
 
-- Спека: Р46, Р47, Р50 (установка, completions); порядок и состав - `~/.claude/templates/github/design.md`.
+- Спека: Р46, Р47, Р50 (установка, completions), Р53 (macOS и Linux), Р54 (примеры в README); порядок и состав - `~/.claude/templates/github/design.md`.
 - Результат: публичный репозиторий снимком рабочего. README на английском с демо VHS, сравнение
-  с аналогами из `docs/research/landscape.md`, LICENSE MIT, CHANGELOG, CI, релиз `v0.1.0` с
-  бинарями и SHA256SUMS, описание и topics.
+  с аналогами из `docs/research/landscape.md`, LICENSE MIT, CHANGELOG, CI на macOS и Linux, релиз `v0.1.0`
+  с бинарями darwin и linux (amd64, arm64) и SHA256SUMS, описание и topics.
 - Не входит: сайт, логотип, перевод README.
 - Проверка: чек-лист раздела 9 дизайн-документа, итог в отчёте.
 - Нужно от пользователя: имя репозитория, вход `gh auth login`.
