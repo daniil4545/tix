@@ -1,6 +1,6 @@
 # git: факты для хранилища `tk`
 
-Дата: 20.10.2026. Git 2.54.0 (Apple Git-157), macOS, M4, APFS. Замеры: 1000 файлов по 5 КБ, 3000 коммитов, прямой путь `xcrun --find git`, n=25-30, медиана. Подробности и команды: scratchpad/git-recon.md. Источники: git-scm.com/docs, Documentation/ в github.com/git/git (master), go-git COMPATIBILITY.md.
+Дата: 20.10.2026. Git 2.54.0 (Apple Git-157), macOS, M4, APFS. Замеры: 1000 файлов по 5 КБ, 3000 коммитов, прямой путь `xcrun --find git`, n=25-30, медиана. Скрипты замеров не сохранены (scratchpad сессии), факты - в этом файле. Источники: git-scm.com/docs, Documentation/ в github.com/git/git (master), go-git COMPATIBILITY.md.
 
 ## 1. Устройство
 
@@ -74,8 +74,46 @@
 
 Плагин зовёт системный git через simple-git: `status`, `add -A`, `commit` без `--no-optional-locks`, берёт index.lock (src/gitManager/simpleGit.ts, 20.10.2026).
 
+## 9. Готовые возможности git (вторая разведка)
+
+Дата: 20.10.2026, git 2.54.0. Проверка запуском во временных репозиториях, без замеров скорости.
+Версии введения - по документации git-scm.com по памяти, со страницей не сверены (кроме 2.54).
+
+| Возможность | Что даёт tk | Git | Проверено |
+|---|---|---|---|
+| `git commit --trailer "Actor: x"` | трейлеры без ручной склейки сообщения (Р56, Р58) | 2.32 | да |
+| `%(trailers:key=Actor,valueonly)` в `log --format` | `Actor:` и `Code:` читаются без разбора текста | 2.22 | да |
+| `shortlog -s --group=trailer:Actor` | число правок сессии | 2.29 | да |
+| `log --grep A --grep B` (ИЛИ), `--all-match` (И) | история нескольких id, фильтр id и `Actor` | давно | да |
+| `log -L ':## Comments:T-1.md'` + `diff.tk.xfuncname '^(## .*)$'` | история одного раздела карточки; атрибуты в `.git/info/attributes` и `.git/config`, не в дереве. Форма `/re/,$` не работает, нужен `:funcname:`; вывод - patch, не список коммитов | 1.8.4 | да |
+| `git last-modified` | дата изменения всех файлов одним вызовом вместо `log -1` на файл; нужен запасной путь (mtime) для старого git | 2.52 | да |
+| `cat-file --batch` / `--batch-command` | один процесс на много чтений blob; нет объекта - строка `missing` | 2.36 | да |
+| `merge-tree --write-tree` | слияние двух коммитов без рабочего дерева (`tk sync`, Р57); конфликт - код 1 и список | 2.38 | да |
+| `.gitattributes *.md merge=union`, `merge-file --union` | дописываемые комментарии сливаются без конфликта; union склеивает и тело, порядок строк не гарантирован, при повторе дубли | давно | да |
+| `git bundle create/verify` | офлайн-копия и перенос на вторую машину без remote | 1.5.1 | да |
+| plumbing `mktree`, `commit-tree`, `update-ref --stdin` | коммит без `index.lock`. Ловушка: индекс устаревает, `status` показывает `D T-3.md` в staged; нужен `read-tree` или `update-index` | давно | да, ловушка найдена |
+
+Не брать: `rerere` (конфликты редки и разные); свой драйвер слияния (внешний бинарь ломает ручной
+git пользователя); `git notes` для `Code:` (трейлер проще, notes не едут при push без refspec);
+подпись коммитов SSH (одна машина, ключ на агента дорог); author и committer вместо `Actor:` (дубль).
+
+## 10. Атрибуция: окно между rename и commit
+
+- Риск (проверка рисков З1, 20.10.2026): `commit --only -- <файл>` берёт файл из рабочего дерева.
+  Запись мимо ядра после rename и до commit уходит в коммит под `Actor:` агента, а не как
+  external edit. Данные целы, автор подменён (нарушает Р56).
+- Способ починки (З1, `f9e88de`): коммитить ровно байты ядра. `hash-object -w` на файл,
+  `update-index -z --index-info` (режим 0 - удаление пути), коммит индекса. Ловушку plumbing из
+  раздела 9 обходит: индекс обновлён, `git status` чист. Код - `gitx.CommitFiles`
+  (`internal/gitx/gitx.go`), тест `TestStore_ExternalWriteBetweenRenameAndCommit_KeepsAuthor`,
+  проверено тестом и живым прогоном. Вариант `update-index --cacheinfo` не выбран.
+- Остаточный риск S1: чужой `git add` между `update-index` и `commit` уйдёт под `Actor:` агента.
+  Решение по S1 за пользователем.
+
 ## Что значит для tk
 
 - `commit --only` одним процессом лучший; plumbing не ускоряет.
 - `maintenance.auto=false` нужен ради скорости, но нужна своя сборка: gc и граф `--changed-paths`.
 - Авточистка lock-файлов и `tmp_obj` безопасна; fsync не включать; go-git не брать.
+- Трейлеры - `commit --trailer` и `%(trailers)` (З2). Даты - `last-modified`, история раздела -
+  `log -L` (З4). После MVP для `tk sync`: `merge-tree --write-tree`, `merge=union`, `bundle`.
