@@ -118,16 +118,8 @@ func TestLoad_ExternalEdits_OwnAuthor_SeveralIDsInOneCommit(t *testing.T) {
 		}
 	}
 	// Правка мимо ядра обоих файлов; следующая операция коммитит её как external edit.
-	for _, id := range []string{"T-1", "T-2"} {
-		matches, _ := filepath.Glob(filepath.Join(repo.Dir, id+" *.md"))
-		if len(matches) != 1 {
-			t.Fatalf("файл %s: %v", id, matches)
-		}
-		data, _ := os.ReadFile(matches[0])
-		if err := os.WriteFile(matches[0], []byte(strings.Replace(string(data), "tags: []", "tags: [x]", 1)+"\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
+	editOutside(t, repo.Dir, "T-1")
+	editOutside(t, repo.Dir, "T-2")
 	clock(t, at(9, 30))
 	if _, err := s.Note("T-1", "after", "claude:a"); err != nil {
 		t.Fatal(err)
@@ -141,16 +133,32 @@ func TestLoad_ExternalEdits_OwnAuthor_SeveralIDsInOneCommit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		found := false
-		for _, e := range es {
-			if e.Actor == "external" && e.Op == "external edit" {
-				found = true
-			}
-		}
-		if !found {
+		if !hasExternalEdit(es) {
 			t.Errorf("%s: нет строки external edit от автора external: %+v", id, es)
 		}
 	}
+}
+
+// editOutside правит файл задачи мимо ядра.
+func editOutside(t *testing.T, dir, id string) {
+	t.Helper()
+	matches, _ := filepath.Glob(filepath.Join(dir, id+" *.md"))
+	if len(matches) != 1 {
+		t.Fatalf("файл %s: %v", id, matches)
+	}
+	data, _ := os.ReadFile(matches[0])
+	if err := os.WriteFile(matches[0], []byte(strings.Replace(string(data), "tags: []", "tags: [x]", 1)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func hasExternalEdit(es []history.Entry) bool {
+	for _, e := range es {
+		if e.Actor == "external" && e.Op == "external edit" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestLoad_UnknownCommitType_ShownAsIs(t *testing.T) {
