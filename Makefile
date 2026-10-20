@@ -34,7 +34,7 @@ check: fmt-check vet lint test build
 bench: build
 	go run ./cmd/tkbench bin/tk
 
-# Живой прогон трёх агентов (Claude Code, Codex, OpenCode) тратит лимиты подписок: только с согласием.
+# Живой прогон двух агентов (Claude Code, Codex) тратит лимиты подписок: только с согласием.
 # Без E2E_ARGS=--yes скрипт печатает предупреждение и выходит с кодом 2. Подмножество: E2E_ARGS="--yes --agents claude".
 e2e-agents:
 	scripts/e2e-agents.sh $(E2E_ARGS)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Живая проверка коннекторов З3: Claude Code, Codex и OpenCode проходят цикл tk на настоящих CLI.
+# Живая проверка коннекторов З3: Claude Code и Codex проходят цикл tk на настоящих CLI.
 # План: docs/plans/z3-connectors.md, раздел 7. ТРАТИТ ЛИМИТЫ ПОДПИСОК: запуск только с --yes.
 #
 # Что делает для каждого агента:
@@ -8,12 +8,12 @@
 #   2. Прогон 1 (cwd проекта): агент берёт задачу. Pass: коммиты take, note, done с Actor: агента.
 #   3. Прогон 2 (cwd = TRACKER_HOME, «домашняя сессия»): «запиши идею». Pass: новая задача
 #      в idea, проект personal, коммит new с Actor: агента.
-# Настройки пользователя не пишутся: Claude получает --plugin-dir, Codex временный CODEX_HOME
-# (симлинк auth.json, tk.rules), OpenCode временный OPENCODE_CONFIG_DIR, скилл Codex и OpenCode
-# лежит в <фикстура>/.agents/skills. Каждый агент идёт через `env -u` с id запускающей сессии,
-# иначе чужой id попадёт в Actor:.
+# Настройки пользователя не пишутся. Claude: `--settings` на файл с хуком и разрешением из
+# connectors/claude/hooks.json, скилл в <фикстура>/.claude/skills. Codex: временный CODEX_HOME
+# (симлинк auth.json, tk.rules, hooks.json не ставится), скилл в <фикстура>/.agents/skills.
+# Каждый агент идёт через `env -u` с id запускающей сессии, иначе чужой id попадёт в Actor:.
 #
-# Использование: scripts/e2e-agents.sh --yes [--agents claude,codex,opencode]
+# Использование: scripts/e2e-agents.sh --yes [--agents claude,codex]
 # Окружение: E2E_TIMEOUT (с на один прогон, 600), E2E_CODEX_MODEL (по умолчанию gpt-6.1-sol).
 # Код выхода: 0 - pass у всех выбранных агентов; 1 - есть fail; 2 - неверный вызов, нет --yes.
 
@@ -28,7 +28,7 @@ PROMPT_IDEA='Write down an idea: add dark mode to the notes app.'
 SCRUB=(-u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u TRACKER_ACTOR)
 
 confirm=no
-agents=(claude codex opencode)
+agents=(claude codex)
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--yes) confirm=yes ;;
@@ -37,17 +37,17 @@ while [ $# -gt 0 ]; do
 		[ $# -gt 0 ] || { echo "e2e-agents: --agents needs a list" >&2; exit 2; }
 		IFS=, read -r -a agents <<<"$1"
 		;;
-	*) echo "usage: scripts/e2e-agents.sh --yes [--agents claude,codex,opencode]" >&2; exit 2 ;;
+	*) echo "usage: scripts/e2e-agents.sh --yes [--agents claude,codex]" >&2; exit 2 ;;
 	esac
 	shift
 done
 [ "$confirm" = yes ] || {
-	echo "e2e-agents: the run spends subscription limits (3 agents x 2 prompts, up to ${TIMEOUT}s each)." >&2
+	echo "e2e-agents: the run spends subscription limits (2 agents x 2 prompts, up to ${TIMEOUT}s each)." >&2
 	echo "Repeat with --yes (make e2e-agents E2E_ARGS=--yes) after the owner agrees." >&2
 	exit 2
 }
 for a in "${agents[@]}"; do
-	case "$a" in claude | codex | opencode) ;; *) echo "e2e-agents: unknown agent $a" >&2; exit 2 ;; esac
+	case "$a" in claude | codex) ;; *) echo "e2e-agents: unknown agent $a" >&2; exit 2 ;; esac
 done
 
 for tool in go git jq perl; do
@@ -60,11 +60,10 @@ echo "e2e-agents: fixtures and logs in $E2E"
 mkdir -p "$E2E/bin"
 go build -C "$ROOT" -o "$E2E/bin/tk" ./cmd/tk || { echo "e2e-agents: go build tk failed" >&2; exit 2; }
 
-# Файлы коннекторов (зона A): ищем по имени, чтобы скрипт не зависел от раскладки каталога.
-PLUGIN="$ROOT/connectors/claude/plugins/tk"
-SKILL_FILE=$(find "$PLUGIN/skills" -name SKILL.md 2>/dev/null | head -1)
-RULES_FILE=$(find "$ROOT/connectors/codex" -name tk.rules 2>/dev/null | head -1)
-OC_PLUGIN=$(find "$ROOT/connectors/opencode" -name tk.js 2>/dev/null | head -1)
+# Файлы коннекторов (зона A).
+SKILL_DIR="$ROOT/connectors/agents/skills/tk"
+RULES_FILE="$ROOT/connectors/codex/tk.rules"
+CLAUDE_HOOKS="$ROOT/connectors/claude/hooks.json"
 
 D="" WORK="" TASKS="" FAILS=0
 declare -a SUMMARY=()
@@ -104,15 +103,16 @@ setup_fixture() {
 		tk_in "$WORK" edit T-1 --base "$rev" --as e2e:setup >/dev/null || return 1
 	[ "$(tk_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj todo" ] || return 1
 	mkdir -p "$TASKS/.git/info"
-	printf '.agents/\n' >>"$TASKS/.git/info/exclude"
+	printf '.agents/\n.claude/\n' >>"$TASKS/.git/info/exclude"
 }
 
-# install_skill: скилл в <фикстура>/.agents/skills (Codex и OpenCode; Claude берёт его из плагина).
+# install_skill <каталог скиллов>: скилл в проект и в TRACKER_HOME фикстуры
+# (Claude: .claude/skills, Codex: .agents/skills).
 install_skill() {
 	local dir
 	for dir in "$WORK" "$TASKS"; do
-		mkdir -p "$dir/.agents/skills/tk"
-		cp -R "$(dirname "$SKILL_FILE")/." "$dir/.agents/skills/tk/" || return 1
+		mkdir -p "$dir/$1/tk"
+		cp -R "$SKILL_DIR/." "$dir/$1/tk/" || return 1
 	done
 }
 
@@ -127,7 +127,6 @@ session_id() {
 	case $1 in
 	claude) jq -r '[.. | objects | .session_id? // empty] | first // empty' "$2" 2>/dev/null ;;
 	codex) jq -rs '[.[] | select(.type == "thread.started") | .thread_id] | first // empty' "$2" 2>/dev/null ;;
-	opencode) jq -rs '[.[] | .. | objects | .sessionID? // empty] | first // empty' "$2" 2>/dev/null ;;
 	esac
 }
 
@@ -140,37 +139,31 @@ launch() {
 	case $agent in
 	claude)
 		agent_run "$cwd" "$out" "$err" -- \
-			claude -p --plugin-dir "$PLUGIN" --allowedTools 'Bash(tk *)' --output-format json
+			claude -p --settings "$D/claude-settings.json" --output-format json
 		;;
 	codex)
 		agent_run "$cwd" "$out" "$err" "CODEX_HOME=$D/codex-home" -- \
 			codex exec --json --skip-git-repo-check -C "$cwd" -m "$CODEX_MODEL"
 		;;
-	opencode)
-		agent_run "$cwd" "$out" "$err" "OPENCODE_CONFIG_DIR=$D/opencode-config" -- \
-			opencode run --format json "$3"
-		;;
 	esac
+}
+
+# prepare_claude: настройки на один прогон (--settings): хук и разрешение, как пишет connect.sh.
+prepare_claude() {
+	jq '. + {permissions: {allow: ["Bash(tk *)"]}}' "$CLAUDE_HOOKS" >"$D/claude-settings.json"
 }
 
 # prepare_codex: временный CODEX_HOME; Codex читает промпт из stdin, если аргумента нет.
 prepare_codex() {
 	[ -f "$HOME/.codex/auth.json" ] || { echo "no ~/.codex/auth.json (codex login first)"; return 1; }
-	[ -n "$RULES_FILE" ] || { echo "connectors/codex/**/tk.rules not found"; return 1; }
+	[ -f "$RULES_FILE" ] || { echo "$RULES_FILE not found"; return 1; }
 	mkdir -p "$D/codex-home/rules"
 	ln -s "$HOME/.codex/auth.json" "$D/codex-home/auth.json"
 	cp "$RULES_FILE" "$D/codex-home/rules/tk.rules"
 	printf 'sandbox_mode = "workspace-write"\napproval_policy = "never"\n' >"$D/codex-home/config.toml"
 }
 
-prepare_opencode() {
-	[ -n "$OC_PLUGIN" ] || { echo "connectors/opencode/**/tk.js not found"; return 1; }
-	mkdir -p "$D/opencode-config/plugins"
-	cp "$OC_PLUGIN" "$D/opencode-config/plugins/tk.js"
-	printf '{"permission":{"bash":{"tk *":"allow"}}}\n' >"$D/opencode-config/opencode.json"
-}
-
-# check_actor <метка> <ERE заголовка> <ожидаемый Actor или ERE при opencode без id> <режим eq|re>
+# check_actor <метка> <ERE заголовка> <ожидаемый Actor> <режим eq|re>
 check_actor() {
 	local label=$1 re=$2 want=$3 mode=$4 got
 	got=$(actor_of "$re")
@@ -186,13 +179,10 @@ check_actor() {
 	return 1
 }
 
-# expectation <agent> <sid>: ожидаемый Actor (eq) или шаблон (re), когда id неизвестен.
+# expectation <agent> <sid>: ожидаемый Actor (eq) или none, когда id не найден.
 expectation() {
-	local kind=$1 sid=$2
-	if [ -n "$sid" ]; then
-		echo "eq $kind:$sid"
-	elif [ "$kind" = opencode ]; then
-		echo "re ^opencode:.+"
+	if [ -n "$2" ]; then
+		echo "eq $1:$2"
 	else
 		echo "none -"
 	fi
@@ -204,13 +194,13 @@ run_agent() {
 	command -v "$agent" >/dev/null || { echo "    FAIL $agent not found in PATH"; return 1; }
 	setup_fixture "$agent" || { echo "    FAIL fixture setup (tk new/edit/list)"; return 1; }
 	case $agent in
+	claude)
+		prepare_claude || return 1
+		install_skill .claude/skills || return 1
+		;;
 	codex)
 		prepare_codex || return 1
-		install_skill || return 1
-		;;
-	opencode)
-		prepare_opencode || return 1
-		install_skill || return 1
+		install_skill .agents/skills || return 1
 		;;
 	esac
 

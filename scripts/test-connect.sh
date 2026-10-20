@@ -4,7 +4,7 @@
 # Каждый тест идёт на своём HOME из mktemp. Настоящий HOME не читается и не пишется:
 # перед запуском connect.sh тест проверяет подмену HOME, в конце сверяет отпечаток
 # (stat, без чтения содержимого) файлов настоящего HOME с отпечатком до прогона.
-# Агенты (codex, opencode) и модели не запускаются; claude - только `plugin ...`.
+# Агенты и модели не запускаются; claude в PATH тестов нет: скрипту он не нужен.
 #
 # Запуск: scripts/test-connect.sh [имя_теста ...]
 # Окружение: TK_BIN=<путь к настоящему tk> - прогнать хук и на нём (иначе заглушка);
@@ -15,8 +15,8 @@ SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$SELF_DIR/.." && pwd)
 CONNECT=$REPO/scripts/connect.sh
 FIX=$REPO/connectors/testdata
-MKT=$REPO/connectors/claude
-PLUGIN=$MKT/plugins/tk
+CONN=$REPO/connectors
+SKILL_SRC=$CONN/agents/skills/tk
 NOW1=2026-10-20T10:00:00Z
 NOW2=2026-10-20T11:00:00Z
 MATCHER_WORDS="startup resume clear compact"
@@ -46,9 +46,8 @@ mode() { "${STAT_MODE[@]}" "$1"; }
 sha() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 <"$1" | cut -d' ' -f1; else sha256sum <"$1" | cut -d' ' -f1; fi; }
 
 REAL_WATCH=(
-  .claude/settings.json .codex/hooks.json .codex/rules/tk.rules .codex/rules/default.rules
-  .codex/config.toml .agents/skills/tk .config/tk/connect-state.json
-  .config/opencode/opencode.json .config/opencode/plugins/tk.js
+  .claude/settings.json .claude/skills/tk .codex/hooks.json .codex/rules/tk.rules
+  .codex/rules/default.rules .codex/config.toml .agents/skills/tk tasks/.tracker/connect-state.json
 )
 
 real_fingerprint() {
@@ -61,7 +60,7 @@ real_fingerprint() {
       printf '%s absent\n' "$p"
     fi
   done
-  find "$REAL_HOME/.claude" "$REAL_HOME/.codex" "$REAL_HOME/.config/opencode" "$REAL_HOME/.config/tk" \
+  find "$REAL_HOME/.claude" "$REAL_HOME/.codex" \
     -maxdepth 2 -name '*.tk-bak-*' 2>/dev/null | LC_ALL=C sort
 }
 
@@ -69,7 +68,7 @@ REAL_BEFORE=$(real_fingerprint)
 
 # ---------- окружение: каталог утилит и заглушка tk ----------
 
-# PATH тестов - только этот каталог: так видно, что скрипт требует jq, claude и tk,
+# PATH тестов - только этот каталог: так видно, что скрипт требует jq и tk,
 # и можно убрать любую из утилит.
 BASE_TOOLS=(bash env sh cat mv cp rm mkdir date dirname basename realpath stat chmod ln mktemp sed awk
   grep sort cut tr head tail readlink cmp diff ls printf touch find shasum sha256sum tee wc uname id
@@ -78,7 +77,7 @@ BASE_TOOLS=(bash env sh cat mv cp rm mkdir date dirname basename realpath stat c
 link_tools() { # каталог, исключение
   local dir=$1 skip=${2:-} t p
   mkdir -p "$dir"
-  for t in "${BASE_TOOLS[@]}" jq claude; do
+  for t in "${BASE_TOOLS[@]}" jq; do
     [ "$t" = "$skip" ] && continue
     p=$(command -v "$t" 2>/dev/null) && [ -x "$p" ] && ln -sf "$p" "$dir/$t"
   done
@@ -99,7 +98,7 @@ exit 64
 EOF
 chmod +x "$BASE/tk-stub"
 link_tools "$TOOLS"
-for x in jq claude tk; do link_tools "$BASE/tools-no-$x" "$x"; done
+for x in jq tk; do link_tools "$BASE/tools-no-$x" "$x"; done
 
 # ---------- проверки и утилиты ----------
 
@@ -120,12 +119,12 @@ new_home() { # создаёт и экспортирует HOME теста; H - �
   assert_fake_home || fail "HOME не подменён: $HOME"
 }
 
-RC=0 OUT="" ERR=""
+RC=0 OUT="" ERR="" RUN_ENV=()
 run() { # run <ключевые слова connect.sh>; результат в RC, OUT, ERR
   assert_fake_home || fail "HOME не подменён перед запуском connect.sh: $HOME"
   [ -f "$CONNECT" ] || fail "scripts/connect.sh не существует"
   local tools=${TOOLS_OVERRIDE:-$TOOLS}
-  OUT=$(env -i HOME="$HOME" PATH="$tools" TERM=dumb LANG=C TMPDIR="$BASE/tmp" \
+  OUT=$(env -i HOME="$HOME" PATH="$tools" TERM=dumb LANG=C TMPDIR="$BASE/tmp" ${RUN_ENV[@]+"${RUN_ENV[@]}"} \
     "$tools/bash" "$CONNECT" "$@" 2>"$H.err" </dev/null)
   RC=$?
   ERR=$(cat "$H.err")
@@ -144,12 +143,14 @@ jq_ok() { jq -e "$2" "$1" >/dev/null 2>&1 || fail "${3:-$2}: не выполне
 same_bytes() { cmp -s "$1" "$2" || fail "${3:-файл изменён}: $1"; }
 must_exist() { [ -e "$1" ] || [ -L "$1" ] || fail "нет $1"; }
 must_absent() { [ ! -e "$1" ] && [ ! -L "$1" ] || fail "остался $1"; }
-baks() { find "$HOME" \( -path '*/.claude/plugins' -o -path '*/.claude/backups' \) -prune -o -name '*.tk-bak-*' -print | LC_ALL=C sort; }
+baks() { find "$HOME" -name '*.tk-bak-*' | LC_ALL=C sort; }
+MANIFEST() { echo "$HOME/tasks/.tracker/connect-state.json"; }
+files_in_home() { (cd "$HOME" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort); }
 
 snap() { # снимок файлов, которые трогает connect.sh: путь, ссылка, права, хэш
   (
     cd "$HOME" || exit 1
-    { find .claude -maxdepth 1 \( -type f -o -type l \); find .codex .agents .config \( -type f -o -type l \); } 2>/dev/null |
+    { find .claude -maxdepth 1 \( -type f -o -type l \); find .claude/skills .codex .agents tasks \( -type f -o -type l \); } 2>/dev/null |
       LC_ALL=C sort | while read -r f; do
         [ -L "$f" ] && printf 'L %s -> %s\n' "$f" "$(readlink "$f")"
         [ -f "$f" ] && printf 'F %s %s %s\n' "$f" "$(mode "$f")" "$(sha "$f")"
@@ -164,11 +165,7 @@ seed_codex() {
   cp "$FIX/codex-default.rules" "$HOME/.codex/rules/default.rules"; cp "$FIX/codex-default.rules" "$ORIG/default.rules"
   cp "$FIX/codex-config.toml" "$HOME/.codex/config.toml"; cp "$FIX/codex-config.toml" "$ORIG/config.toml"
 }
-seed_opencode() { mkdir -p "$HOME/.config/opencode"; cp "$FIX/${1:-opencode.json}" "$HOME/.config/opencode/opencode.json"; cp "$FIX/${1:-opencode.json}" "$ORIG/opencode.json"; }
-seed_all() { seed_claude claude-settings.json; seed_codex; seed_opencode; }
-
-# Ключи, которые claude CLI добавляет сам; в тестах не про них исходный JSON не имеет таких ключей.
-NO_PLUGIN_KEYS='del(.enabledPlugins, .extraKnownMarketplaces)'
+seed_all() { seed_claude claude-settings.json; seed_codex; }
 
 # ---------- тесты ----------
 
@@ -182,13 +179,12 @@ t_guard_rejects_real_home() {
 t_validate_connectors() {
   new_home
   local f
-  while IFS= read -r f; do jq empty "$f" 2>/dev/null || fail "не JSON: $f"; done < <(find "$REPO/connectors" -name '*.json' -not -path '*/testdata/claude-settings-broken.json')
-  [ -f "$MKT/.claude-plugin/marketplace.json" ] || fail "нет $MKT/.claude-plugin/marketplace.json"
-  local d
-  for d in "$MKT" "$PLUGIN"; do
-    OUT=$(env -i HOME="$HOME" PATH="$TOOLS" TERM=dumb LANG=C TMPDIR="$BASE/tmp" "$TOOLS/claude" plugin validate "$d" 2>&1); RC=$?
-    [ "$RC" -eq 0 ] || fail "claude plugin validate $d: код $RC: $(echo "$OUT" | head -5)"
-  done
+  while IFS= read -r f; do jq empty "$f" 2>/dev/null || fail "не JSON: $f"; done < <(find "$CONN" -name '*.json' -not -path '*/testdata/claude-settings-broken.json')
+  [ -f "$SKILL_SRC/SKILL.md" ] || fail "нет $SKILL_SRC/SKILL.md"
+  [ -f "$CONN/claude/hooks.json" ] || fail "нет connectors/claude/hooks.json"
+  [ ! -e "$CONN/claude/plugins" ] && [ ! -e "$CONN/claude/.claude-plugin" ] || fail "остался плагин Claude"
+  [ ! -e "$CONN/opencode" ] || fail "остался connectors/opencode"
+  [ "$(find "$CONN" -name SKILL.md -not -path '*/testdata/*' | wc -l | tr -d ' ')" = 1 ] || fail "копий скилла не одна"
 }
 
 t_plan_writes_nothing_and_lists_targets() {
@@ -201,67 +197,82 @@ t_plan_writes_nothing_and_lists_targets() {
   [ "$RC" -eq 0 ] || fail "plan без аргументов (по умолчанию): код $RC"
   after=$(snap)
   [ "$before" = "$after" ] || fail "plan изменил файлы HOME"
-  must_absent "$HOME/.claude/plugins"
-  must_absent "$HOME/.config/tk/connect-state.json"
+  [ -z "$(files_in_home)" ] || fail "plan создал файлы: $(files_in_home)"
   run plan --agent all
   all_out | grep -qF 'Bash(tk *)' || fail "plan не называет ключ Bash(tk *): $(all_out | head -5)"
   all_out | grep -qF 'hooks.json' || fail "plan не называет .codex/hooks.json"
 }
 
-t_apply_clean_writes_all_targets() {
+t_apply_clean_writes_exact_paths() {
   new_home
   apply
+  local want
+  want=$(printf '%s\n' ./.agents/skills/tk/SKILL.md ./.claude/settings.json ./.claude/skills/tk/SKILL.md \
+    ./.codex/hooks.json ./.codex/rules/tk.rules ./tasks/.tracker/connect-state.json | LC_ALL=C sort)
+  [ "$(files_in_home)" = "$want" ] || fail "набор файлов HOME другой:"$'\n'"$(diff <(echo "$want") <(files_in_home) | head -8)"
+  [ -z "$(baks)" ] || fail "после apply остались бэкапы: $(baks)"
+
   local s=$HOME/.claude/settings.json
   jq_ok "$s" '.permissions.allow | index("Bash(tk *)") != null' 'Claude: Bash(tk *) в allow'
-  jq_ok "$s" '.enabledPlugins["tk@tk-local"] == true' 'Claude: плагин включён'
-  jq_ok "$s" '.extraKnownMarketplaces["tk-local"] != null' 'Claude: маркетплейс tk-local'
-  local src
-  src=$(jq -r '.extraKnownMarketplaces["tk-local"].source.path // empty' "$s")
-  [ -f "$src/.claude-plugin/marketplace.json" ] || fail "путь маркетплейса не ведёт к каталогу с marketplace.json: '$src'"
-  jq_ok "$HOME/.claude/plugins/installed_plugins.json" '.plugins["tk@tk-local"] | length > 0' 'claude plugin install выполнен'
-
+  jq_ok "$s" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Claude: группа SessionStart с tk ctx'
+  jq_ok "$s" 'keys | sort == ["hooks","permissions"]' 'Claude: лишние ключи в settings.json'
   local h=$HOME/.codex/hooks.json
   jq_ok "$h" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Codex: группа SessionStart с tk ctx'
-  grep -qF 'prefix_rule(pattern=["tk"], decision="allow")' "$HOME/.codex/rules/tk.rules" 2>/dev/null || fail "Codex: tk.rules без prefix_rule для tk"
-  must_exist "$HOME/.agents/skills/tk/SKILL.md"
-  must_absent "$HOME/.codex/config.toml"
-  must_absent "$HOME/.codex/rules/default.rules"
-
-  local o=$HOME/.config/opencode/opencode.json
-  jq_ok "$o" '.permission.bash["tk *"] == "allow"' 'OpenCode: tk * allow'
-  jq_ok "$o" '.permission.bash | keys_unsorted | last == "tk *"' 'OpenCode: tk * последним ключом'
-  grep -q 'TRACKER_ACTOR' "$HOME/.config/opencode/plugins/tk.js" 2>/dev/null || fail "OpenCode: plugins/tk.js без TRACKER_ACTOR"
-  jq empty "$HOME/.config/tk/connect-state.json" 2>/dev/null || fail "манифест connect-state.json отсутствует или не JSON"
+  grep -qF 'prefix_rule(pattern=["tk"], decision="allow")' "$HOME/.codex/rules/tk.rules" || fail "Codex: tk.rules без prefix_rule для tk"
+  jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'манифест'
 
   run plan --agent all
   [ "$RC" -eq 0 ] || fail "повторный plan: код $RC"
   [ -z "$(printf '%s' "$OUT" | tr -d '[:space:]')" ] || fail "повторный plan не пуст: $(echo "$OUT" | head -5)"
 }
 
+t_tracker_home_sets_manifest_place() {
+  new_home
+  RUN_ENV=("TRACKER_HOME=$H/alt")
+  apply
+  jq_ok "$H/alt/.tracker/connect-state.json" '.version == 1' 'манифест в TRACKER_HOME'
+  must_absent "$HOME/tasks"
+  undo
+  RUN_ENV=()
+  must_absent "$H/alt"
+  [ -z "$(files_in_home)" ] || fail "после undo остались файлы: $(files_in_home)"
+}
+
 t_apply_twice_no_changes() {
   new_home; seed_all
   apply "$NOW1"
-  local s1 b1 s2 b2
-  s1=$(snap); b1=$(baks)
-  [ -n "$b1" ] || fail "первый apply не сделал бэкап ни одного существующего файла"
+  local s1 s2
+  s1=$(snap)
   apply "$NOW2"
-  s2=$(snap); b2=$(baks)
+  s2=$(snap)
   [ "$s1" = "$s2" ] || fail "второй apply изменил файлы:"$'\n'"$(diff <(echo "$s1") <(echo "$s2") | head -10)"
-  [ "$b1" = "$b2" ] || fail "второй apply добавил бэкапы:"$'\n'"$(diff <(echo "$b1") <(echo "$b2") | head -5)"
+  [ -z "$(baks)" ] || fail "бэкапы остались: $(baks)"
 }
 
-t_backup_before_edit_same_rights() {
+t_backups_live_only_during_apply() {
   new_home; seed_all
   chmod 640 "$HOME/.codex/hooks.json"
   apply
-  local pair f b
-  for pair in ".claude/settings.json:settings.json" ".codex/hooks.json:hooks.json" ".config/opencode/opencode.json:opencode.json"; do
-    f=$HOME/${pair%%:*}
-    set -- "$f".tk-bak-*
+  [ -z "$(baks)" ] || fail "успешный apply оставил бэкапы: $(baks)"
+}
+
+t_failed_apply_keeps_and_names_backups() {
+  new_home; seed_all
+  chmod 555 "$HOME/.codex/rules"
+  run apply --agent all --now "$NOW1"
+  chmod 755 "$HOME/.codex/rules"
+  [ "$RC" -ne 0 ] || fail "apply вернул 0, хотя запись tk.rules невозможна"
+  local f
+  for f in .claude/settings.json .codex/hooks.json; do
+    set -- "$HOME/$f".tk-bak-*
     [ -e "$1" ] && [ "$#" -eq 1 ] || fail "ожидался один бэкап рядом с $f, есть: $*"
-    same_bytes "$1" "$ORIG/${pair##*:}" "бэкап не равен исходному файлу"
-    [ "$(mode "$1")" = "$(mode "$f")" ] || fail "права бэкапа $(mode "$1") не равны правам цели $(mode "$f")"
+    same_bytes "$1" "$ORIG/$(basename "$f")" "бэкап не равен исходному файлу"
+    [ "$(mode "$1")" = "$(mode "$HOME/$f")" ] || fail "права бэкапа $(mode "$1") не равны правам цели"
+    all_out | grep -qF "$1" || fail "вывод не называет бэкап $1: $(all_out | head -6)"
   done
+  undo
+  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'settings.json после undo неполного apply'
+  jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" . 'hooks.json после undo неполного apply'
 }
 
 t_undo_restores_original_json() {
@@ -269,39 +280,19 @@ t_undo_restores_original_json() {
   apply; undo
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'Claude settings.json после undo'
   jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" . 'Codex hooks.json после undo'
-  jq_eq "$HOME/.config/opencode/opencode.json" "$ORIG/opencode.json" . 'opencode.json после undo'
   same_bytes "$HOME/.codex/rules/default.rules" "$ORIG/default.rules"
   same_bytes "$HOME/.codex/config.toml" "$ORIG/config.toml"
   must_absent "$HOME/.codex/rules/tk.rules"
   must_absent "$HOME/.agents/skills/tk"
-  must_absent "$HOME/.config/opencode/plugins/tk.js"
-  must_absent "$HOME/.config/tk/connect-state.json"
-  [ -z "$(baks)" ] || fail "undo оставил свои бэкапы: $(baks)"
-  jq_ok "$HOME/.claude/plugins/installed_plugins.json" '(.plugins["tk@tk-local"] // []) | length == 0' 'плагин tk снят'
+  must_absent "$HOME/.claude/skills"
+  must_absent "$(MANIFEST)"
+  [ -z "$(baks)" ] || fail "undo оставил бэкапы: $(baks)"
 }
 
 t_undo_on_pristine_home_leaves_no_trace() {
   new_home
   apply; undo
-  local f
-  for f in .claude/settings.json .codex/hooks.json .config/opencode/opencode.json; do
-    if [ -e "$HOME/$f" ]; then
-      [ "$(jq -S -c . "$HOME/$f" 2>&1)" = '{}' ] || fail "после undo на пустом HOME $f не пуст: $(jq -c . "$HOME/$f" | head -c 200)"
-    fi
-  done
-  must_absent "$HOME/.codex/rules/tk.rules"
-  must_absent "$HOME/.agents/skills/tk"
-  must_absent "$HOME/.config/opencode/plugins/tk.js"
-  must_absent "$HOME/.config/tk/connect-state.json"
-  [ -z "$(baks)" ] || fail "остались бэкапы: $(baks)"
-}
-
-t_undo_keeps_foreign_plugin_keys() {
-  new_home; seed_claude claude-settings-plugins.json
-  apply
-  jq_ok "$HOME/.claude/settings.json" '.enabledPlugins["other@other-mkt"] == true and .extraKnownMarketplaces["other-mkt"] != null' 'чужие ключи плагинов после apply'
-  undo
-  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'settings.json с чужими плагинами после undo'
+  [ -z "$(find "$HOME" -mindepth 1)" ] || fail "после undo на пустом HOME остались следы: $(find "$HOME" -mindepth 1 | head -5)"
 }
 
 t_existing_tk_permission_survives_undo() {
@@ -317,29 +308,18 @@ t_existing_tk_permission_survives_undo() {
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" '.permissions' 'permissions после undo'
 }
 
-t_opencode_already_allowed_is_not_touched() {
-  local variant
-  for variant in wildcard explicit; do
-    new_home
-    if [ "$variant" = wildcard ]; then seed_opencode opencode-wildcard.json
-    else
-      jq '.permission.bash["tk *"] = "allow"' "$FIX/opencode.json" >"$BASE/o.json"
-      mkdir -p "$HOME/.config/opencode"; cp "$BASE/o.json" "$HOME/.config/opencode/opencode.json"; cp "$BASE/o.json" "$ORIG/opencode.json"
-    fi
-    local o=$HOME/.config/opencode/opencode.json
-    apply
-    same_bytes "$o" "$ORIG/opencode.json" "$variant: apply переписал opencode.json, хотя tk уже разрешён"
-    set -- "$o".tk-bak-*
-    [ ! -e "$1" ] || fail "$variant: apply сделал бэкап opencode.json без записи"
-    undo
-    same_bytes "$o" "$ORIG/opencode.json" "$variant: undo изменил opencode.json"
-  done
+t_existing_own_hook_survives_undo() {
+  new_home; seed_claude claude-settings-ownhook.json
+  apply
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук tk ctx продублирован'
+  undo
+  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'свой хук tk ctx не должен меняться'
 }
 
 t_symlinked_configs_stay_symlinks() {
   new_home; seed_codex
   mkdir -p "$HOME/dotfiles" "$HOME/.claude"
-  local link
+  local link rel name want
   cp "$FIX/claude-settings.json" "$HOME/dotfiles/settings.json"; chmod 600 "$HOME/dotfiles/settings.json"
   ln -s "$HOME/dotfiles/settings.json" "$HOME/.claude/settings.json"
   cp "$FIX/claude-settings.json" "$ORIG/settings.json"
@@ -353,24 +333,38 @@ t_symlinked_configs_stay_symlinks() {
     [ "$(mode "$HOME/dotfiles/$name")" = "$want" ] || fail "права цели $name: $(mode "$HOME/dotfiles/$name"), ожидалось $want"
   done
   jq_ok "$HOME/dotfiles/settings.json" '.permissions.allow | index("Bash(tk *)") != null' 'запись ушла в цель симлинка'
-  jq_ok "$HOME/dotfiles/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук ушёл в цель симлинка'
+  jq_ok "$HOME/dotfiles/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук Claude ушёл в цель симлинка'
+  jq_ok "$HOME/dotfiles/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук Codex ушёл в цель симлинка'
   undo
   for link in .claude/settings.json:settings.json .codex/hooks.json:hooks.json; do
     IFS=: read -r rel name <<<"$link"
     [ -L "$HOME/$rel" ] || fail "$rel перестал быть симлинком после undo"
   done
-  jq_eq "$HOME/dotfiles/settings.json" "$ORIG/settings.json" "$NO_PLUGIN_KEYS" 'цель settings.json после undo'
+  jq_eq "$HOME/dotfiles/settings.json" "$ORIG/settings.json" . 'цель settings.json после undo'
   jq_eq "$HOME/dotfiles/hooks.json" "$ORIG/hooks.json" . 'цель hooks.json после undo'
+}
+
+t_symlinked_skill_dir_target_untouched() {
+  new_home
+  # .agents/skills - ссылка на чужой каталог: apply пишет в цель, ссылку не рвёт.
+  mkdir -p "$HOME/dotfiles/skills"
+  mkdir -p "$HOME/.agents"
+  ln -s "$HOME/dotfiles/skills" "$HOME/.agents/skills"
+  apply
+  [ -L "$HOME/.agents/skills" ] || fail ".agents/skills перестал быть ссылкой"
+  must_exist "$HOME/dotfiles/skills/tk/SKILL.md"
+  undo
+  [ -L "$HOME/.agents/skills" ] || fail ".agents/skills перестал быть ссылкой после undo"
+  must_absent "$HOME/dotfiles/skills/tk"
 }
 
 t_permissions_600_preserved() {
   new_home; seed_all
-  chmod 600 "$HOME/.claude/settings.json" "$HOME/.config/opencode/opencode.json"
+  chmod 600 "$HOME/.claude/settings.json"
   chmod 640 "$HOME/.codex/hooks.json"
   apply
   [ -f "$HOME/.claude/settings.json" ] && [ ! -L "$HOME/.claude/settings.json" ] || fail "settings.json не обычный файл"
   [ "$(mode "$HOME/.claude/settings.json")" = 600 ] || fail "settings.json после apply: $(mode "$HOME/.claude/settings.json")"
-  [ "$(mode "$HOME/.config/opencode/opencode.json")" = 600 ] || fail "opencode.json после apply: $(mode "$HOME/.config/opencode/opencode.json")"
   [ "$(mode "$HOME/.codex/hooks.json")" = 640 ] || fail "hooks.json после apply: $(mode "$HOME/.codex/hooks.json")"
   undo
   [ "$(mode "$HOME/.claude/settings.json")" = 600 ] || fail "settings.json после undo: $(mode "$HOME/.claude/settings.json")"
@@ -382,36 +376,40 @@ t_foreign_content_intact() {
   echo 'user backup' >"$HOME/.claude/settings.json.bak"
   apply
   local s=$HOME/.claude/settings.json
-  jq_eq "$s" "$ORIG/settings.json" 'del(.permissions.allow) | del(.enabledPlugins, .extraKnownMarketplaces)' 'Claude: чужие ключи (кроме allow)'
+  jq_eq "$s" "$ORIG/settings.json" 'del(.permissions.allow) | del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")))' 'Claude: чужие ключи (кроме allow и нашей группы)'
   [ "$(jq -c '.permissions.allow[0:3]' "$s")" = "$(jq -c '.permissions.allow' "$ORIG/settings.json")" ] || fail "порядок чужих allow нарушен: $(jq -c .permissions.allow "$s")"
+  jq_ok "$s" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-claude-start"' 'Claude: чужая группа осталась первой'
   jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" 'del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")))' 'Codex: чужие группы SessionStart и Stop'
   jq_ok "$HOME/.codex/hooks.json" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-codex-start"' 'Codex: чужая группа осталась первой'
   same_bytes "$HOME/.codex/rules/default.rules" "$ORIG/default.rules" 'default.rules изменён'
   same_bytes "$HOME/.codex/config.toml" "$ORIG/config.toml" 'config.toml изменён'
-  local o=$HOME/.config/opencode/opencode.json
-  jq_eq "$o" "$ORIG/opencode.json" 'del(.permission.bash["tk *"])' 'OpenCode: чужие ключи'
-  [ "$(jq -c '.permission.bash | keys_unsorted[0:-1]' "$o")" = "$(jq -c '.permission.bash | keys_unsorted' "$ORIG/opencode.json")" ] || fail "порядок чужих ключей permission.bash нарушен"
   must_absent "$HOME/.claude/CLAUDE.md"
   must_absent "$HOME/.codex/AGENTS.md"
-  must_absent "$HOME/.config/opencode/AGENTS.md"
   undo
   [ "$(cat "$HOME/.claude/settings.json.bak" 2>/dev/null)" = 'user backup' ] || fail "undo удалил чужой settings.json.bak"
 }
 
-t_cli_rewritten_foreign_key_is_restored() {
-  new_home; seed_claude claude-settings-model.json
-  run apply --agent all --now "$NOW1"
-  [ "$RC" -eq 0 ] || fail "apply: код $RC: $(all_out | head -5)"
-  all_out | grep -i 'warn' | grep -q 'model' || fail "apply не предупредил про ключ model: $(all_out | head -5)"
-  jq_ok "$HOME/.claude/settings.json" '.model == "opus"' 'после apply model не "opus"'
+t_agent_filter_touches_only_that_agent() {
+  new_home
+  run apply --agent claude --now "$NOW1"
+  [ "$RC" -eq 0 ] || fail "apply --agent claude: код $RC: $(all_out | head -5)"
+  must_exist "$HOME/.claude/settings.json"
+  must_absent "$HOME/.codex"
+  must_absent "$HOME/.agents"
+  run apply --agent codex --now "$NOW1"
+  [ "$RC" -eq 0 ] || fail "apply --agent codex: код $RC"
+  run undo --agent claude --now "$NOW2"
+  [ "$RC" -eq 1 ] || fail "undo одного агента при втором в манифесте: ожидался код 1, есть $RC"
+  must_absent "$HOME/.claude"
+  must_exist "$HOME/.codex/hooks.json"
+  must_exist "$(MANIFEST)"
   undo
-  jq_ok "$HOME/.claude/settings.json" '.model == "opus"' 'после undo model не "opus"'
-  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'settings.json после undo'
+  [ -z "$(find "$HOME" -mindepth 1)" ] || fail "следы после undo: $(find "$HOME" -mindepth 1 | head -5)"
 }
 
 t_missing_tools_err_and_files_intact() {
   local missing
-  for missing in jq claude tk; do
+  for missing in jq tk; do
     new_home; seed_all
     local before after
     before=$(snap)
@@ -430,6 +428,7 @@ t_broken_or_unexpected_json_err_and_file_intact() {
   for case_ in \
     "claude:.claude/settings.json:claude-settings-broken.json" \
     "claude:.claude/settings.json:claude-settings-badshape.json" \
+    "claude:.claude/settings.json:claude-settings-hooks-badshape.json" \
     "codex:.codex/hooks.json:codex-hooks-badshape.json"; do
     IFS=: read -r _ target fixture <<<"$case_"
     new_home
@@ -441,26 +440,26 @@ t_broken_or_unexpected_json_err_and_file_intact() {
     all_out | grep -qi 'err' || fail "$fixture: нет err: $(all_out | head -3)"
     all_out | grep -qF "$target" || fail "$fixture: сообщение не называет путь $target: $(all_out | head -3)"
     same_bytes "$HOME/$target" "$ORIG/orig" "$fixture: файл изменён"
-    set -- "$HOME/$target".tk-bak-*
-    [ ! -e "$1" ] || fail "$fixture: лишний бэкап"
+    [ -z "$(baks)" ] || fail "$fixture: лишний бэкап: $(baks)"
+    [ -z "$(find "$HOME" -type f -not -path "$HOME/$target")" ] || fail "$fixture: записаны другие файлы: $(find "$HOME" -type f -not -path "$HOME/$target" | head -3)"
   done
 }
 
 t_hook_reads_stdin_and_output_is_short() {
   new_home
   apply
-  local cmds=() c name out rc tools
-  while IFS= read -r c; do cmds+=("codex|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")) | .hooks[].command' "$HOME/.codex/hooks.json")
-  local ph=$PLUGIN/hooks/hooks.json
-  [ -f "$ph" ] || fail "нет $ph"
-  for w in $MATCHER_WORDS; do
-    jq_ok "$ph" "[.hooks.SessionStart[].matcher | split(\"|\") | index(\"$w\")] | any(. != null)" "Claude: matcher SessionStart без $w"
+  local cmds=() c name out rc w f
+  for f in claude:.claude/settings.json codex:.codex/hooks.json; do
+    name=${f%%:*}
+    for w in $MATCHER_WORDS; do
+      jq_ok "$HOME/${f#*:}" "[.hooks.SessionStart[].matcher // \"\" | split(\"|\") | index(\"$w\")] | any(. != null)" "$name: matcher SessionStart без $w"
+    done
+    while IFS= read -r c; do cmds+=("$name|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")) | .hooks[].command' "$HOME/${f#*:}")
   done
-  while IFS= read -r c; do cmds+=("claude|$c"); done < <(jq -r '.hooks.SessionStart[].hooks[].command' "$ph")
-  [ "${#cmds[@]}" -ge 2 ] || fail "найдено хуков: ${#cmds[@]}, нужно по одному в Claude и Codex"
+  [ "${#cmds[@]}" -eq 2 ] || fail "найдено хуков tk ctx: ${#cmds[@]}, нужно по одному в Claude и Codex"
   for c in "${cmds[@]}"; do
     name=${c%%|*}; c=${c#*|}
-    out=$(env -i HOME="$HOME" PATH="$TOOLS" CLAUDE_PLUGIN_ROOT="$PLUGIN" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" 2>"$H.err"); rc=$?
+    out=$(env -i HOME="$HOME" PATH="$TOOLS" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" 2>"$H.err"); rc=$?
     [ "$rc" -eq 0 ] || fail "$name: хук '$c' вернул $rc: $(head -3 "$H.err")"
     [ "${#out}" -lt 2000 ] || fail "$name: вывод хука ${#out} знаков, нужно меньше 2000"
     [ -n "$out" ] || fail "$name: хук ничего не вывел в контекст"
@@ -470,9 +469,11 @@ t_hook_reads_stdin_and_output_is_short() {
 t_skill_copies_identical_and_small() {
   new_home
   apply
-  local a=$PLUGIN/skills/tk/SKILL.md b=$HOME/.agents/skills/tk/SKILL.md
+  local a=$SKILL_SRC/SKILL.md d
   [ -f "$a" ] || fail "нет $a"
-  diff -r "$PLUGIN/skills/tk" "$HOME/.agents/skills/tk" >/dev/null || fail "копии скилла различаются"
+  for d in "$HOME/.claude/skills/tk" "$HOME/.agents/skills/tk"; do
+    diff -r "$SKILL_SRC" "$d" >/dev/null || fail "копия скилла $d отличается от источника"
+  done
   [ "$(wc -c <"$a")" -le 1536 ] || fail "SKILL.md больше 1,5 КБ: $(wc -c <"$a")"
   head -8 "$a" | grep -q '^name: tk$' || fail "в SKILL.md нет name: tk"
   head -8 "$a" | grep -q '^description:.*Use when' || fail "в description нет 'Use when'"
@@ -484,18 +485,20 @@ TESTS=(
   t_guard_rejects_real_home
   t_validate_connectors
   t_plan_writes_nothing_and_lists_targets
-  t_apply_clean_writes_all_targets
+  t_apply_clean_writes_exact_paths
+  t_tracker_home_sets_manifest_place
   t_apply_twice_no_changes
-  t_backup_before_edit_same_rights
+  t_backups_live_only_during_apply
+  t_failed_apply_keeps_and_names_backups
   t_undo_restores_original_json
   t_undo_on_pristine_home_leaves_no_trace
-  t_undo_keeps_foreign_plugin_keys
   t_existing_tk_permission_survives_undo
-  t_opencode_already_allowed_is_not_touched
+  t_existing_own_hook_survives_undo
   t_symlinked_configs_stay_symlinks
+  t_symlinked_skill_dir_target_untouched
   t_permissions_600_preserved
   t_foreign_content_intact
-  t_cli_rewritten_foreign_key_is_restored
+  t_agent_filter_touches_only_that_agent
   t_missing_tools_err_and_files_intact
   t_broken_or_unexpected_json_err_and_file_intact
   t_hook_reads_stdin_and_output_is_short
