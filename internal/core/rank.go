@@ -21,11 +21,10 @@ type placement struct {
 // columnTasks возвращает задачи колонки без skipID по возрастанию ранга. Битые файлы
 // на порядок не влияют.
 func (s *Store) columnTasks(column, skipID string) []*task.Task {
-	all, _ := s.List()
 	var col []*task.Task
-	for _, t := range all {
-		if t.Status == column && t.ID != skipID {
-			col = append(col, t)
+	for _, e := range s.rankIndex() {
+		if e.status == column && e.id != skipID {
+			col = append(col, &task.Task{ID: e.id, Status: e.status, Rank: e.rank, Path: e.path})
 		}
 	}
 	sort.SliceStable(col, func(i, j int) bool {

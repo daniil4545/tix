@@ -172,10 +172,9 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 		return Result{}, err
 	}
 	rank := 1.0
-	tasks, _ := s.List() // битые файлы на ранг не влияют
-	for _, t := range tasks {
-		if t.Rank+1 > rank {
-			rank = t.Rank + 1
+	for _, e := range s.rankIndex() { // битые файлы на ранг не влияют
+		if e.rank+1 > rank {
+			rank = e.rank + 1
 		}
 	}
 	id := fmt.Sprintf("T-%d", num)
