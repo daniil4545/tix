@@ -30,6 +30,7 @@ type txEnv struct {
 const gitignore = `.tracker/tmp/
 .tracker/lock
 .tracker/log
+.tracker/connect-state.json
 .obsidian/workspace*
 .trash/
 *.swp
