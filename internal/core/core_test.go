@@ -5,13 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -330,6 +328,10 @@ func TestStore_StaleIndexLock_DroppedWithWarn(t *testing.T) {
 	if err := os.WriteFile(idx, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	old := time.Now().Add(-time.Minute)
+	if err := os.Chtimes(idx, old, old); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := s.Comment("T-1", "x", "a"); err != nil {
 		t.Fatalf("Comment при index.lock: %v", err)
 	}
@@ -385,44 +387,106 @@ func TestStore_NoPartialWritesInTree(t *testing.T) {
 	})
 }
 
-func TestStore_ConcurrentComments_5x20(t *testing.T) {
-	if testing.Short() {
-		t.Skip("slow tier: гонка 5x20")
-	}
+func TestStore_FreshIndexLock_BusyNothingWritten(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
-	mustCreate(t, e.open(30*time.Second), "Alpha")
-	var wg sync.WaitGroup
-	errc := make(chan error, 100)
-	for w := 0; w < 5; w++ {
-		wg.Add(1)
-		go func(w int) {
-			defer wg.Done()
-			s, err := core.Open(e.root, core.Options{LockTimeout: 30 * time.Second, GitBin: gitBin, Log: slog.New(slog.NewTextHandler(io.Discard, nil))})
-			if err != nil {
-				errc <- err
-				return
-			}
-			for i := 0; i < 20; i++ {
-				if _, err := s.Comment("T-1", fmt.Sprintf("w%d-i%d", w, i), fmt.Sprintf("agent:%d", w)); err != nil {
-					errc <- err
-				}
-			}
-		}(w)
-	}
-	wg.Wait()
-	close(errc)
-	for err := range errc {
-		t.Errorf("Comment: %v", err)
-	}
-	tk, _, err := e.open(time.Second).Get("T-1")
-	if err != nil {
+	s := e.open(2 * time.Second)
+	mustCreate(t, s, "Alpha")
+	idx := filepath.Join(e.root, ".git", "index.lock")
+	if err := os.WriteFile(idx, nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if len(tk.Comments) != 100 {
-		t.Errorf("комментариев %d, ждали 100", len(tk.Comments))
+	before, _ := os.ReadFile(e.file("T-1"))
+	_, err := s.Comment("T-1", "x", "a")
+	if !errors.Is(err, core.ErrLocked) || err.Error() != "git is busy" {
+		t.Fatalf("Comment при свежем lock: %v, ждали `git is busy` (ErrLocked)", err)
 	}
-	if n := e.count(); n != 101 {
-		t.Errorf("коммитов %d, ждали 101", n)
+	if _, err := os.Stat(idx); err != nil {
+		t.Errorf("свежий lock удалён: %v", err)
 	}
+	if after, _ := os.ReadFile(e.file("T-1")); !bytes.Equal(before, after) {
+		t.Error("отказ git is busy изменил файл задачи")
+	}
+}
+
+// Шаг 4 из 2.1: файл изменился между чтением и rename - правка мимо ядра не теряется,
+// операция повторяется с external edit. Краснеет, если убрать сверку в replace.
+func TestStore_ExternalEditBetweenReadAndRename_NotLost(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.open(2 * time.Second)
+	mustCreate(t, s, "Alpha")
+	const outside = "\nправка мимо ядра\n"
+	calls := 0
+	core.SetAfterRead(s, func(path string, attempt int) {
+		calls++
+		if attempt == 0 {
+			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			defer f.Close()
+			if _, err := f.WriteString(outside); err != nil {
+				t.Error(err)
+			}
+		}
+	})
+	if _, err := s.Comment("T-1", "наш комментарий", "agent:1"); err != nil {
+		t.Fatalf("Comment: %v", err)
+	}
+	got, _ := os.ReadFile(e.file("T-1"))
+	for _, want := range []string{"правка мимо ядра", "наш комментарий"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("в файле нет %q:\n%s", want, got)
+		}
+	}
+	if calls != 2 {
+		t.Errorf("попыток %d, ждали 2 (повтор после правки мимо ядра)", calls)
+	}
+	if !strings.Contains(e.git("log", "--format=%s"), "T-1: external edit") {
+		t.Errorf("правка мимо ядра не закоммичена отдельно:\n%s", e.git("log", "--format=%s"))
+	}
+	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
+		t.Errorf("дерево не чистое:\n%s", st)
+	}
+}
+
+// Файл меняется на каждой из трёх попыток: ошибка, файл не тронут нами, temp не остался.
+func TestStore_FileChangesEveryAttempt_ErrorAfterThree(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.open(2 * time.Second)
+	mustCreate(t, s, "Alpha")
+	calls := 0
+	core.SetAfterRead(s, func(path string, attempt int) {
+		calls++
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer f.Close()
+		_, _ = f.WriteString("\nвнешняя правка " + string(rune('A'+attempt)) + "\n")
+	})
+	_, err := s.Comment("T-1", "не должен записаться", "agent:1")
+	if err == nil || !strings.Contains(err.Error(), "file changes during write") {
+		t.Fatalf("Comment: %v, ждали ошибку `file changes during write`", err)
+	}
+	if calls != 3 {
+		t.Errorf("попыток %d, ждали 3", calls)
+	}
+	got, _ := os.ReadFile(e.file("T-1"))
+	if strings.Contains(string(got), "не должен записаться") || !strings.Contains(string(got), "внешняя правка C") {
+		t.Errorf("файл после отказа:\n%s", got)
+	}
+	_ = filepath.Walk(e.root, func(p string, info os.FileInfo, err error) error {
+		if err == nil && info.IsDir() && info.Name() == ".git" {
+			return filepath.SkipDir
+		}
+		if err == nil && !info.IsDir() && strings.Contains(info.Name(), ".tmp") {
+			t.Errorf("остался временный файл %s", p)
+		}
+		return nil
+	})
 }

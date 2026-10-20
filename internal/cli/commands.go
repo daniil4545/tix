@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"tracker/internal/core"
@@ -212,7 +211,7 @@ func (a *app) cmdShow(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	t, rev, err := a.store.Get(id)
+	t, rev, data, err := a.store.Show(id)
 	if err != nil {
 		return wrap(id, err)
 	}
@@ -227,10 +226,6 @@ func (a *app) cmdShow(args []string) error {
 		return a.printJSON(t)
 	}
 	// Файл как есть: Obsidian мог записать его не в каноническом виде.
-	data, err := os.ReadFile(t.Path)
-	if err != nil {
-		data = t.Render()
-	}
 	a.out("rev %s", rev)
 	_, _ = a.env.Stdout.Write(data)
 	return nil
@@ -320,14 +315,9 @@ func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
 		if x.Rank != y.Rank {
 			return x.Rank < y.Rank
 		}
-		return idNumber(x.ID) < idNumber(y.ID)
+		return core.IDNum(x.ID) < core.IDNum(y.ID)
 	})
 	return out
-}
-
-func idNumber(id string) int {
-	n, _ := strconv.Atoi(strings.TrimPrefix(id, "T-"))
-	return n
 }
 
 func (a *app) printTasks(p *parsed, tasks []*task.Task) error {

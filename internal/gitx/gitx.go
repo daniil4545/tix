@@ -26,6 +26,36 @@ const (
 // revRe - допустимый blob id: защита от опций вместо id в cat-file.
 var revRe = regexp.MustCompile(`^[0-9a-f]{4,64}$`)
 
+// ErrBusy - в .git лежит свежий lock-файл: git другого процесса ещё работает.
+var ErrBusy = errors.New("git is busy")
+
+// staleLockAge - lock-файл старше этого возраста считается висящим (след убитого git).
+const staleLockAge = 10 * time.Second
+
+// Error - отказ git. Error() даёт короткую фразу без текста git: она идёт в ответ
+// пользователю. Полный текст stderr - в Stderr и Detail, он идёт только в лог.
+type Error struct {
+	Op     string // подкоманда git
+	Code   int    // код выхода, 0 - git не запустился
+	Stderr string // вывод git или текст ошибки запуска
+}
+
+func (e *Error) Error() string { return "git " + e.Op + " failed" }
+
+// Detail - полный текст отказа для лога.
+func (e *Error) Detail() string {
+	return fmt.Sprintf("git %s: exit %d: %s", e.Op, e.Code, strings.TrimSpace(e.Stderr))
+}
+
+// Detail возвращает текст ошибки для лога: с выводом git, если он в цепочке.
+func Detail(err error) string {
+	var ge *Error
+	if errors.As(err, &ge) {
+		return err.Error() + " [" + ge.Detail() + "]"
+	}
+	return err.Error()
+}
+
 // Repo - репозиторий задач и путь к бинарю git.
 type Repo struct{ Dir, Bin string }
 
@@ -213,7 +243,7 @@ func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
 		return res, nil
 	}
 	if err != nil {
-		return res, fmt.Errorf("git %s: %w", args[0], err)
+		return res, &Error{Op: args[0], Stderr: err.Error()}
 	}
 	return res, nil
 }
@@ -225,23 +255,15 @@ func (r Repo) must(stdin []byte, reader bool, args ...string) ([]byte, error) {
 		return nil, err
 	}
 	if res.code != 0 {
-		return nil, fmt.Errorf("git %s: exit %d: %s", args[0], res.code, firstLine(res.errOut))
+		return nil, &Error{Op: args[0], Code: res.code, Stderr: string(res.errOut)}
 	}
 	return res.out, nil
-}
-
-func firstLine(b []byte) string {
-	s := strings.TrimSpace(string(b))
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		s = s[:i]
-	}
-	return s
 }
 
 // Init создаёт репозиторий (и папку, если её нет).
 func (r Repo) Init() error {
 	if err := os.MkdirAll(r.Dir, 0o750); err != nil {
-		return fmt.Errorf("git init: %w", err)
+		return &Error{Op: "init", Stderr: err.Error()}
 	}
 	_, err := r.must(nil, false, "init", "-q", "-b", "main", "--template=")
 	return err
@@ -306,7 +328,7 @@ func (r Repo) Commit(paths []string, subject, actor string) (string, error) {
 		}
 	}
 	if res.code != 0 {
-		return "", fmt.Errorf("git commit: exit %d: %s", res.code, firstLine(res.errOut))
+		return "", &Error{Op: "commit", Code: res.code, Stderr: string(res.errOut)}
 	}
 	return r.head()
 }
@@ -393,13 +415,13 @@ func (r Repo) Blob(rev string) ([]byte, error) {
 func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, err error) {
 	dir, err := os.MkdirTemp("", "tkmerge-")
 	if err != nil {
-		return nil, false, fmt.Errorf("git merge-file: %w", err)
+		return nil, false, &Error{Op: "merge-file", Stderr: err.Error()}
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	names := []string{"ours", "base", "theirs"}
 	for i, data := range [][]byte{ours, base, theirs} {
 		if err := os.WriteFile(filepath.Join(dir, names[i]), data, 0o600); err != nil {
-			return nil, false, fmt.Errorf("git merge-file: %w", err)
+			return nil, false, &Error{Op: "merge-file", Stderr: err.Error()}
 		}
 	}
 	res, err := r.run(nil, true, "merge-file", "-p",
@@ -414,43 +436,22 @@ func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, e
 	case res.code > 0 && res.code < 128:
 		return res.out, true, nil
 	default:
-		return nil, false, fmt.Errorf("git merge-file: exit %d: %s", res.code, firstLine(res.errOut))
+		return nil, false, &Error{Op: "merge-file", Code: res.code, Stderr: string(res.errOut)}
 	}
 }
 
-// Remove удаляет файл из дерева и индекса (git rm). Файл с правками, которых
-// нет в индексе, git не удаляет: ошибка.
-func (r Repo) Remove(path string) error {
-	_, err := r.must(nil, false, "rm", "-q", "--", path)
-	return err
-}
-
-// DropGitLocks удаляет lock-файлы git, оставшиеся после убитого процесса: .git/*.lock
-// (index.lock, HEAD.lock, packed-refs.lock) и .git/refs/**/*.lock. Вызывать только под
-// нашим локом, пока нет живого git. Возвращает пути (относительно .git) удалённых файлов.
+// DropGitLocks удаляет висящие lock-файлы git после убитого процесса: .git/*.lock
+// (index.lock, HEAD.lock, packed-refs.lock) и .git/refs/**/*.lock. Висящий - с mtime
+// старше staleLockAge. Свежий lock может держать живой git (Obsidian Git, терминал):
+// его не трогаем, а при нём ничего не удаляем и отвечаем ErrBusy.
+// Вызывать под нашим локом. Возвращает пути (относительно .git) удалённых файлов.
 func (r Repo) DropGitLocks() ([]string, error) {
 	gitDir := filepath.Join(r.Dir, ".git")
-	var dropped []string
-	drop := func(path string) error {
-		err := os.Remove(path)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("remove %s: %w", path, err)
-		}
-		if err == nil {
-			rel, _ := filepath.Rel(gitDir, path)
-			dropped = append(dropped, filepath.ToSlash(rel))
-		}
-		return nil
-	}
 	top, err := filepath.Glob(filepath.Join(gitDir, "*.lock"))
 	if err != nil {
 		return nil, fmt.Errorf("glob git locks: %w", err)
 	}
-	for _, p := range top {
-		if err := drop(p); err != nil {
-			return dropped, err
-		}
-	}
+	locks := top
 	err = filepath.WalkDir(filepath.Join(gitDir, "refs"), func(p string, d fs.DirEntry, err error) error {
 		switch {
 		case err != nil && errors.Is(err, os.ErrNotExist):
@@ -458,12 +459,39 @@ func (r Repo) DropGitLocks() ([]string, error) {
 		case err != nil:
 			return err
 		case !d.IsDir() && strings.HasSuffix(p, ".lock"):
-			return drop(p)
+			locks = append(locks, p)
 		}
 		return nil
 	})
 	if err != nil {
-		return dropped, fmt.Errorf("walk refs: %w", err)
+		return nil, fmt.Errorf("walk refs: %w", err)
+	}
+	var stale []string
+	for _, p := range locks {
+		info, err := os.Lstat(p)
+		if errors.Is(err, os.ErrNotExist) {
+			continue // git снял lock сам
+		}
+		if err != nil {
+			return nil, fmt.Errorf("stat %s: %w", p, err)
+		}
+		if time.Since(info.ModTime()) < staleLockAge {
+			rel, _ := filepath.Rel(gitDir, p)
+			return nil, fmt.Errorf("%w: %s is fresh", ErrBusy, filepath.ToSlash(rel))
+		}
+		stale = append(stale, p)
+	}
+	var dropped []string
+	for _, p := range stale {
+		err := os.Remove(p)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return dropped, fmt.Errorf("remove %s: %w", p, err)
+		}
+		rel, _ := filepath.Rel(gitDir, p)
+		dropped = append(dropped, filepath.ToSlash(rel))
 	}
 	return dropped, nil
 }

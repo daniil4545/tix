@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"tracker/internal/core"
+	"tracker/internal/gitx"
 	"tracker/internal/project"
 )
 
@@ -120,11 +121,11 @@ func (a *app) fail(err error) {
 	reason := firstLine(err.Error())
 	var ie *idError
 	if errors.As(err, &ie) {
-		a.log.Error("command failed", "cmd", a.cmd, "id", ie.ID, "err", err)
+		a.log.Error("command failed", "cmd", a.cmd, "id", ie.ID, "err", gitx.Detail(err))
 		_, _ = fmt.Fprintf(a.env.Stderr, "err %s: %s\n", ie.ID, reason)
 		return
 	}
-	a.log.Error("command failed", "cmd", a.cmd, "err", err)
+	a.log.Error("command failed", "cmd", a.cmd, "err", gitx.Detail(err))
 	_, _ = fmt.Fprintf(a.env.Stderr, "err %s\n", reason)
 }
 

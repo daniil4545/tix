@@ -32,7 +32,8 @@ func blobID(data []byte) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func idNum(id string) int {
+// IDNum - номер задачи из id вида T-12.
+func IDNum(id string) int {
 	n, _ := strconv.Atoi(strings.TrimPrefix(id, "T-"))
 	return n
 }
@@ -52,7 +53,7 @@ func (s *Store) taskFiles() ([]taskRef, error) {
 			continue
 		}
 		if m := fileIDRe.FindStringSubmatch(e.Name()); m != nil {
-			refs = append(refs, taskRef{id: m[1], num: idNum(m[1]), path: filepath.Join(s.root, e.Name())})
+			refs = append(refs, taskRef{id: m[1], num: IDNum(m[1]), path: filepath.Join(s.root, e.Name())})
 		}
 	}
 	sort.Slice(refs, func(i, j int) bool { return refs[i].num < refs[j].num })

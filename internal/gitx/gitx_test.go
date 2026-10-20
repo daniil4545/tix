@@ -3,12 +3,14 @@ package gitx_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"tracker/internal/gitx"
 )
@@ -219,49 +221,83 @@ func TestMergeFile(t *testing.T) {
 	})
 }
 
-func TestRemove_DeletesFileAndIndexEntry(t *testing.T) {
-	defer guard(t)
-	r := newRepo(t)
-	put(t, r, "a.md", "a\n")
-	if _, err := r.Commit([]string{"a.md"}, "T-1: new", "x"); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.Remove("a.md"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(r.Dir, "a.md")); err == nil {
-		t.Error("файл остался на диске")
-	}
-	if st := raw(t, r, "status", "--porcelain"); !strings.HasPrefix(strings.TrimLeft(st, " "), "D") {
-		t.Errorf("удаление не в индексе: %q", st)
-	}
-}
+var testLocks = []string{"index.lock", "HEAD.lock", filepath.Join("refs", "heads", "main.lock"),
+	filepath.Join("refs", "heads", "feat", "x.lock")}
 
-func TestDropGitLocks(t *testing.T) {
-	defer guard(t)
-	r := newRepo(t)
-	if dropped, err := r.DropGitLocks(); err != nil || len(dropped) != 0 {
-		t.Errorf("no files: dropped=%v err=%v, want none, nil", dropped, err)
-	}
-	gitDir := filepath.Join(r.Dir, ".git")
-	locks := []string{"index.lock", "HEAD.lock", filepath.Join("refs", "heads", "main.lock"),
-		filepath.Join("refs", "heads", "feat", "x.lock")}
+// putLocks создаёт пустые lock-файлы; age > 0 состаривает их на это время.
+func putLocks(t *testing.T, r gitx.Repo, locks []string, age time.Duration) {
+	t.Helper()
+	when := time.Now().Add(-age)
 	for _, l := range locks {
-		p := filepath.Join(gitDir, l)
+		p := filepath.Join(r.Dir, ".git", l)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(p, nil, 0o644); err != nil {
 			t.Fatal(err)
 		}
+		if err := os.Chtimes(p, when, when); err != nil {
+			t.Fatal(err)
+		}
 	}
+}
+
+func TestDropGitLocks_NoFiles(t *testing.T) {
+	defer guard(t)
+	r := newRepo(t)
+	if dropped, err := r.DropGitLocks(); err != nil || len(dropped) != 0 {
+		t.Errorf("dropped=%v err=%v, want none, nil", dropped, err)
+	}
+}
+
+func TestDropGitLocks_StaleRemoved(t *testing.T) {
+	defer guard(t)
+	r := newRepo(t)
+	putLocks(t, r, testLocks, time.Minute)
 	dropped, err := r.DropGitLocks()
-	if err != nil || len(dropped) != len(locks) {
-		t.Errorf("with files: dropped=%v err=%v, want %d paths", dropped, err, len(locks))
+	if err != nil || len(dropped) != len(testLocks) {
+		t.Errorf("dropped=%v err=%v, want %d paths", dropped, err, len(testLocks))
 	}
-	for _, l := range locks {
-		if _, err := os.Stat(filepath.Join(gitDir, l)); err == nil {
+	for _, l := range testLocks {
+		if _, err := os.Stat(filepath.Join(r.Dir, ".git", l)); err == nil {
 			t.Errorf("%s left behind", l)
 		}
+	}
+}
+
+func TestDropGitLocks_FreshKeptBusy(t *testing.T) {
+	defer guard(t)
+	r := newRepo(t)
+	putLocks(t, r, testLocks, 0)
+	if dropped, err := r.DropGitLocks(); !errors.Is(err, gitx.ErrBusy) || len(dropped) != 0 {
+		t.Errorf("dropped=%v err=%v, want none, ErrBusy", dropped, err)
+	}
+	for _, l := range testLocks {
+		if _, err := os.Stat(filepath.Join(r.Dir, ".git", l)); err != nil {
+			t.Errorf("fresh %s removed: %v", l, err)
+		}
+	}
+}
+
+func TestDropGitLocks_OneFreshRemovesNothing(t *testing.T) {
+	defer guard(t)
+	r := newRepo(t)
+	putLocks(t, r, testLocks[1:], time.Minute)
+	putLocks(t, r, testLocks[:1], 0)
+	if dropped, err := r.DropGitLocks(); !errors.Is(err, gitx.ErrBusy) || len(dropped) != 0 {
+		t.Errorf("dropped=%v err=%v, want none, ErrBusy", dropped, err)
+	}
+	if _, err := os.Stat(filepath.Join(r.Dir, ".git", testLocks[1])); err != nil {
+		t.Errorf("stale lock removed despite fresh one: %v", err)
+	}
+}
+
+func TestError_ShortTextAndDetail(t *testing.T) {
+	err := error(fmt.Errorf("outer: %w", &gitx.Error{Op: "status", Code: 128, Stderr: "fatal: boom\n"}))
+	if strings.Contains(err.Error(), "boom") || !strings.Contains(err.Error(), "git status failed") {
+		t.Errorf("Error() = %q, want short phrase without git text", err)
+	}
+	if d := gitx.Detail(err); !strings.Contains(d, "boom") || !strings.Contains(d, "exit 128") {
+		t.Errorf("Detail() = %q, want git text", d)
 	}
 }

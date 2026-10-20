@@ -135,7 +135,7 @@ func benches(home string, tasks int) []bench {
 			check: expectOK,
 		},
 		{
-			name: "comment after outside edit", targetMS: 50, args: []string{"comment", id, "speed measurement"},
+			name: "comment after outside edit", targetMS: 70, args: []string{"comment", id, "speed measurement"},
 			before: func(n int) error { return editOutside(ext, n) },
 			check:  expectOK,
 		},

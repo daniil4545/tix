@@ -92,10 +92,14 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 	tx := &txEnv{repo: repo, skip: map[string]bool{}}
 	if _, err := os.Stat(filepath.Join(s.root, ".git")); os.IsNotExist(err) {
 		if err := repo.Init(); err != nil {
-			return nil, fmt.Errorf("git init: %w", err)
+			return nil, err
 		}
 	}
 	dropped, err := repo.DropGitLocks()
+	if errors.Is(err, gitx.ErrBusy) {
+		s.log.Warn("git lock is fresh", "op", "git_busy", "err", err)
+		return nil, errGitBusy{}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("git locks: %w", err)
 	}
@@ -143,7 +147,7 @@ func (s *Store) cleanTmp() {
 func (s *Store) syncExternal(tx *txEnv) error {
 	changes, err := tx.repo.Status()
 	if err != nil {
-		return fmt.Errorf("git status: %w", err)
+		return err
 	}
 	ids := map[string]bool{}
 	var others, paths []string
@@ -171,7 +175,7 @@ func (s *Store) syncExternal(tx *txEnv) error {
 		lines = append(lines, "external edit: "+p)
 	}
 	if _, err := tx.repo.Commit(paths, strings.Join(lines, "\n\n"), "external"); err != nil {
-		s.log.Warn("external edit not committed", "op", "external_edit", "paths", len(paths), "err", err)
+		s.log.Warn("external edit not committed", "op", "external_edit", "paths", len(paths), "err", gitx.Detail(err))
 	}
 	return nil
 }
@@ -181,7 +185,7 @@ func sortedIDs(ids map[string]bool) []string {
 	for id := range ids {
 		out = append(out, id)
 	}
-	sort.Slice(out, func(i, j int) bool { return idNum(out[i]) < idNum(out[j]) })
+	sort.Slice(out, func(i, j int) bool { return IDNum(out[i]) < IDNum(out[j]) })
 	return out
 }
 
@@ -189,7 +193,7 @@ func sortedIDs(ids map[string]bool) []string {
 func (s *Store) commit(repo gitx.Repo, res *Result, paths []string, subject, actor string) {
 	h, err := repo.Commit(paths, subject, actor)
 	if err != nil {
-		s.log.Warn("commit not recorded", "op", "commit", "id", res.ID, "err", err)
+		s.log.Warn("commit not recorded", "op", "commit", "id", res.ID, "err", gitx.Detail(err))
 		res.Warning = warnCommit
 		return
 	}
@@ -201,11 +205,11 @@ func (s *Store) commit(repo gitx.Repo, res *Result, paths []string, subject, act
 func (s *Store) modify(id, actor, op string, mutate func(t *task.Task, curRev string) error) (Result, error) {
 	var res Result
 	err := s.withLock(false, func(tx *txEnv) error {
-		for range maxAttempts {
+		for attempt := range maxAttempts {
 			if err := s.syncExternal(tx); err != nil {
 				return err
 			}
-			r, done, err := s.modifyOnce(tx, id, actor, op, mutate)
+			r, done, err := s.modifyOnce(tx, id, actor, op, attempt, mutate)
 			if err != nil || done {
 				res = r
 				return err
@@ -217,7 +221,7 @@ func (s *Store) modify(id, actor, op string, mutate func(t *task.Task, curRev st
 }
 
 // modifyOnce - одна попытка modify. done=false: файл изменился с чтения, нужен повтор.
-func (s *Store) modifyOnce(tx *txEnv, id, actor, op string,
+func (s *Store) modifyOnce(tx *txEnv, id, actor, op string, attempt int,
 	mutate func(t *task.Task, curRev string) error) (Result, bool, error) {
 	path, err := s.findPath(id)
 	if err != nil {
@@ -238,6 +242,9 @@ func (s *Store) modifyOnce(tx *txEnv, id, actor, op string,
 	out := t.Render()
 	if bytes.Equal(out, data) {
 		return Result{ID: id, Rev: rev}, true, nil
+	}
+	if s.afterRead != nil {
+		s.afterRead(path, attempt)
 	}
 	ok, err := s.replace(path, data, out)
 	if err != nil || !ok {
@@ -265,6 +272,7 @@ func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string,
 	}
 	baseData, err := repo.Blob(baseRev)
 	if err != nil {
+		s.log.Warn("base blob not read", "op", "cat_file", "rev", baseRev, "err", gitx.Detail(err))
 		return "", stale
 	}
 	bt, err := task.Parse(cur.Path+" (base "+baseRev[:7]+")", baseData)
@@ -281,7 +289,7 @@ func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string,
 	// и его отступ в слиянии не участвуют.
 	out, conflict, err := repo.MergeFile([]byte(nl(cur.Body)), []byte(nl(bt.Body)), []byte(nl(body)))
 	if err != nil {
-		return "", fmt.Errorf("merge: %w", err)
+		return "", err
 	}
 	if conflict {
 		return "", fmt.Errorf("%w: body changed after tk show, reread and retry", ErrConflict)

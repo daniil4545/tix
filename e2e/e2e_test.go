@@ -60,6 +60,8 @@ type box struct {
 	home string // TRACKER_HOME
 	cwd  string // не git-папка
 	env  []string
+	// stale - rev, оставшийся позади файла (для сценариев слияния).
+	stale string
 }
 
 func newBox(t *testing.T) *box {
@@ -322,19 +324,41 @@ func (b *box) showJSON(id string) showJSON {
 	return s
 }
 
-// fakeGit ставит обёртку git: режим берётся из файла mode рядом (pass, fail, hang).
+// fakeGit ставит обёртку git: режим берётся из файла mode рядом: pass; fail и hang - на
+// commit (hang оставляет .git/index.lock, как убитый git); failon:<подкоманда> - отказ
+// с текстом boom-secret на любой подкоманде.
 func (b *box) fakeGit() (script, dir string) {
 	b.t.Helper()
 	dir = filepath.Join(b.root, "fakegit")
 	script = filepath.Join(dir, "git")
 	b.write(script, "#!/bin/sh\nD=$(dirname \"$0\")\nMODE=pass\n[ -f \"$D/mode\" ] && MODE=$(cat \"$D/mode\")\n"+
-		"for a in \"$@\"; do\n  if [ \"$a\" = commit ]; then\n"+
+		"for a in \"$@\"; do\n  case \"$MODE\" in failon:*)\n"+
+		"    [ \"$a\" = \"${MODE#failon:}\" ] && { echo 'fatal: boom-secret' >&2; exit 128; };;\n  esac\n"+
+		"  if [ \"$a\" = commit ]; then\n"+
 		"    case \"$MODE\" in\n      fail) echo 'fatal: boom' >&2; exit 128;;\n"+
-		"      hang) touch \"$D/marker\"; exec sleep 600;;\n    esac\n  fi\ndone\nexec "+gitBin+" \"$@\"\n")
+		"      hang) touch .git/index.lock; touch \"$D/marker\"; exec sleep 600;;\n    esac\n  fi\ndone\nexec "+gitBin+" \"$@\"\n")
 	if err := os.Chmod(script, 0o755); err != nil {
 		b.t.Fatal(err)
 	}
 	return script, dir
+}
+
+// ageLocks состаривает lock-файлы git: висящий lock старше порога снимается.
+// Проверяется восстановление, а не ожидание 10 секунд.
+func (b *box) ageLocks() []string {
+	b.t.Helper()
+	old := time.Now().Add(-time.Minute)
+	var found []string
+	_ = filepath.WalkDir(filepath.Join(b.home, ".git"), func(p string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() && strings.HasSuffix(p, ".lock") {
+			if err := os.Chtimes(p, old, old); err != nil {
+				b.t.Fatal(err)
+			}
+			found = append(found, p)
+		}
+		return nil
+	})
+	return found
 }
 
 func waitFile(t *testing.T, path string) {
@@ -658,6 +682,7 @@ func TestScenario_StaleGitLocks_Dropped(t *testing.T) {
 		b.write(p, "")
 		locks = append(locks, p)
 	}
+	b.ageLocks()
 	b.ok("", "comment", "T-1", "after lock")
 	for _, p := range locks {
 		if _, err := os.Stat(p); err == nil {
@@ -667,6 +692,80 @@ func TestScenario_StaleGitLocks_Dropped(t *testing.T) {
 	log := b.read(filepath.Join(b.home, ".tracker", "log"))
 	if !strings.Contains(log, "WARN") || !strings.Contains(log, "drop_index_lock") {
 		t.Errorf("в .tracker/log нет WARN op=drop_index_lock:\n%s", log)
+	}
+}
+
+// Свежий lock - git другого процесса ещё работает: операция его не трогает и не пишет.
+func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	lock := filepath.Join(b.home, ".git", "index.lock")
+	b.write(lock, "")
+	before := b.snapshot()
+	r := b.tk("", "comment", "T-1", "busy")
+	if r.code != 1 || r.err != "err T-1: git is busy\n" {
+		t.Errorf("свежий lock: код %d, stderr %q, ждали код 1 и `err T-1: git is busy`", r.code, r.err)
+	}
+	if _, err := os.Stat(lock); err != nil {
+		t.Errorf("свежий lock удалён: %v", err)
+	}
+	if fmt.Sprint(b.snapshot()) != fmt.Sprint(before) {
+		t.Error("отказ git is busy изменил базу")
+	}
+	// Lock состарился: висящий, операция его снимает.
+	b.ageLocks()
+	b.ok("", "comment", "T-1", "after")
+	if _, err := os.Stat(lock); err == nil {
+		t.Error("висящий lock не удалён")
+	}
+}
+
+// Текст stderr git не попадает в ответ ни на одном пути; полный текст - в .tracker/log.
+func TestScenario_GitStderr_NotInReply(t *testing.T) {
+	const secret = "boom-secret"
+	body := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\n"
+	cases := []struct {
+		name, mode string
+		run        func(b *box, env []string) res
+		wantCode   int
+	}{
+		{"init", "failon:init", func(b *box, env []string) res { return b.runEnv(env, "", "new", "Alpha") }, 1},
+		{"status", "failon:status", func(b *box, env []string) res { return b.runEnv(env, "", "comment", "T-1", "x") }, 1},
+		{"commit", "failon:commit", func(b *box, env []string) res { return b.runEnv(env, "", "comment", "T-1", "x") }, 0},
+		{"hash-object", "failon:hash-object", func(b *box, env []string) res { return b.runEnv(env, "", "show", "T-1") }, 0},
+		{"cat-file", "failon:cat-file", func(b *box, env []string) res {
+			return b.runEnv(env, body, "edit", "T-1", "--base", b.stale)
+		}, 1},
+		{"merge-file", "failon:merge-file", func(b *box, env []string) res {
+			return b.runEnv(env, strings.Replace(body, "l9", "mine", 1), "edit", "T-1", "--base", b.stale)
+		}, 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			b := newBox(t)
+			script, dir := b.fakeGit()
+			env := b.with("TRACKER_GIT=" + script)
+			if c.name != "init" {
+				b.ok(body, "new", "Alpha")
+				b.ok(body, "edit", "T-1", "--base", b.showRev("T-1"))
+				b.stale = b.showRev("T-1")
+				b.ok("", "comment", "T-1", "other") // файл ушёл от базы: edit пойдёт через слияние
+				b.ok(strings.Replace(body, "l1", "first", 1), "edit", "T-1", "--base", b.showRev("T-1"))
+			}
+			b.write(filepath.Join(dir, "mode"), c.mode)
+			r := c.run(b, env)
+			if r.code != c.wantCode {
+				t.Errorf("код %d, ждали %d; stdout %q, stderr %q", r.code, c.wantCode, r.out, r.err)
+			}
+			for _, bad := range []string{secret, "fatal", "exit 128"} {
+				if strings.Contains(r.err, bad) || strings.Contains(r.out, bad) {
+					t.Errorf("в ответе текст git %q: stdout %q, stderr %q", bad, r.out, r.err)
+				}
+			}
+			if log := b.read(filepath.Join(b.home, ".tracker", "log")); !strings.Contains(log, secret) {
+				t.Errorf("полного текста git нет в .tracker/log:\n%s", log)
+			}
+		})
 	}
 }
 
@@ -722,6 +821,10 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 
 	b.noTmpLeft(false)
 	b.fsck()
+	lock := filepath.Join(b.home, ".git", "index.lock")
+	if _, err := os.Stat(lock); err != nil {
+		t.Fatalf("убитый git не оставил index.lock: %v", err)
+	}
 	if !strings.Contains(b.read(b.taskFile("T-1")), "zzz") {
 		t.Error("записанная правка пропала")
 	}
@@ -729,6 +832,11 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 		t.Errorf("list после kill: stderr %q, файл полузаписан?", r.err)
 	}
 	b.write(filepath.Join(dir, "mode"), "pass")
+	// Пока lock свежий, git мог быть живым: отказ без записи.
+	if r := b.tk("", "note", "T-1", "рано"); r.code != 1 || !strings.Contains(r.err, "git is busy") {
+		t.Errorf("свежий lock после kill: код %d, stderr %q, ждали git is busy", r.code, r.err)
+	}
+	b.ageLocks()
 	r := b.runEnv(b.with("TRACKER_LOCK_TIMEOUT=5s"), "", "note", "T-1", "после kill")
 	if r.code != 0 {
 		t.Fatalf("после kill -9 операция не прошла (лок не снят?): код %d, %q", r.code, r.err)
@@ -759,6 +867,7 @@ func TestScenario_Kill9Random_RepoStaysConsistent(t *testing.T) {
 		if err := c.Wait(); err == nil {
 			finished = append(finished, text)
 		}
+		b.ageLocks() // убитый git оставил lock: считаем его висящим
 	}
 	b.noTmpLeft(false)
 	b.fsck()

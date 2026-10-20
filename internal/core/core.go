@@ -28,6 +28,12 @@ var (
 	ErrNotFound = errors.New("task not found")
 )
 
+// errGitBusy - свежий lock-файл git: ответ "git is busy", errors.Is(err, ErrLocked).
+type errGitBusy struct{}
+
+func (errGitBusy) Error() string        { return "git is busy" }
+func (errGitBusy) Is(target error) bool { return target == ErrLocked }
+
 const (
 	defaultLockTimeout = 5 * time.Second
 	maxAttempts        = 3
@@ -67,6 +73,10 @@ type Store struct {
 	wait time.Duration
 	bin  string
 	log  *slog.Logger
+
+	// afterRead - шов для тестов: вызывается между чтением файла и сверкой перед rename
+	// (шаг 4 из 2.1). В работе nil.
+	afterRead func(path string, attempt int)
 
 	gitOnce sync.Once
 	repo    gitx.Repo
@@ -280,28 +290,34 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 // Get читает задачу и её rev, пишет blob в git (hash-object -w). Отказ git - warn в лог,
 // rev тогда считается в Go (тот же blob id).
 func (s *Store) Get(id string) (*task.Task, string, error) {
+	t, rev, _, err := s.Show(id)
+	return t, rev, err
+}
+
+// Show - Get плюс файл как прочитан: rev посчитан по этим же байтам.
+func (s *Store) Show(id string) (*task.Task, string, []byte, error) {
 	path, err := s.findPath(id)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	data, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
 	if err != nil {
-		return nil, "", fmt.Errorf("read %s: %w", path, err)
+		return nil, "", nil, fmt.Errorf("read %s: %w", path, err)
 	}
 	t, err := task.Parse(path, data)
 	if err != nil {
-		return nil, "", err
+		return nil, "", nil, err
 	}
 	rev := blobID(data)
 	if repo, err := s.git(); err != nil {
 		s.log.Warn("hash-object skipped", "op", "hash_object", "id", id, "err", err)
 	} else if h, err := repo.HashObject(data); err != nil {
-		s.log.Warn("hash-object failed", "op", "hash_object", "id", id, "err", err)
+		s.log.Warn("hash-object failed", "op", "hash_object", "id", id, "err", gitx.Detail(err))
 	} else {
 		rev = h
 	}
 	t.Rev, t.Path = rev, path
-	return t, rev, nil
+	return t, rev, data, nil
 }
 
 // pickColumn проверяет колонку; пустое имя - колонка роли inbox, иначе первая.
