@@ -1,0 +1,12 @@
+{
+  "name": "tk-local",
+  "description": "Local marketplace for the tk task tracker plugin",
+  "owner": { "name": "tracker" },
+  "plugins": [
+    {
+      "name": "tk",
+      "source": "./plugins/tk",
+      "description": "tk skill and SessionStart ctx hook"
+    }
+  ]
+}

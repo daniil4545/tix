@@ -34,6 +34,7 @@ check: fmt-check vet lint test build
 bench: build
 	go run ./cmd/tkbench bin/tk
 
-# Проверка трёх агентов (Claude Code, Codex, OpenCode) на живых CLI делает З3.
+# Живой прогон трёх агентов (Claude Code, Codex, OpenCode) тратит лимиты подписок: только с согласием.
+# Без E2E_ARGS=--yes скрипт печатает предупреждение и выходит с кодом 2. Подмножество: E2E_ARGS="--yes --agents claude".
 e2e-agents:
-	@echo "e2e-agents: цель появится в задаче З3"
+	scripts/e2e-agents.sh $(E2E_ARGS)

@@ -1,0 +1,6 @@
+{
+  "name": "tk",
+  "version": "0.1.0",
+  "description": "tk task tracker: skill and SessionStart ctx hook",
+  "author": { "name": "tracker" }
+}

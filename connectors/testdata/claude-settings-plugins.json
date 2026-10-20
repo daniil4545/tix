@@ -1,0 +1,7 @@
+{
+  "permissions": {"allow": ["Bash(git status)"]},
+  "extraKnownMarketplaces": {
+    "other-mkt": {"source": {"source": "github", "repo": "example/other-mkt"}}
+  },
+  "enabledPlugins": {"other@other-mkt": true}
+}
