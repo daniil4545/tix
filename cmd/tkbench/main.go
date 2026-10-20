@@ -1,4 +1,4 @@
-// Команда tkbench - speed measurement tk. Зона B.
+// Команда tkbench - замер скорости tk.
 // Вызов из make bench: go run ./cmd/tkbench bin/tk (первый аргумент - путь к собранному tk).
 // Код выхода 0, если цели раздела 7 плана выполнены.
 package main
@@ -22,10 +22,19 @@ import (
 
 const (
 	runTimeout = 30 * time.Second
-	benchActor = "bench"
+	benchActor = "bench:1"
 	// Задачи, на которых идёт замер: show и comment читают одну, правка мимо ядра - другую.
 	targetTask   = 500
 	externalTask = 600
+	// moveTask лежит в колонке todo; move гоняет её между todo и doing, каждый вызов пишет коммит.
+	moveTask = 701
+	// takeFirst - первая задача todo; take берёт по одной новой на прогон (каждая пятая).
+	takeFirst   = 6
+	takeStride  = 5
+	columnTodo  = "todo"
+	columnDoing = "doing"
+	// maxRuns держит take между первой todo-задачей и moveTask (701 = 6 + 5*139).
+	maxRuns = 130
 )
 
 // bench - один замеряемый вызов tk и цель по медиане.
@@ -33,8 +42,9 @@ type bench struct {
 	name     string
 	targetMS float64
 	args     []string
-	before   func(n int) error // правка перед каждым прогоном, не входит в время
-	check    func(out string) error
+	argsOf   func(n int) []string // аргументы прогона n; вместо args, если задана
+	before   func(n int) error    // правка перед каждым прогоном, не входит в время
+	check    func(n int, out string) error
 }
 
 type sample struct {
@@ -69,8 +79,11 @@ func main() {
 }
 
 func run(tk string, tasks, runs, warm int, keep bool) (bool, error) {
-	if tasks < externalTask {
-		return false, fmt.Errorf("need at least %d tasks", externalTask)
+	if tasks <= moveTask {
+		return false, fmt.Errorf("need at least %d tasks", moveTask+1)
+	}
+	if warm+runs > maxRuns {
+		return false, fmt.Errorf("at most %d runs per operation: take needs a new task each run", maxRuns)
 	}
 	home, err := os.MkdirTemp("", "tkbench-")
 	if err != nil {
@@ -114,7 +127,7 @@ func benches(home string, tasks int) []bench {
 	return []bench{
 		{
 			name: "list", targetMS: 15, args: []string{"list"},
-			check: func(out string) error {
+			check: func(_ int, out string) error {
 				if n := strings.Count(out, "\n"); n < tasks {
 					return fmt.Errorf("%d lines in reply, expected at least %d", n, tasks)
 				}
@@ -123,12 +136,33 @@ func benches(home string, tasks int) []bench {
 		},
 		{
 			name: "show", targetMS: 15, args: []string{"show", id},
-			check: func(out string) error {
+			check: func(_ int, out string) error {
 				if !strings.HasPrefix(out, "rev ") {
 					return fmt.Errorf("reply does not start with rev: %.40q", out)
 				}
 				return nil
 			},
+		},
+		{
+			name: "ctx", targetMS: 15, args: []string{"ctx"},
+			check: func(_ int, out string) error {
+				if !strings.HasPrefix(out, "project ") {
+					return fmt.Errorf("reply does not start with project: %.40q", out)
+				}
+				return nil
+			},
+		},
+		{
+			name: "take", targetMS: 50,
+			argsOf: func(n int) []string { return []string{"take", taskID(takeFirst + takeStride*n)} },
+			check: func(n int, out string) error {
+				return expectMove(out, taskID(takeFirst+takeStride*n), columnDoing)
+			},
+		},
+		{
+			name: "move", targetMS: 50,
+			argsOf: func(n int) []string { return []string{"move", taskID(moveTask), moveTarget(n)} },
+			check:  func(n int, out string) error { return expectMove(out, taskID(moveTask), moveTarget(n)) },
 		},
 		{
 			name: "comment", targetMS: 50, args: []string{"comment", id, "speed measurement"},
@@ -142,9 +176,27 @@ func benches(home string, tasks int) []bench {
 	}
 }
 
-func expectOK(out string) error {
+func expectOK(_ int, out string) error {
 	if !strings.HasPrefix(out, "ok ") {
 		return fmt.Errorf("reply does not start with ok: %.60q", out)
+	}
+	return nil
+}
+
+func taskID(n int) string { return fmt.Sprintf("T-%d", n) }
+
+// moveTarget чередует колонки: чётный прогон - в doing, нечётный - обратно в todo.
+func moveTarget(n int) string {
+	if n%2 == 0 {
+		return columnDoing
+	}
+	return columnTodo
+}
+
+// expectMove требует ответ о настоящем переносе: повтор без изменения коммита не пишет.
+func expectMove(out, id, column string) error {
+	if !strings.HasPrefix(out, "ok "+id+" ") || !strings.Contains(out, "> "+column) {
+		return fmt.Errorf("reply is not a move of %s to %s: %.60q", id, column, out)
 	}
 	return nil
 }
@@ -158,11 +210,15 @@ func measure(tk, home string, b bench, runs, warm int) (sample, error) {
 				return sample{}, err
 			}
 		}
-		d, out, err := timeRun(tk, home, b.args)
+		args := b.args
+		if b.argsOf != nil {
+			args = b.argsOf(i)
+		}
+		d, out, err := timeRun(tk, home, args)
 		if err != nil {
 			return sample{}, err
 		}
-		if err := b.check(out); err != nil {
+		if err := b.check(i, out); err != nil {
 			return sample{}, err
 		}
 		if i >= warm {
@@ -193,8 +249,21 @@ func percentile(sorted []float64, q float64) float64 {
 func tkCmd(ctx context.Context, tk, home string, args []string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, tk, args...) //nolint:gosec // tk - аргумент командной строки bench
 	cmd.Dir = home
-	cmd.Env = append(os.Environ(), "TRACKER_HOME="+home)
+	cmd.Env = append(cleanEnv(), "TRACKER_HOME="+home, "TRACKER_ACTOR="+benchActor)
 	return cmd
+}
+
+// cleanEnv убирает переменные сессии агента: личность замера не зависит от окна запуска.
+func cleanEnv() []string {
+	var env []string
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "CLAUDE_CODE_SESSION_ID=") || strings.HasPrefix(kv, "CODEX_THREAD_ID=") ||
+			strings.HasPrefix(kv, "TRACKER_ACTOR=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
 }
 
 func timeRun(tk, home string, args []string) (time.Duration, string, error) {
@@ -288,7 +357,7 @@ func para(r *rand.Rand, n int) string {
 
 // taskContent строит файл около 4 КБ по разделу 5 спеки: frontmatter, тело, комментарии.
 func taskContent(r *rand.Rand, id int) string {
-	cols := []string{"inbox", "ready", "active", "waiting", "done"}
+	cols := []string{"idea", "todo", "doing", "blocked", "done"}
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: T-%d\ntitle: Task number %d about the core\nproject: proj%d\nstatus: %s\nrank: %d\ncreated: 2026-10-01T09:00:00\n",
 		id, id, id%12, cols[id%5], id)

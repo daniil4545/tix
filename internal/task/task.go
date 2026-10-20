@@ -423,12 +423,26 @@ func (t *Task) syncField(m *yaml.Node, key string) bool {
 	if t.sameField(key, val) {
 		return false
 	}
+	if want == nil && !requiredFields[key] {
+		removeKey(m, key)
+		return true
+	}
 	if want == nil {
 		want = plainNode("")
 	}
 	want.LineComment, want.HeadComment, want.FootComment = val.LineComment, val.HeadComment, val.FootComment
 	*val = *want
 	return true
+}
+
+// removeKey удаляет пару ключ-значение из узла-карты.
+func removeKey(m *yaml.Node, key string) {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content = append(m.Content[:i], m.Content[i+2:]...)
+			return
+		}
+	}
 }
 
 func plainNode(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Value: v} }

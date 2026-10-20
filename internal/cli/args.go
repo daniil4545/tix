@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -47,18 +45,18 @@ func parseArgs(args []string, spec flagSpec) (*parsed, error) {
 		name, val, hasVal := strings.Cut(strings.TrimLeft(arg, "-"), "=")
 		takes, known := spec[name]
 		if !known {
-			return nil, fmt.Errorf("unknown flag %s", arg)
+			return nil, inputf("unknown flag %s", arg)
 		}
 		if !takes {
 			if hasVal {
-				return nil, fmt.Errorf("flag %s takes no value", arg)
+				return nil, inputf("flag %s takes no value", arg)
 			}
 			p.set[name] = true
 			continue
 		}
 		if !hasVal {
 			if i+1 >= len(args) {
-				return nil, fmt.Errorf("flag %s needs a value", arg)
+				return nil, inputf("flag %s needs a value", arg)
 			}
 			i++
 			val = args[i]
@@ -67,17 +65,4 @@ func parseArgs(args []string, spec flagSpec) (*parsed, error) {
 		p.set[name] = true
 	}
 	return p, nil
-}
-
-// actor возвращает автора записи; без --as - unknown.
-// Запрещённое ломает маркер комментария и трейлер коммита.
-func (p *parsed) actor() (string, error) {
-	if !p.set["as"] {
-		return "unknown", nil
-	}
-	a := p.vals["as"]
-	if strings.TrimSpace(a) == "" || strings.ContainsAny(a, "|\r\n") || strings.Contains(a, "-->") {
-		return "", errors.New("bad --as: empty, or contains |, --> or a line break")
-	}
-	return a, nil
 }

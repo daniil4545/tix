@@ -22,7 +22,17 @@ const (
 	commentsHeading = "## Comments"
 )
 
+// anyInput: план З2, раздел 5, не задаёт код для этих входов - допустимы 1 и 6.
+const anyInput = -1
+
 var gitBin string
+
+func codeMatches(got, want int) bool {
+	if want == anyInput {
+		return got == 1 || got == 6
+	}
+	return got == want
+}
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "tk-cli-")
@@ -58,6 +68,8 @@ type box struct {
 	home string
 	cwd  string
 	root string
+	// extra - переменные окружения сверх базовых (личность агента и прочее).
+	extra map[string]string
 }
 
 func newBox(t *testing.T) *box {
@@ -83,6 +95,9 @@ func (b *box) runIn(cwd, stdin string, args ...string) res {
 		"TRACKER_GIT":          gitBin,
 		"TRACKER_LOCK_TIMEOUT": "2s",
 		"HOME":                 os.Getenv("HOME"),
+	}
+	for k, v := range b.extra {
+		vars[k] = v
 	}
 	code := cli.Run(context.Background(), args, cli.Env{
 		Stdin: strings.NewReader(stdin), Stdout: &o, Stderr: &e, Cwd: cwd,
@@ -357,28 +372,30 @@ func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
 	rev := strings.TrimPrefix(strings.SplitN(b.ok("", "show", "T-1").out, "\n", 2)[0], "rev ")
+	// Коды выхода по разделу 5 плана З2: 4 нет задачи, 6 ввод (флаг, id), 1 прочее.
 	cases := []struct {
 		name  string
 		stdin string
 		args  []string
+		want  int
 	}{
-		{"show нет задачи", "", []string{"show", "T-99"}},
-		{"comment нет задачи", "", []string{"comment", "T-99", "x"}},
-		{"rm нет задачи", "", []string{"rm", "T-99"}},
-		{"new неизвестная колонка", "", []string{"new", "X", "--to", "nosuch"}},
-		{"edit с заголовком комментариев", "текст\n" + commentsHeading + "\nподдельный\n", []string{"edit", "T-1", "--base", rev}},
-		{"edit пустой stdin", "", []string{"edit", "T-1", "--base", rev}},
-		{"as с чертой", "", []string{"comment", "T-1", "x", "--as", "a|b"}},
-		{"as со стрелкой", "", []string{"comment", "T-1", "x", "--as", "a-->b"}},
-		{"as с переводом строки", "", []string{"comment", "T-1", "x", "--as", "a\nb"}},
+		{"show нет задачи", "", []string{"show", "T-99"}, 4},
+		{"comment нет задачи", "", []string{"comment", "T-99", "x"}, 4},
+		{"rm нет задачи", "", []string{"rm", "T-99"}, 4},
+		{"new неизвестная колонка", "", []string{"new", "X", "--to", "nosuch"}, anyInput},
+		{"edit с заголовком комментариев", "текст\n" + commentsHeading + "\nподдельный\n", []string{"edit", "T-1", "--base", rev}, anyInput},
+		{"edit пустой stdin", "", []string{"edit", "T-1", "--base", rev}, anyInput},
+		{"as с чертой", "", []string{"comment", "T-1", "x", "--as", "a|b"}, 6},
+		{"as со стрелкой", "", []string{"comment", "T-1", "x", "--as", "a-->b"}, 6},
+		{"as с переводом строки", "", []string{"comment", "T-1", "x", "--as", "a\nb"}, 6},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			defer guard(t)
 			before := b.snapshot()
 			r := b.tk(c.stdin, c.args...)
-			if r.code != 1 {
-				t.Errorf("код %d, ждали 1; stdout %q stderr %q", r.code, r.out, r.err)
+			if !codeMatches(r.code, c.want) {
+				t.Errorf("код %d, ждали %d (anyInput: 1 или 6); stdout %q stderr %q", r.code, c.want, r.out, r.err)
 			}
 			if r.out != "" {
 				t.Errorf("при ошибке stdout должен быть пуст: %q", r.out)

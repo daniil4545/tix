@@ -42,13 +42,13 @@ func (a *app) cmdNew(args []string) error {
 	if err != nil {
 		return err
 	}
-	actor, err := p.actor()
+	actor, err := a.actorOf(p)
 	if err != nil {
 		return err
 	}
 	title := strings.TrimSpace(strings.Join(p.pos, " "))
 	if title == "" {
-		return errors.New("title required: tk new <title>")
+		return inputf("title required: tk new <title>")
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -91,7 +91,7 @@ func (a *app) column(p *parsed) (string, error) {
 	for i, c := range cols {
 		names[i] = c.Name
 	}
-	return "", fmt.Errorf("unknown column %q; available: %s", want, strings.Join(names, ", "))
+	return "", inputf("unknown column %q; available: %s", want, strings.Join(names, ", "))
 }
 
 func (a *app) cmdText(args []string) error {
@@ -103,13 +103,13 @@ func (a *app) cmdText(args []string) error {
 	if err != nil {
 		return err
 	}
-	actor, err := p.actor()
+	actor, err := a.actorOf(p)
 	if err != nil {
 		return err
 	}
 	text := strings.TrimSpace(strings.Join(p.pos[1:], " "))
 	if text == "" {
-		return &idError{ID: id, Err: fmt.Errorf("text required: tk %s %s <text>", a.cmd, id)}
+		return &idError{ID: id, Err: inputf("text required: tk %s %s <text>", a.cmd, id)}
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -135,7 +135,7 @@ func (a *app) cmdRemove(args []string) error {
 	if err != nil {
 		return err
 	}
-	actor, err := p.actor()
+	actor, err := a.actorOf(p)
 	if err != nil {
 		return err
 	}
@@ -159,12 +159,12 @@ func (a *app) cmdEdit(args []string) error {
 	if err != nil {
 		return err
 	}
-	actor, err := p.actor()
+	actor, err := a.actorOf(p)
 	if err != nil {
 		return err
 	}
 	if p.vals["base"] == "" {
-		return &idError{ID: id, Err: fmt.Errorf("--base <rev> from tk show %s required", id)}
+		return &idError{ID: id, Err: inputf("--base <rev> from tk show %s required", id)}
 	}
 	body, err := a.readBody()
 	if err != nil {
@@ -184,14 +184,14 @@ func (a *app) cmdEdit(args []string) error {
 // readBody читает новое тело из stdin; пустое тело - отказ.
 func (a *app) readBody() (string, error) {
 	if a.env.Stdin == nil {
-		return "", errors.New("task body not passed on stdin")
+		return "", inputf("task body not passed on stdin")
 	}
 	data, err := io.ReadAll(a.env.Stdin)
 	if err != nil {
 		return "", fmt.Errorf("read stdin: %w", err)
 	}
 	if strings.TrimSpace(string(data)) == "" {
-		return "", errors.New("empty body on stdin")
+		return "", inputf("empty body on stdin")
 	}
 	return string(data), nil
 }
@@ -261,7 +261,7 @@ func (a *app) cmdList(args []string) error {
 		return err
 	}
 	if len(p.pos) > 0 {
-		return fmt.Errorf("list takes no arguments, extra: %s", p.pos[0])
+		return inputf("list takes no arguments, extra: %s", p.pos[0])
 	}
 	root, err := a.rootDir()
 	if err != nil {

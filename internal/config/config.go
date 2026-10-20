@@ -132,10 +132,20 @@ func (c *Config) Render() []byte {
 
 // ByRole возвращает первую колонку с ролью role.
 func (c *Config) ByRole(role string) (Column, bool) {
+	for _, col := range c.Columns {
+		if col.Role == role {
+			return col, true
+		}
+	}
 	return Column{}, false
 }
 
 // RoleOf возвращает роль колонки. Пусто: колонки нет или у неё нет роли.
 func (c *Config) RoleOf(column string) string {
+	for _, col := range c.Columns {
+		if col.Name == column {
+			return col.Role
+		}
+	}
 	return ""
 }

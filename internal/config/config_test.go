@@ -91,3 +91,45 @@ func TestLoad_Broken_ErrorHasPathAndLine(t *testing.T) {
 		t.Errorf("ошибка %q, ждали `config.toml:<строка>`", err)
 	}
 }
+
+const customConfig = `[[column]]
+name = "ideas"
+role = "inbox"
+
+[[column]]
+name = "todo"
+role = "ready"
+
+[[column]]
+name = "review"
+
+[[column]]
+name = "doing"
+role = "active"
+`
+
+func TestByRoleAndRoleOf(t *testing.T) {
+	defer guard(t)
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte(customConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if col, ok := c.ByRole("inbox"); !ok || col.Name != "ideas" {
+		t.Errorf("ByRole(inbox) = %+v, %v; ждали ideas", col, ok)
+	}
+	if col, ok := c.ByRole("waiting"); ok {
+		t.Errorf("ByRole(waiting) = %+v, true; роли в конфиге нет", col)
+	}
+	for name, want := range map[string]string{"ideas": "inbox", "doing": "active", "review": "", "nosuch": ""} {
+		if got := c.RoleOf(name); got != want {
+			t.Errorf("RoleOf(%q) = %q, ждали %q", name, got, want)
+		}
+	}
+	if got := config.Default().RoleOf("blocked"); got != "waiting" {
+		t.Errorf("RoleOf(blocked) в конфиге по умолчанию = %q, ждали waiting", got)
+	}
+}

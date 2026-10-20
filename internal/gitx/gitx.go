@@ -205,8 +205,8 @@ func (r Repo) env() []string {
 	return env
 }
 
-// run запускает git с флагами 2.1; reader добавляет --no-optional-locks.
-func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
+// command собирает вызов git с флагами 2.1; reader добавляет --no-optional-locks.
+func (r Repo) command(ctx context.Context, reader bool, args ...string) *exec.Cmd {
 	full := []string{
 		"-c", "commit.gpgsign=false",
 		"-c", "core.hooksPath=/dev/null",
@@ -224,12 +224,18 @@ func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
 	if bin == "" {
 		bin = "git"
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
-	defer cancel()
 	cmd := exec.CommandContext(ctx, bin, full...) //nolint:gosec // бинарь git задаёт Resolve или TRACKER_GIT
 	cmd.Dir = r.Dir
 	cmd.Env = r.env()
 	cmd.WaitDelay = 2 * time.Second
+	return cmd
+}
+
+// run запускает git и ждёт до gitTimeout.
+func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
+	defer cancel()
+	cmd := r.command(ctx, reader, args...)
 	if stdin != nil {
 		cmd.Stdin = bytes.NewReader(stdin)
 	}
@@ -299,16 +305,43 @@ func parseStatus(out []byte) []Change {
 	return changes
 }
 
+// Trailer - строка "Key: Value" в конце сообщения коммита (git commit --trailer).
+// Пустое значение - трейлер не пишется.
+type Trailer struct{ Key, Value string }
+
+// trailerKeyRe - ключ трейлера: токен без пробелов и двоеточия.
+var trailerKeyRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*$`)
+
+// messageArgs собирает аргументы сообщения: тема, затем трейлеры. Actor идёт первым.
+func messageArgs(subject, actor string, trailers []Trailer) ([]string, error) {
+	args := []string{"-m", subject}
+	all := trailers
+	if actor != "" {
+		all = append([]Trailer{{Key: "Actor", Value: actor}}, trailers...)
+	}
+	for _, t := range all {
+		if t.Value == "" {
+			continue
+		}
+		if !trailerKeyRe.MatchString(t.Key) || strings.ContainsAny(t.Value, "\n\r\x00") {
+			return nil, fmt.Errorf("git commit: bad trailer %q", t.Key)
+		}
+		args = append(args, "--trailer", t.Key+": "+t.Value)
+	}
+	return args, nil
+}
+
 // Commit делает add -A -- paths и commit --only -- paths, возвращает хеш.
 // Пустой список путей - commit --allow-empty --only (индекс не забирается).
 // Путь, которого нет ни в дереве, ни в индексе, - ошибка.
 // Быстрый путь: commit --only сам индексирует правку отслеживаемого файла, без
 // отдельного add (-5 мс). Новый файл git так не берёт: тогда add -A и повтор.
-func (r Repo) Commit(paths []string, subject, actor string) (string, error) {
-	args := []string{"commit", "-q", "--only", "-m", subject}
-	if actor != "" {
-		args = append(args, "-m", "Actor: "+actor)
+func (r Repo) Commit(paths []string, subject, actor string, trailers ...Trailer) (string, error) {
+	msg, err := messageArgs(subject, actor, trailers)
+	if err != nil {
+		return "", err
 	}
+	args := append([]string{"commit", "-q", "--only"}, msg...)
 	if len(paths) == 0 {
 		args = append(args, "--allow-empty")
 	} else {
@@ -346,9 +379,13 @@ const zeroID = "0000000000000000000000000000000000000000"
 // --index-info, commit индекса. Файл из дерева в коммит не идёт: чужая запись после
 // rename остаётся правкой дерева и уходит следующим коммитом external edit.
 // Пустой список - пустой коммит, как Commit(nil, ...).
-func (r Repo) CommitFiles(files []File, subject, actor string) (string, error) {
+func (r Repo) CommitFiles(files []File, subject, actor string, trailers ...Trailer) (string, error) {
 	if len(files) == 0 {
-		return r.Commit(nil, subject, actor)
+		return r.Commit(nil, subject, actor, trailers...)
+	}
+	msg, err := messageArgs(subject, actor, trailers)
+	if err != nil {
+		return "", err
 	}
 	var info bytes.Buffer
 	for _, f := range files {
@@ -365,11 +402,7 @@ func (r Repo) CommitFiles(files []File, subject, actor string) (string, error) {
 	if _, err := r.must(info.Bytes(), false, "update-index", "-z", "--index-info"); err != nil {
 		return "", err
 	}
-	args := []string{"commit", "-q", "-m", subject}
-	if actor != "" {
-		args = append(args, "-m", "Actor: "+actor)
-	}
-	if _, err := r.must(nil, false, args...); err != nil {
+	if _, err := r.must(nil, false, append([]string{"commit", "-q"}, msg...)...); err != nil {
 		return "", err
 	}
 	return r.head()

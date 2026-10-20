@@ -512,8 +512,8 @@ func TestScenario_EditStaleBase_MergeAndConflict(t *testing.T) {
 	// Те же строки: конфликт, отказ, файл цел.
 	before := b.snapshot()
 	r := b.tk(body("C-first", "l10"), "edit", "T-1", "--base", revA)
-	if r.code != 1 {
-		t.Fatalf("конфликт: код %d, ждали 1; stdout %q", r.code, r.out)
+	if r.code != 3 {
+		t.Fatalf("конфликт: код %d, ждали 3 (ErrConflict); stdout %q", r.code, r.out)
 	}
 	if !regexp.MustCompile(`^err T-1: .+\n$`).MatchString(r.err) {
 		t.Errorf("конфликт: stderr %q, ждали одну строку `err T-1: ...`", r.err)
@@ -660,8 +660,8 @@ func TestScenario_LockBusy_ErrOneLine(t *testing.T) {
 	start := time.Now()
 	r := b.runEnv(b.with("TRACKER_LOCK_TIMEOUT=200ms"), "", "comment", "T-1", "busy")
 	elapsed := time.Since(start)
-	if r.code != 1 || !regexp.MustCompile(`^err .+\n$`).MatchString(r.err) {
-		t.Errorf("лок занят: код %d, stderr %q, ждали код 1 и одну строку err", r.code, r.err)
+	if r.code != 2 || !regexp.MustCompile(`^err .+\n$`).MatchString(r.err) {
+		t.Errorf("лок занят: код %d, stderr %q, ждали код 2 (занято) и одну строку err", r.code, r.err)
 	}
 	if elapsed > 10*time.Second {
 		t.Errorf("ожидание %v, ждали около 200 мс", elapsed)
@@ -703,8 +703,8 @@ func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
 	b.write(lock, "")
 	before := b.snapshot()
 	r := b.tk("", "comment", "T-1", "busy")
-	if r.code != 1 || r.err != "err T-1: git is busy\n" {
-		t.Errorf("свежий lock: код %d, stderr %q, ждали код 1 и `err T-1: git is busy`", r.code, r.err)
+	if r.code != 2 || r.err != "err T-1: git is busy\n" {
+		t.Errorf("свежий lock: код %d, stderr %q, ждали код 2 и `err T-1: git is busy`", r.code, r.err)
 	}
 	if _, err := os.Stat(lock); err != nil {
 		t.Errorf("свежий lock удалён: %v", err)
@@ -833,7 +833,7 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 	}
 	b.write(filepath.Join(dir, "mode"), "pass")
 	// Пока lock свежий, git мог быть живым: отказ без записи.
-	if r := b.tk("", "note", "T-1", "рано"); r.code != 1 || !strings.Contains(r.err, "git is busy") {
+	if r := b.tk("", "note", "T-1", "рано"); r.code != 2 || !strings.Contains(r.err, "git is busy") {
 		t.Errorf("свежий lock после kill: код %d, stderr %q, ждали git is busy", r.code, r.err)
 	}
 	b.ageLocks()

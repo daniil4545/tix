@@ -29,17 +29,52 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tk new|list|show|edit|comment|note|rm; flags: -v, --as, --json; text starting with a dash goes after --"
+	usage              = "tk ctx|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
-var (
-	idPattern = regexp.MustCompile(`^T-[0-9]+$`)
-	// laterCommands - команды раздела 2.2 спеки, которые делает З2.
-	laterCommands = map[string]bool{
-		"ctx": true, "take": true, "move": true, "set": true,
-		"check": true, "done": true, "backup": true,
-	}
+// Коды выхода раздела 5 плана З2.
+const (
+	exitOther    = 1
+	exitBusy     = 2
+	exitConflict = 3
+	exitNotFound = 4
+	exitRule     = 5
+	exitInput    = 6
 )
+
+var idPattern = regexp.MustCompile(`^T-[0-9]+$`)
+
+// inputError - неверный ввод: флаг, id, число аргументов. Код выхода 6.
+type inputError struct{ msg string }
+
+func (e *inputError) Error() string { return e.msg }
+
+func inputf(format string, v ...any) error { return &inputError{msg: fmt.Sprintf(format, v...)} }
+
+// ruleError - отказ по правилу вне ядра. Код выхода 5.
+type ruleError struct{ msg string }
+
+func (e *ruleError) Error() string        { return e.msg }
+func (e *ruleError) Is(target error) bool { return target == core.ErrRule }
+
+// exitCode переводит ошибку в код выхода по errors.Is.
+func exitCode(err error) int {
+	var in *inputError
+	switch {
+	case errors.Is(err, core.ErrClaimed), errors.Is(err, core.ErrLocked):
+		return exitBusy
+	case errors.Is(err, core.ErrConflict):
+		return exitConflict
+	case errors.Is(err, core.ErrNotFound):
+		return exitNotFound
+	case errors.Is(err, core.ErrRule):
+		return exitRule
+	case errors.As(err, &in), errors.Is(err, core.ErrNoIdentity):
+		return exitInput
+	}
+	return exitOther
+}
 
 // idError привязывает ошибку к задаче: stderr `err T-12: причина`.
 type idError struct {
@@ -65,12 +100,12 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 	defer func() {
 		if r := recover(); r != nil {
 			a.fail(fmt.Errorf("internal error: %v", r))
-			code = 1
+			code = exitOther
 		}
 	}()
 	if err := a.dispatch(ctx, args); err != nil {
 		a.fail(err)
-		return 1
+		return exitCode(err)
 	}
 	return 0
 }
@@ -80,7 +115,7 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return err
 	}
 	if len(args) == 0 {
-		return errors.New("command required: " + usage)
+		return inputf("command required: %s", usage)
 	}
 	a.cmd, args = args[0], args[1:]
 	switch a.cmd {
@@ -99,11 +134,22 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdText(args)
 	case "rm":
 		return a.cmdRemove(args)
+	case "ctx":
+		return a.cmdCtx(args)
+	case "take":
+		return a.cmdTake(args)
+	case "move":
+		return a.cmdMove(args)
+	case "set":
+		return a.cmdSet(args)
+	case "check":
+		return a.cmdCheck(args)
+	case "done":
+		return a.cmdDone(args)
+	case "backup":
+		return a.cmdBackup(ctx, args)
 	}
-	if laterCommands[a.cmd] {
-		return fmt.Errorf("command %s is not implemented yet", a.cmd)
-	}
-	return fmt.Errorf("unknown command %s; %s", a.cmd, usage)
+	return inputf("unknown command %s; %s", a.cmd, usage)
 }
 
 // out печатает строку ответа в stdout.
@@ -176,15 +222,23 @@ func (a *app) detectProject() (string, bool) {
 	return project.Detect(a.env.Cwd, a.root, a.store.Config())
 }
 
-// taskID проверяет номер задачи.
+// normID разворачивает короткий id: `12` равно `T-12` (Р48).
+func normID(s string) (string, error) {
+	if s != "" && strings.Trim(s, "0123456789") == "" {
+		s = "T-" + s
+	}
+	if !idPattern.MatchString(s) {
+		return "", inputf("bad task id %q, expected form T-12 or 12", s)
+	}
+	return s, nil
+}
+
+// taskID проверяет номер задачи в первом аргументе.
 func taskID(args []string) (string, error) {
 	if len(args) == 0 {
-		return "", errors.New("task id required, for example T-12")
+		return "", inputf("task id required, for example T-12")
 	}
-	if !idPattern.MatchString(args[0]) {
-		return "", fmt.Errorf("bad task id %q, expected form T-12", args[0])
-	}
-	return args[0], nil
+	return normID(args[0])
 }
 
 // lazyLog открывает .tracker/log при первой записи и только если папка есть:

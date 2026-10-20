@@ -37,6 +37,7 @@ func (errGitBusy) Is(target error) bool { return target == ErrLocked }
 const (
 	defaultLockTimeout = 5 * time.Second
 	maxAttempts        = 3
+	claimTTL           = 3 * time.Hour
 	defaultProject     = "personal"
 	unknownActor       = "unknown"
 	warnCommit         = "commit not recorded"
@@ -44,6 +45,7 @@ const (
 	trackerDir = ".tracker"
 	nextIDFile = "next_id"
 	configFile = "config.toml"
+	rulesFile  = "RULES.md"
 	lockFile   = "lock"
 	tmpDir     = "tmp"
 	tmpPrefix  = "w-"
@@ -200,7 +202,7 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 		{Path: name, Data: data},
 		{Path: filepath.ToSlash(filepath.Join(trackerDir, nextIDFile)), Data: nextID},
 	}, tx.extra...)
-	s.commit(tx.repo, &res, written, id+": new", actor)
+	s.commit(tx, &res, written, id+": new", actor)
 	return res, nil
 }
 
@@ -263,7 +265,7 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // путь строит ядро
 			res.Rev = blobID(data)
 		}
-		s.commit(tx.repo, &res, nil, id+": note "+text, actor)
+		s.commit(tx, &res, nil, id+": note "+text, actor)
 		return nil
 	})
 	return res, err
@@ -290,7 +292,7 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 		}
 		res = Result{ID: id}
 		files := append([]gitx.File{{Path: filepath.Base(path)}}, tx.extra...)
-		s.commit(tx.repo, &res, files, id+": rm", actor)
+		s.commit(tx, &res, files, id+": rm", actor)
 		return nil
 	})
 	return res, err
