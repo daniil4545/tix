@@ -17,7 +17,7 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 
 ## Структура
 
-Зависимости: `cli` - `core`, `project`; `core` - `task`, `gitx`, `config`.
+Зависимости: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `gitx`, `config`, `assets`, `project`, `actor`; `brief` - `task`, `config`, `actor`. Карта и потоки - `docs/architecture.md`.
 
 | Путь | Роль |
 |---|---|
@@ -26,9 +26,12 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 | `internal/cli` | разбор команд и печать ответа |
 | `internal/core` | единственный путь записи в `~/tasks`: лок, rename, коммит |
 | `internal/task` | разбор и печать файла задачи, без IO |
-| `internal/config` | `.tracker/config.toml` |
-| `internal/gitx` | все вызовы git, единственный `os/exec` |
-| `internal/project` | проект по рабочей папке, без git |
+| `internal/config` | `.tracker/config.toml`: колонки и роли |
+| `internal/actor` | личность записи: источники, проверка имени |
+| `internal/brief` | сборка вывода `tk ctx`, без IO |
+| `internal/assets` | `RULES.md`, встроенный в бинарь |
+| `internal/gitx` | все вызовы git, единственный `os/exec` в `internal` |
+| `internal/project` | проект по рабочей папке и HEAD проекта, без git |
 | `e2e/` | сквозные тесты чёрного ящика |
 
 ## Команды
@@ -37,7 +40,7 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 |---|---|
 | `make check` | формат, vet, линтер, тесты, сборка; приёмка |
 | `make test-fast` | быстрый ярус (`-short`); `RUN=Имя` - один тест |
-| `make bench` | собирает `bin/tk`, замер скорости на 1000 задач |
+| `make bench` | собирает `bin/tk`, замер скорости на 1000 задач, включая `ctx`, `take`, `move` |
 | `make build` | `go build ./...` и `bin/tk` |
 | `make fmt` | `gofmt -l -w .` |
 | `make e2e-agents` | заглушка до З3 |
@@ -62,3 +65,4 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 - Запись в `~/tasks` только через ядро: лок, временный файл, rename, коммит; полузаписанных файлов нет.
 - Правка, сделанная в обход ядра, не теряется: следующая операция коммитит её как external edit.
 - Файл, который не разбирается, ядро не перезаписывает.
+- Claim ставит только `take`; живой claim другого актора не перехватывается без `--steal`.

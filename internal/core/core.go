@@ -265,7 +265,7 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // путь строит ядро
 			res.Rev = blobID(data)
 		}
-		s.commit(tx, &res, nil, id+": note "+text, actor)
+		s.commit(tx, &res, tx.extra, id+": note "+text, actor)
 		return nil
 	})
 	return res, err
