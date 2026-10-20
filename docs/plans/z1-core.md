@@ -83,7 +83,7 @@ func (r Repo) HashObject(data []byte) (string, error)
 func (r Repo) Blob(rev string) ([]byte, error)
 func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, err error)
 func (r Repo) Remove(path string) error
-func (r Repo) DropIndexLock() (bool, error)
+func (r Repo) DropGitLocks() (bool, error)
 
 // internal/project: без git
 func Detect(cwd, root string, c *config.Config) (string, bool) // false: в root или вне git
