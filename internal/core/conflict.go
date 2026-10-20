@@ -1,11 +1,10 @@
 package core
 
-// ConflictError - конфликт слияния тела при Edit. Rev - блоб, на который правка
-// опиралась; Merged - слияние с маркерами конфликта. Заглушка зоны 0:
-// mergeBody пока возвращает голый ErrConflict, перейдёт на этот тип зона H.
+// ConflictError - конфликт слияния тела при Edit. Rev - блоб текущего файла: новая база
+// для повторного Edit; Merged - слияние тел с маркерами конфликта, его правит человек.
 type ConflictError struct{ Rev, Merged string }
 
-// Error совпадает с текстом, который mergeBody отдаёт сейчас (код 3 в CLI).
+// Error даёт прежний текст отказа (код 3 в CLI).
 func (e *ConflictError) Error() string {
 	return ErrConflict.Error() + ": body changed after tk show, reread and retry"
 }

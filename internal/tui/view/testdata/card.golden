@@ -1,0 +1,19 @@
+T-12  Report on calls                                                                        [doing]
+alpha   due 28.10   @claude
+----------------------------------------------------------------------------------------------------
+abstract                                                                                            
+  abstract text
+
+summary                                                                                             
+  summary text
+
+details                                                                                          1/3
+  details text
+
+history                                                                                             
+> 01.10 10:00  claude           new                                                                 
+  01.10 11:00  claude           3 edits
+  01.10 12:00  daniil           comment
+                                use a dash for empty values
+----------------------------------------------------------------------------------------------------
+e editor  c comment  m M move  j k history  enter unfold  esc back

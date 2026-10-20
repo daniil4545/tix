@@ -317,7 +317,7 @@ func (s *Store) writePending(tx *txEnv) []gitx.File {
 }
 
 // mergeBody возвращает тело для SetBody. База совпала с файлом - новое тело как есть;
-// иначе трёхстороннее слияние тел через git merge-file. Конфликт - ErrConflict.
+// иначе трёхстороннее слияние тел через git merge-file. Конфликт - *ConflictError.
 func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string, error) {
 	if baseRev == curRev {
 		return body, nil
@@ -352,7 +352,7 @@ func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string,
 		return "", err
 	}
 	if conflict {
-		return "", fmt.Errorf("%w: body changed after tk show, reread and retry", ErrConflict)
+		return "", &ConflictError{Rev: curRev, Merged: string(out)}
 	}
 	return string(out), nil
 }

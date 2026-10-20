@@ -181,39 +181,16 @@ func firstLine(s string) string {
 }
 
 // rootDir: TRACKER_HOME, иначе ~/tasks.
-func (a *app) rootDir() (string, error) {
-	if dir := a.env.Getenv("TRACKER_HOME"); dir != "" {
-		return dir, nil
-	}
-	home := a.env.Getenv("HOME")
-	if home == "" {
-		var err error
-		if home, err = os.UserHomeDir(); err != nil {
-			return "", fmt.Errorf("home directory unknown, set TRACKER_HOME: %w", err)
-		}
-	}
-	return filepath.Join(home, "tasks"), nil
-}
+func (a *app) rootDir() (string, error) { return rootDir(a.env) }
 
 // open открывает базу; лог пишется в .tracker/log, если папка уже есть.
 func (a *app) open() error {
-	root, err := a.rootDir()
-	if err != nil {
-		return err
-	}
-	timeout := defaultLockTimeout
-	if raw := a.env.Getenv("TRACKER_LOCK_TIMEOUT"); raw != "" {
-		if timeout, err = time.ParseDuration(raw); err != nil || timeout <= 0 {
-			return fmt.Errorf("TRACKER_LOCK_TIMEOUT %q: duration like 5s required", raw)
-		}
+	store, log, root, _, err := OpenStore(a.env)
+	if log != nil {
+		a.log = log
 	}
 	a.root = root
-	a.log = slog.New(slog.NewTextHandler(&lazyLog{dir: filepath.Join(root, ".tracker")}, nil))
-	a.store, err = core.Open(root, core.Options{
-		LockTimeout: timeout,
-		GitBin:      a.env.Getenv("TRACKER_GIT"),
-		Log:         a.log,
-	})
+	a.store = store
 	return err
 }
 

@@ -34,7 +34,7 @@ func run() int {
 		Getenv: os.Getenv,
 		Cwd:    cwd,
 	}
-	if len(os.Args) == 1 && isTerminal(os.Stdout) {
+	if len(os.Args) == 1 && (isTerminal(os.Stdout) || env.Getenv("TRACKER_TUI_ONESHOT") == "1") {
 		return runTUI(ctx, env)
 	}
 	return cli.Run(ctx, os.Args[1:], env)
@@ -46,15 +46,19 @@ func isTerminal(f *os.File) bool {
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
-// runTUI открывает доску от имени человека (spec 2.4). Deps.Root заполняет зона M:
-// OpenStore по плану корень не возвращает.
+// runTUI открывает доску от имени человека (spec 2.4).
 func runTUI(ctx context.Context, env cli.Env) int {
-	store, log, proj, err := cli.OpenStore(env)
+	store, log, root, proj, err := cli.OpenStore(env)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "err", err)
 		return 1
 	}
-	if err := tui.Run(ctx, tui.Deps{Store: store, Actor: "human", Project: proj, Log: log}); err != nil {
+	d := tui.Deps{
+		Store: store, Root: root, Actor: "human", Project: proj,
+		GitBin: env.Getenv("TRACKER_GIT"), Log: log,
+	}
+	if err := tui.Run(ctx, d); err != nil {
+		log.Error("tui failed", "err", err)
 		fmt.Fprintln(os.Stderr, "err", err)
 		return 1
 	}
