@@ -22,7 +22,7 @@ case $DEST/ in "$ROOT"/*) printf 'err: dir must be outside the repository\n' >&2
 DIRS=(cmd internal e2e connectors scripts .github assets)
 FILES=(README.md LICENSE CHANGELOG.md .editorconfig .gitattributes .gitignore
   .golangci.yml .goreleaser.yaml Makefile go.mod go.sum
-  docs/architecture.md docs/demo.tape)
+  docs/architecture.md docs/demo.tape docs/board.tape docs/board-seed.sh)
 
 cd "$ROOT"
 for f in "${FILES[@]}"; do
