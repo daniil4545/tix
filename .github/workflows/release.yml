@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Check version, tag and changelog agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # The binary must report the tag it is released under.
+          go build -ldflags "-X main.version=${version}" -o "${RUNNER_TEMP}/tix" ./cmd/tix
+          got="$("${RUNNER_TEMP}/tix" --version)"
+          case "${got}" in
+            *"${version}"*) ;;
+            *) echo "tix --version prints '${got}', tag is ${TAG}" >&2; exit 1 ;;
+          esac
+          # The changelog must have a section for this version.
+          grep -qF "## [${version}] - " CHANGELOG.md || {
+            echo "CHANGELOG.md has no section for ${version}" >&2; exit 1; }
+
+      - name: Cut release notes from the changelog
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          awk -v h="## [${version}] - " '
+            index($0, h) == 1 { on = 1; next }
+            on && /^## \[/ { exit }
+            on && /^\[[^]]+\]: / { next }
+            on { print }
+          ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > release-notes.md
+          test -s release-notes.md || { echo "release notes are empty" >&2; exit 1; }
+          cat release-notes.md
+
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: "~> v2"
+          args: release --clean --release-notes release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

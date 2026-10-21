@@ -1,8 +1,8 @@
 # tix architecture
 
-tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex, OpenCode) write through the `tix` CLI, and the human edits files in Obsidian. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
+tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex) write through the `tix` CLI, and the human edits files in Obsidian. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
 
-How to read: the overall picture is section 1, the flow of work is sections 2 and 3, where to edit is section 9. Why it is built this way: `docs/spec.md`, decisions D1-D62 in `docs/specs/decisions.md`. Facts about git and Codex: `docs/api/git.md`, `docs/api/codex.md`. Setup: `README.md`, developer rules: `AGENTS.md`.
+How to read: the overall picture is section 1, the flow of work is sections 2 and 3, where to edit is section 9. Setup: `README.md`.
 
 ## Contents
 
@@ -183,13 +183,13 @@ The diagram shows the main paths: `move` is allowed between any columns that hav
 
 ## 5. External systems and trust boundaries
 
-| System or input | What we send and take | Where input is checked before use | Card |
-|---|---|---|---|
-| git | commits, `status`, `merge-file`, `push`; git stderr | `gitx`: remote name, trailer key, sha; git output goes only to the log, the reply gets a short phrase | `docs/api/git.md` |
-| origin (remote) | `push HEAD`, 30 s, no `--force` | `gitx.Push`: name without a leading `-`; `user:pass@` is cut out | `docs/api/git.md` |
-| Agent (arguments, environment) | commands, `--as`, id, text | `cli`: id matches `T-N`, `actor.Valid` | `docs/api/codex.md` |
-| Store files (Obsidian) | arbitrary md | `task.Parse`; a broken file is not overwritten, `ctx` gives `warn` and code 0 | - |
-| Project repository | HEAD read as files | `project.Head`: reftable or no HEAD - the `Code:` trailer is not written | `docs/api/git.md`, section 7 |
+| System or input | What we send and take | Where input is checked before use |
+|---|---|---|
+| git | commits, `status`, `merge-file`, `push`; git stderr | `gitx`: remote name, trailer key, sha; git output goes only to the log, the reply gets a short phrase |
+| origin (remote) | `push HEAD`, 30 s, no `--force` | `gitx.Push`: name without a leading `-`; `user:pass@` is cut out |
+| Agent (arguments, environment) | commands, `--as`, id, text | `cli`: id matches `T-N`, `actor.Valid` |
+| Store files (Obsidian) | arbitrary md | `task.Parse`; a broken file is not overwritten, `ctx` gives `warn` and code 0 |
+| Project repository | HEAD read as files | `project.Head`: reftable or no HEAD - the `Code:` trailer is not written |
 
 ## 6. Failures and retries
 
@@ -234,8 +234,8 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | A new command | `cli.dispatch`, `internal/cli/agent.go` or `commands.go`, a `Store` method | usage in `cli.go`, exit codes, `RULES.md`, `README.md` |
 | `ctx` content, text limit | `internal/brief`, `cli.ctxPerColumn`, `cli.ctxTextLimit` | 15 ms target in `cmd/tixbench`, `RULES.md` |
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
-| A git call | `internal/gitx` | `docs/api/git.md` |
-| gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `docs/api/git.md`, sections 5 and 9 |
+| A git call | `internal/gitx` | `internal/gitx` tests |
+| gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
 | Columns and roles | `.tix/config.toml`, `internal/config` | the code finds columns by role, names are not hardcoded |
 | `RULES.md` text | `internal/assets/RULES.md` | existing stores are not updated |
 
