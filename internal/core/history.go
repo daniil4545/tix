@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"tracker/internal/actor"
 	"tracker/internal/gitx"
 	"tracker/internal/project"
 )
@@ -33,6 +34,16 @@ func (s *Store) codeTrailer() gitx.Trailer {
 		return gitx.Trailer{}
 	}
 	return gitx.Trailer{Key: "Code", Value: name + "@" + sha}
+}
+
+// modelTrailer возвращает трейлер Model: <TRACKER_MODEL>. Переменная пуста или не проходит
+// проверку - пустой трейлер, он не пишется, запись не отказывает.
+func modelTrailer() gitx.Trailer {
+	model := os.Getenv("TRACKER_MODEL")
+	if !actor.ValidModel(model) {
+		return gitx.Trailer{}
+	}
+	return gitx.Trailer{Key: "Model", Value: model}
 }
 
 // repoDir поднимается от dir к папке с .git (каталогом или файлом worktree).

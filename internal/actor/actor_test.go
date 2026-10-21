@@ -1,6 +1,7 @@
 package actor_test
 
 import (
+	"strings"
 	"testing"
 
 	"tracker/internal/actor"
@@ -68,6 +69,21 @@ func TestShort_KindAndEightCharsOfID(t *testing.T) {
 	for in, want := range cases {
 		if got := actor.Short(in); got != want {
 			t.Errorf("Short(%q) = %q, ждали %q", in, got, want)
+		}
+	}
+}
+
+// Значение модели попадает в строку `export` для shell: всё, что выходит за белый список, отказ.
+func TestValidModel(t *testing.T) {
+	defer guard(t)
+	for _, ok := range []string{"claude-opus-4-8", "claude-opus-4-8[1m]", "gpt-5.5", "us.anthropic.x:v1/a_b", strings.Repeat("a", 100)} {
+		if !actor.ValidModel(ok) {
+			t.Errorf("ValidModel(%q) = false, ждали true", ok)
+		}
+	}
+	for _, bad := range []string{"", "a;b", "a$(id)", "a`id`", "a b", "a\nb", "a\r", "a'b", `a"b`, "a&b", "a|b", "a>b", "a*b", "a\\b", "a\x00b", "модель", strings.Repeat("a", 101)} {
+		if actor.ValidModel(bad) {
+			t.Errorf("ValidModel(%q) = true, ждали false", bad)
 		}
 	}
 }

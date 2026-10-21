@@ -212,7 +212,7 @@ func sortedIDs(ids map[string]bool) []string {
 // commit коммитит байты операции, а не файлы дерева: чужая запись после rename не уходит
 // под actor. Отказ git - Warning в ответе, правка уже в файле.
 func (s *Store) commit(tx *txEnv, res *Result, files []gitx.File, subject, actor string) {
-	h, err := tx.repo.CommitFiles(files, subject, actor, s.codeTrailer())
+	h, err := tx.repo.CommitFiles(files, subject, actor, s.codeTrailer(), modelTrailer())
 	if err != nil {
 		s.log.Warn("commit not recorded", "op", "commit", "id", res.ID, "err", gitx.Detail(err))
 		res.Warning = warnCommit

@@ -10,10 +10,12 @@ import (
 	"tracker/internal/history"
 )
 
-// Row - строка колонки доски.
+// Row - строка колонки доски. Третья строка карточки (пульс) - первое из: вопрос Ask (жёлтый),
+// заметка Note (готовая строка "<возраст> <текст>", пусто вне колонки active), Summary.
 type Row struct {
 	ID, Project, Title, Summary, Meta string
-	Star                              bool
+	Ask, Note                         string
+	Star                              bool // звёздочка в первой строке; ненулевой Ask включает её сам
 }
 
 // Col - колонка доски.
@@ -31,6 +33,7 @@ type Board struct {
 	W, H     int
 	Status   string
 	IsErr    bool
+	ByDue    bool // колонки отсортированы по сроку, не по rank
 }
 
 // Card - всё, что нужно для кадра карточки. Scroll - смещение тела в строках; кадр
@@ -50,6 +53,7 @@ var (
 	askStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E9CF6A"))
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8A06A"))
 	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#111416"))
+	selAskStyle = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#E9CF6A"))
 )
 
 // RenderInput рисует строку ввода: приглашение, текст и курсор. Длинный текст показывается хвостом.

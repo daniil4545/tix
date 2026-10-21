@@ -143,9 +143,16 @@ func (m *Model) editResult(msg opDone) tea.Cmd {
 	return m.loadCmd()
 }
 
-// keepCopy оставляет копию и называет её путь в строке ошибки.
+// keepCopy оставляет копию; строка ошибки начинается с её пути, та же строка идёт в лог.
 func (m *Model) keepCopy(s *editSession, reason string) {
-	m.setStatus(fmt.Sprintf("%s: %s, copy kept: %s", s.id, reason, s.path), true)
+	lead := "copy kept: "
+	// Узкий экран: путь важнее надписи, он виден целиком, если сам короче ширины.
+	if m.w > 0 && len(lead)+len(s.path) > m.w && len(s.path) < m.w {
+		lead = ""
+	}
+	line := fmt.Sprintf("%s%s - %s: %s", lead, s.path, s.id, reason)
+	m.setStatus(line, true)
+	m.log.Warn(line, "id", s.id, "path", s.path, "reason", reason)
 }
 
 func same(a, b string) bool { return strings.TrimRight(a, "\n") == strings.TrimRight(b, "\n") }

@@ -14,8 +14,20 @@ const logLimit = 500
 // logRecordFields - число полей записи log: хеш, время автора, тема, значение трейлера Actor.
 const logRecordFields = 4
 
+// noteLimit - сколько последних коммитов просматривает Notes: пульс доски читает их одним вызовом git.
+const noteLimit = 300
+
 // logIDRe - id задачи для --grep: без метасимволов регулярного выражения.
 var logIDRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
+
+// noteSubjectRe - тема коммита note: "<id>: note <текст>".
+var noteSubjectRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9]*-[0-9]+): note (.+)$`)
+
+// Note - последняя заметка задачи: время автора и текст.
+type Note struct {
+	At   time.Time
+	Text string
+}
 
 // Commit - запись истории одной задачи: хеш, время автора, тема и значение трейлера Actor.
 type Commit struct {
@@ -73,4 +85,52 @@ func parseLog(out []byte) ([]Commit, error) {
 func firstLine(s string) string {
 	s, _, _ = strings.Cut(strings.TrimSpace(s), "\n")
 	return strings.TrimSpace(s)
+}
+
+// Notes возвращает по id задачи самую новую заметку среди последних noteLimit коммитов note.
+// Один процесс git на все задачи; нет коммитов - пустой результат.
+func (r Repo) Notes() (map[string]Note, error) {
+	res, err := r.run(nil, true, "log", "-n", fmt.Sprint(noteLimit), "-z", "--extended-regexp",
+		"--grep=^[A-Za-z][A-Za-z0-9]*-[0-9]+: note ",
+		"--format=%aI%x1f%s")
+	if err != nil {
+		return nil, err
+	}
+	if res.code != 0 {
+		if strings.Contains(string(res.errOut), "does not have any commits") {
+			return map[string]Note{}, nil
+		}
+		return nil, &Error{Op: "log", Code: res.code, Stderr: string(res.errOut)}
+	}
+	return parseNotes(res.out)
+}
+
+// parseNotes разбирает вывод -z от новых к старым: у задачи остаётся первая встреченная заметка.
+// Коммит, выбранный по другой строке сообщения (external edit), темой не подходит и пропускается.
+func parseNotes(out []byte) (map[string]Note, error) {
+	notes := map[string]Note{}
+	for _, rec := range strings.Split(string(out), "\x00") {
+		rec = strings.TrimLeft(rec, "\n")
+		if rec == "" {
+			continue
+		}
+		stamp, subject, ok := strings.Cut(rec, "\x1f")
+		if !ok {
+			return nil, &Error{Op: "log", Stderr: "unexpected record " + fmt.Sprintf("%q", rec)}
+		}
+		at, err := time.Parse(time.RFC3339, stamp)
+		if err != nil {
+			return nil, &Error{Op: "log", Stderr: err.Error()}
+		}
+		m := noteSubjectRe.FindStringSubmatch(subject)
+		if m == nil {
+			continue
+		}
+		text := strings.TrimSpace(m[2])
+		if _, seen := notes[m[1]]; seen || text == "" {
+			continue
+		}
+		notes[m[1]] = Note{At: at.Local(), Text: text}
+	}
+	return notes, nil
 }

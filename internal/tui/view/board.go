@@ -3,14 +3,16 @@ package view
 import (
 	"fmt"
 	"strings"
+
+	"charm.land/lipgloss/v2"
 )
 
 const (
 	colWidth   = 24
 	colGap     = 2
 	cardLines  = 5 // ID и проект, название, сводка, мета, пустая
-	boardFrame = 6 // шапка, линия, имена колонок, линии колонок, линия, состояние
-	boardHint  = "h l column  j k card  enter open  m M move  J K order  p project  c comment  q quit"
+	boardFrame = 7 // шапка, линия, имена колонок, линии колонок, линия, состояние, подсказка
+	boardHint  = "h l column  j k card  enter open  m M move  J K order  o order by due  p project  e edit  c comment  q quit"
 )
 
 // RenderBoard рисует доску: колонки по 24 знака, окно колонок за курсором.
@@ -22,10 +24,7 @@ func RenderBoard(b Board) string {
 		width = min(width, b.W)
 	}
 
-	bodyHeight := 0
-	if b.H > 0 {
-		bodyHeight = max(b.H-boardFrame, 0)
-	}
+	bodyHeight := boardBodyHeight(b.H)
 	cells := make([][]string, 0, shown)
 	for i := first; i < last; i++ {
 		cells = append(cells, columnCells(b, i, bodyHeight))
@@ -53,11 +52,19 @@ func RenderBoard(b Board) string {
 		}
 		lines = append(lines, strings.Join(row, strings.Repeat(" ", colGap)))
 	}
-	lines = append(lines, ruleLine(width), statusLine(b.Status, boardHint, b.IsErr, b.W))
+	lines = append(lines, ruleLine(width), statusLine(b.Status, "", b.IsErr, b.W), dimStyle.Render(truncate(boardHint, b.W)))
 	if b.H > 0 && len(lines) > b.H {
 		lines = lines[:b.H]
 	}
 	return strings.Join(lines, "\n")
+}
+
+// boardBodyHeight - высота тела колонок при высоте кадра h; h <= 0: не ограничена (0).
+func boardBodyHeight(h int) int {
+	if h <= 0 {
+		return 0
+	}
+	return max(h-boardFrame, 0)
 }
 
 // columnWindow выбирает показанные колонки [first, last): страница, на которой стоит курсор.
@@ -85,6 +92,9 @@ func boardHeader(b Board, first, last int) string {
 	}
 	left := accentStyle.Render("tracker") + dimStyle.Render("  project: ") +
 		accentStyle.Render(truncate(clean(project), colWidth)) + dimStyle.Render(fmt.Sprintf("  %d %s", b.Total, noun))
+	if b.ByDue {
+		left += dimStyle.Render("  order: due")
+	}
 	var hidden []string
 	if first > 0 {
 		hidden = append(hidden, fmt.Sprintf("<%d", first))
@@ -107,18 +117,25 @@ func columnNames(b Board, first, last int) string {
 	return strings.Join(names, strings.Repeat(" ", colGap))
 }
 
-// columnCells рисует строки одной колонки; у выбранной колонки окно по высоте идёт за курсором.
+// rowWindow - карточки колонки index, попавшие в окно по высоте: индексы [offset, end).
+// У выбранной колонки окно идёт за курсором, у прочих стоит сверху. bodyHeight <= 0: все.
+func rowWindow(b Board, index, bodyHeight int) (offset, end int) {
+	count := len(b.Cols[index].Rows)
+	if bodyHeight <= 0 {
+		return 0, count
+	}
+	capacity := max((bodyHeight+1)/cardLines, 1)
+	if index == b.Col {
+		offset = max(b.Row-capacity+1, 0)
+	}
+	return offset, min(offset+capacity, count)
+}
+
+// columnCells рисует строки одной колонки в окне rowWindow.
 func columnCells(b Board, index, bodyHeight int) []string {
 	rows := b.Cols[index].Rows
 	selected := index == b.Col
-	offset, end := 0, len(rows)
-	if bodyHeight > 0 {
-		capacity := max((bodyHeight+1)/cardLines, 1)
-		if selected {
-			offset = max(b.Row-capacity+1, 0)
-		}
-		end = min(offset+capacity, len(rows))
-	}
+	offset, end := rowWindow(b, index, bodyHeight)
 	var out []string
 	for r := offset; r < end; r++ {
 		out = append(out, rowCells(rows[r], selected && r == b.Row)...)
@@ -127,23 +144,24 @@ func columnCells(b Board, index, bodyHeight int) []string {
 }
 
 func rowCells(row Row, selected bool) []string {
+	star := row.Star || strings.TrimSpace(row.Ask) != ""
 	marker := " "
 	if selected {
 		marker = ">"
 	}
 	head := marker + clean(row.ID+" "+row.Project)
 	title := " " + clean(row.Title)
-	summary := " " + clean(firstLine(row.Summary))
+	summary, third := pulseLine(row)
 	meta := " " + clean(row.Meta)
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected {
-		star := ""
-		if row.Star {
-			star = " *"
+		first := selStyle.Render(fit(head, colWidth))
+		if star {
+			first = selStyle.Render(fit(head, colWidth-2)+" ") + selAskStyle.Render("*")
 		}
 		return []string{
-			selStyle.Render(fit(fit(head, colWidth-len(star))+star, colWidth)),
+			first,
 			selStyle.Render(fit(title, colWidth)),
 			selStyle.Render(fit(summary, colWidth)),
 			selStyle.Render(fit(meta, colWidth)),
@@ -151,10 +169,21 @@ func rowCells(row Row, selected bool) []string {
 		}
 	}
 	first := fit(head, colWidth)
-	if row.Star {
+	if star {
 		first = fit(head, colWidth-2) + " " + askStyle.Render("*")
 	}
-	return []string{first, fit(title, colWidth), dimStyle.Render(fit(summary, colWidth)), dimStyle.Render(fit(meta, colWidth)), blank}
+	return []string{first, fit(title, colWidth), third.Render(fit(summary, colWidth)), dimStyle.Render(fit(meta, colWidth)), blank}
+}
+
+// pulseLine выбирает третью строку карточки и её стиль: вопрос, заметка, сводка.
+func pulseLine(row Row) (string, lipgloss.Style) {
+	switch ask := strings.TrimSpace(row.Ask); {
+	case ask != "":
+		return " " + clean(firstLine("? "+ask)), askStyle
+	case strings.TrimSpace(row.Note) != "":
+		return " " + clean(firstLine(strings.TrimSpace(row.Note))), dimStyle
+	}
+	return " " + clean(firstLine(row.Summary)), dimStyle
 }
 
 func firstLine(s string) string {

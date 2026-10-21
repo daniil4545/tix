@@ -204,14 +204,23 @@ ST_ARR='(try (getpath($p)|type) catch "bad") as $t
     elif (getpath($p)|index([$v])) != null then "ok"
     else "add" end'
 ST_HOOK='(try (getpath($p)|type) catch "bad") as $t
+  | ($v.hooks[0].command) as $want
   | if $t=="null" then "add"
     elif $t!="array" then "err: \($p|join(".")) не массив"
-    elif any(getpath($p)[]?; any((.hooks // [])[]?; .command == "tk ctx")) then "ok"
+    elif any(getpath($p)[]?; any((.hooks // [])[]?; .command == $want)) then "ok"
+    elif $want == "tk ctx --hook" and any(getpath($p)[]?; any((.hooks // [])[]?; .command == "tk ctx")) then "upd"
     else "add" end'
 AD_ARR='setpath($p; (getpath($p) // []) + [$v])'
 RM_ARR='if (try (getpath($p)|type) catch "x") == "array" then setpath($p; getpath($p) | map(select(. != $v))) else . end'
 RM_HOOK='if (try (getpath($p)|type) catch "x") == "array" then
-    setpath($p; getpath($p) | map(select((type == "object" and ((.hooks // []) | length) == 1 and .hooks[0].command == "tk ctx") | not)))
+    setpath($p; getpath($p) | map(select((type == "object" and ((.hooks // []) | length) == 1 and (.hooks[0].command == "tk ctx" or .hooks[0].command == "tk ctx --hook")) | not)))
+  else . end'
+# Старый хук `tk ctx` становится `tk ctx --hook` (UP_HOOK); снятие возвращает его (DN_HOOK).
+UP_HOOK='setpath($p; getpath($p) | map(if (.hooks | type) == "array"
+    then .hooks |= map(if type == "object" and .command == "tk ctx" then .command = "tk ctx --hook" else . end) else . end))'
+DN_HOOK='if (try (getpath($p)|type) catch "x") == "array" then
+    setpath($p; getpath($p) | map(if (.hooks | type) == "array"
+      then .hooks |= map(if type == "object" and .command == "tk ctx --hook" then .command = "tk ctx" else . end) else . end))
   else . end'
 CREATED='. as $d | [range(1; ($p|length) + 1) as $i | $p[:$i] as $q | select(($d | getpath($q)) == null) | $q]'
 PRUNE='reduce ($c | reverse)[] as $q (.; (try getpath($q) catch null) as $x
@@ -221,13 +230,14 @@ PRUNE='reduce ($c | reverse)[] as $q (.; (try getpath($q) catch null) as $x
 jedit_apply() {
   local pre=$1 file=$2 p=$3 v=$4 st=$5 ad=$6 op=$7 label=$8 fcreated=${9:-}
   local real doc status created entry new key ag
-  case $pre in codex-hook) ag=codex ;; *) ag=claude ;; esac
+  case $pre in codex-hook*) ag=codex ;; *) ag=claude ;; esac
   real=$(resolve "$file")
   doc=$(json_load "$real")
   status=$(jq -r --argjson p "$p" --argjson v "$v" "$st" <<<"$doc") || die "не разобрать $real"
   case $status in
     ok) return 0 ;;
     err*) die "${status#err: } ($real); запись не сделана" ;;
+    upd) pre=${pre}-up; ad=$UP_HOOK; op=hookup; label="$ag: hooks.SessionStart tk ctx -> tk ctx --hook" ;;
   esac
   act "$label: $real"
   [ "$DRY" = 1 ] && return 0
@@ -326,7 +336,7 @@ run_claude() {
   local group
   group=$(jq -ce '.hooks.SessionStart[0]' "$CLAUDE_HOOKS_SRC") || die "нет группы SessionStart в $CLAUDE_HOOKS_SRC"
   jedit_apply "claude-hook" "$SETTINGS" '["hooks","SessionStart"]' "$group" "$ST_HOOK" "$AD_ARR" hook \
-    "claude: hooks.SessionStart += tk ctx"
+    "claude: hooks.SessionStart += tk ctx --hook"
   jedit_apply "allow" "$SETTINGS" '["permissions","allow"]' '"Bash(tk *)"' "$ST_ARR" "$AD_ARR" arr \
     "claude: permissions.allow += Bash(tk *)"
   put_skill "$CLAUDE_SKILL" claude
@@ -412,7 +422,7 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
       jq -e '.path == ["hooks","SessionStart"] or .path == ["permissions","allow"]' <<<"$e" >/dev/null \
         || { warn "undo: ключ вне белого списка, пропуск: $p в $f"; return 1; }
       op=$(jq -r .op <<<"$e"); c=$(jq -c .created <<<"$e"); fc=$(jq -r .file_created <<<"$e")
-      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
+      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; hookup) rm_prog=$DN_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
       if [ -e "$f" ]; then
         doc=$(json_load "$f")
         new=$(jq --argjson p "$p" --argjson v "$v" --argjson c "$c" "$rm_prog | $PRUNE" <<<"$doc") \

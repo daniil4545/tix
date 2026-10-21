@@ -167,7 +167,8 @@ func TestEditor_Conflict_SecondRunUnchanged_CancelsCopyKept(t *testing.T) {
 	n := e.gitOut("rev-list", "--count", "HEAD")
 	st.touch("go.1")
 	e.until("второй запуск", func() bool { return st.calls() == 2 })
-	e.screenHas("edit cancelled, copy kept")
+	e.screenHas("copy kept: ")
+	e.screenHas("edit cancelled")
 	if len(copies(e)) != 1 {
 		t.Errorf("копия с правкой человека не сохранена: %v", copies(e))
 	}

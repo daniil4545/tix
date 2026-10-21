@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+
 	"tracker/internal/actor"
 	"tracker/internal/core"
 	"tracker/internal/task"
@@ -44,25 +46,57 @@ func (m *Model) rebuild() {
 	if len(byCol[unknownColumn]) > 0 {
 		names = append(names, unknownColumn)
 	}
-	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row}
+	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row, ByDue: m.board.ByDue}
 	m.colTasks = m.colTasks[:0]
 	for _, name := range names {
 		ts := byCol[name]
-		sortTasks(ts)
+		sortTasks(ts, m.board.ByDue)
 		m.colTasks = append(m.colTasks, ts)
-		b.Cols = append(b.Cols, view.Col{Name: name, Rows: rows(ts)})
+		b.Cols = append(b.Cols, view.Col{Name: name, Rows: m.rows(ts)})
 	}
 	m.board = b
 	m.restoreSelection()
 }
 
-func sortTasks(ts []*task.Task) {
+// sortTasks сортирует колонку по rank; byDue: сначала задачи со сроком по дате, затем без срока по rank.
+func sortTasks(ts []*task.Task, byDue bool) {
 	sort.SliceStable(ts, func(i, j int) bool {
+		if byDue {
+			di, iok := dueDate(ts[i])
+			dj, jok := dueDate(ts[j])
+			if iok != jok {
+				return iok
+			}
+			if iok && !di.Equal(dj) {
+				return di.Before(dj)
+			}
+		}
 		if ts[i].Rank != ts[j].Rank {
 			return ts[i].Rank < ts[j].Rank
 		}
 		return core.IDNum(ts[i].ID) < core.IDNum(ts[j].ID)
 	})
+}
+
+// dueDate - срок задачи датой; пустой или нечитаемый срок - false.
+func dueDate(t *task.Task) (time.Time, bool) {
+	d, err := time.Parse(time.DateOnly, t.Due)
+	return d, err == nil
+}
+
+// toggleOrder переключает порядок всех колонок: по rank или по сроку.
+func (m *Model) toggleOrder() {
+	m.board.ByDue = !m.board.ByDue
+	m.rebuild()
+}
+
+// reorderKey - J, K: в порядке по сроку ручной порядок выключен.
+func (m *Model) reorderKey(dir int) tea.Cmd {
+	if m.board.ByDue {
+		m.setStatus("order by due: J K off", false)
+		return nil
+	}
+	return m.reorder(dir)
 }
 
 // restoreSelection ищет selID в колонках; нет - остаётся позиция, зажатая в границы.
@@ -126,13 +160,13 @@ func (m *Model) boardView() view.Board {
 	return b
 }
 
-func rows(ts []*task.Task) []view.Row {
+func (m *Model) rows(ts []*task.Task) []view.Row {
 	out := make([]view.Row, len(ts))
-	now := time.Now()
+	now := m.now()
 	for i, t := range ts {
 		out[i] = view.Row{
 			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Star: strings.TrimSpace(t.Ask) != "",
+			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Note: m.note(t, now),
 		}
 	}
 	return out

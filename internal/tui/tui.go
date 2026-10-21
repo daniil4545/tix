@@ -15,6 +15,7 @@ import (
 
 	"tracker/internal/config"
 	"tracker/internal/core"
+	"tracker/internal/gitx"
 	"tracker/internal/task"
 	"tracker/internal/tui/view"
 )
@@ -86,6 +87,9 @@ type Model struct {
 	showing bool // карточка открыта
 	input   *prompt
 
+	notes map[string]gitx.Note // последние заметки задач для пульса; nil, пока git не ответил
+	now   func() time.Time     // часы модели: мета, пульс, двойной клик
+
 	status  string
 	isErr   bool
 	w, h    int
@@ -103,6 +107,7 @@ func New(ctx context.Context, d Deps) *Model {
 		queue:   make(chan job, queueSize),
 		events:  make(chan struct{}, 1),
 		project: d.Project,
+		now:     time.Now,
 	}
 	if m.log == nil {
 		m.log = slog.New(slog.DiscardHandler)
@@ -115,7 +120,10 @@ func New(ctx context.Context, d Deps) *Model {
 
 // Init откладывает запуск наблюдателя до первого кадра.
 func (m *Model) Init() tea.Cmd {
-	return tea.Tick(watchDelay, func(time.Time) tea.Msg { return watchStart{} })
+	return tea.Batch(
+		tea.Tick(watchDelay, func(time.Time) tea.Msg { return watchStart{} }),
+		m.notesCmd(),
+	)
 }
 
 // Update разбирает сообщение; панику пишет в лог и отдаёт Bubble Tea, он вернёт терминал.

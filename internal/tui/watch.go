@@ -20,6 +20,10 @@ func (m *Model) startWatch() tea.Msg {
 		_ = w.Close()
 		return watchReady{err: err}
 	}
+	// tk note - пустой коммит: файлы не меняются, виден только журнал HEAD.
+	if err := w.Add(filepath.Join(m.d.Root, ".git", "logs")); err != nil {
+		m.log.Warn("pulse watch off", "err", err)
+	}
 	go m.pump(w)
 	return watchReady{}
 }
@@ -55,11 +59,17 @@ func (m *Model) pump(w *fsnotify.Watcher) {
 	}
 }
 
-// relevant: изменение файла задачи. Папка .tracker и .git шума не дают, chmod не меняет текст.
+// relevant: изменение файла задачи или журнала HEAD (коммит без правки файла). Прочее в .tracker и .git
+// шума не даёт, chmod не меняет текст.
 func relevant(ev fsnotify.Event) bool {
+	if ev.Op&^fsnotify.Chmod == 0 {
+		return false
+	}
 	name := filepath.Base(ev.Name)
-	return strings.HasPrefix(name, "T-") && strings.HasSuffix(name, ".md") &&
-		ev.Op&^fsnotify.Chmod != 0
+	if name == "HEAD" {
+		return filepath.Base(filepath.Dir(ev.Name)) == "logs"
+	}
+	return strings.HasPrefix(name, "T-") && strings.HasSuffix(name, ".md")
 }
 
 // waitEvent ждёт события наблюдателя; конец ctx снимает ожидание.
@@ -74,7 +84,7 @@ func (m *Model) waitEvent() tea.Cmd {
 	}
 }
 
-// loadCmd перечитывает все задачи; git не трогает.
+// loadCmd перечитывает все задачи; git не трогает (заметки пульса читает notesCmd).
 func (m *Model) loadCmd() tea.Cmd {
 	return m.guard(func() tea.Msg {
 		tasks, errs := m.d.Store.List()
@@ -86,13 +96,13 @@ func (m *Model) loadCmd() tea.Cmd {
 func (m *Model) afterLoad(msg loaded) tea.Cmd {
 	m.apply(msg.tasks, msg.skipped)
 	if !m.showing {
-		return nil
+		return m.notesCmd()
 	}
 	t := m.byID(m.card.id)
 	if t == nil {
 		m.showing = false
 		m.setStatus(m.card.id+" removed", false)
-		return nil
+		return m.notesCmd()
 	}
-	return m.historyCmd(t)
+	return tea.Batch(m.historyCmd(t), m.notesCmd())
 }

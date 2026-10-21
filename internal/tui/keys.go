@@ -45,9 +45,11 @@ func (m *Model) boardKey(k string) tea.Cmd {
 	case "k", "up":
 		m.moveCursor(0, -1)
 	case "J":
-		return m.reorder(1)
+		return m.reorderKey(1)
 	case "K":
-		return m.reorder(-1)
+		return m.reorderKey(-1)
+	case "o":
+		m.toggleOrder()
 	case "p":
 		m.cycleProject()
 	case "enter":
@@ -107,6 +109,8 @@ func (m *Model) event(msg tea.Msg) tea.Cmd {
 		return m.loadCmd()
 	case loaded:
 		return m.afterLoad(msg)
+	case notesLoaded:
+		m.setNotes(msg)
 	case opDone:
 		return m.opResult(msg)
 	case historyMsg:

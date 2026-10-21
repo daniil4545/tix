@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,6 +23,7 @@ const (
 	rulesFile      = "RULES.md"
 	closedRole     = "closed"
 	backupFallback = "origin"
+	hookStdinLimit = 64 << 10
 )
 
 // actorOf возвращает автора записи: --as, затем окружение (actor.Resolve);
@@ -67,12 +70,15 @@ func target(p *parsed, positional int, usage string) (string, error) {
 }
 
 func (a *app) cmdCtx(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"project": true, "json": false}))
+	p, err := parseArgs(args, withCommon(flagSpec{"project": true, "json": false, "hook": false}))
 	if err != nil {
 		return err
 	}
 	if len(p.pos) > 0 {
 		return inputf("ctx takes no arguments, extra: %s", p.pos[0])
+	}
+	if p.set["hook"] {
+		a.exportModel()
 	}
 	who, err := a.actorOf(p)
 	if err != nil {
@@ -119,6 +125,38 @@ func (a *app) cmdCtx(args []string) error {
 	}
 	a.out("%s", strings.TrimRight(b.Text(), "\n"))
 	return nil
+}
+
+// exportModel читает JSON хука SessionStart со stdin и дописывает `export TRACKER_MODEL=<model>`
+// в CLAUDE_ENV_FILE. Нет файла, пустой или чужой ввод, модель не проходит проверку - молча
+// пропуск: хук не должен ломать сессию. Файл исполняет shell, поэтому значение проверяется.
+func (a *app) exportModel() {
+	path := a.env.Getenv("CLAUDE_ENV_FILE")
+	if path == "" || a.env.Stdin == nil {
+		return
+	}
+	raw, err := io.ReadAll(io.LimitReader(a.env.Stdin, hookStdinLimit))
+	if err != nil {
+		return
+	}
+	var in struct {
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(raw, &in) != nil || !actor.ValidModel(in.Model) {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // путь задаёт Claude Code
+	if err != nil {
+		a.warn("model not exported: %s", firstLine(err.Error()))
+		return
+	}
+	_, werr := f.WriteString("export TRACKER_MODEL=" + in.Model + "\n")
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		a.warn("model not exported: %s", firstLine(werr.Error()))
+	}
 }
 
 // tilde сокращает домашнюю папку до ~.
