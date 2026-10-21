@@ -248,27 +248,23 @@ func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
 	e.create("Beta task", "beta", "idea")
 	e.start("", 140, 30)
 	e.screenHas("Alpha task", "Beta task")
-	seen := map[string]bool{}
-	for i := 0; i < 4; i++ {
-		e.key("p")
-		e.until("frame after p", func() bool {
-			s := e.text()
-			a, b := strings.Contains(s, "Alpha task"), strings.Contains(s, "Beta task")
-			switch {
-			case a && b:
-				seen["all"] = true
-			case a:
-				seen["alpha"] = true
-			case b:
-				seen["beta"] = true
-			default:
-				return false
-			}
-			return true
-		})
+	// Each p must reach the next filter; waiting for any frame would read the frame before the press.
+	state := func() string {
+		s := e.text()
+		a, b := strings.Contains(s, "Alpha task"), strings.Contains(s, "Beta task")
+		switch {
+		case a && b:
+			return "all"
+		case a:
+			return "alpha"
+		case b:
+			return "beta"
+		}
+		return ""
 	}
-	if !seen["all"] || !seen["alpha"] || !seen["beta"] {
-		t.Errorf("four presses of p saw %v; expected all, alpha, beta", seen)
+	for _, want := range []string{"alpha", "beta", "all", "alpha"} {
+		e.key("p")
+		e.until("filter "+want+" after p", func() bool { return state() == want })
 	}
 
 	f := newEnv(t, "")
@@ -321,4 +317,19 @@ func TestCard_HistoryFoldsSetsAndShowsCommentOnce(t *testing.T) {
 	if n := strings.Count(e.text(), "unique-comment-text"); n != 1 {
 		t.Errorf("comment shown %d times, expected 1:\n%s", n, e.text())
 	}
+}
+
+// A task written between the first load and the watcher start still reaches the board:
+// the watcher starts after the first frame, so its first event is not enough.
+func TestLiveUpdate_EditBeforeWatcherStart_Shown(t *testing.T) {
+	e := newEnv(t, "")
+	e.create("First", "p", "idea")
+	e.start("", 140, 30)
+	e.screenHas("First")
+	// A direct file write is instant: it lands before the delayed watcher start.
+	early := "---\nid: T-9\ntitle: Written early\nproject: p\nstatus: idea\nrank: 9\ncreated: 2026-10-21T10:00:00\ntags: []\n---\n"
+	if err := os.WriteFile(filepath.Join(e.root, "T-9 written-early.md"), []byte(early), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.screenHas("Written early")
 }

@@ -161,7 +161,8 @@ func (m *Model) event(msg tea.Msg) tea.Cmd {
 			m.setStatus("live update off: "+firstLine(msg.err.Error()), true)
 			return nil
 		}
-		return m.waitEvent()
+		// Edits between the first load and the watcher start gave no event: reload once.
+		return tea.Batch(m.waitEvent(), m.settle())
 	case fsEvent:
 		return tea.Batch(m.waitEvent(), m.settle())
 	case reloadTick:
