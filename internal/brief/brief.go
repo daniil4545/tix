@@ -52,6 +52,7 @@ type Section struct {
 type Brief struct {
 	Project  string    `json:"project"`
 	Rules    string    `json:"rules"`
+	Columns  string    `json:"columns"` // колонки с ролями: RULES.md говорит ролями, на доске имена
 	Sections []Section `json:"sections"`
 	Next     string    `json:"next"`
 }
@@ -59,7 +60,7 @@ type Brief struct {
 // Build собирает Brief: роли active, waiting, ready; сжатие до Limit. Задачи в Input
 // уже отобраны по проекту. Пустой Project печатается как "all".
 func Build(in Input) Brief {
-	b := Brief{Project: in.Project, Rules: in.RulesPath, Sections: []Section{}}
+	b := Brief{Project: in.Project, Rules: in.RulesPath, Columns: in.Cfg.Roles(), Sections: []Section{}}
 	if b.Project == "" {
 		b.Project = "all"
 	}
@@ -189,6 +190,9 @@ func (b Brief) Text() string {
 		head += "   rules: " + b.Rules
 	}
 	lines := []string{head, howto}
+	if b.Columns != "" {
+		lines = append(lines, "- columns: "+b.Columns)
+	}
 	if len(b.Sections) == 0 {
 		lines = append(lines, "no tasks")
 	}

@@ -185,7 +185,7 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 		if err != nil {
 			return err
 		}
-		info, err = s.move(tx, t, cfg, column, o, actor, op)
+		info, err = s.move(tx, t, cfg, cfg.Resolve(column), o, actor, op)
 		return err
 	})
 	res.Info = info
@@ -229,7 +229,7 @@ func (s *Store) move(tx *txEnv, t *task.Task, cfg *config.Config, column string,
 // moveRoles проверяет, что обе колонки есть и с ролью, и что -m уместен.
 func moveRoles(cfg *config.Config, from, column, msg string) (fromRole, toRole string, err error) {
 	if !slices.ContainsFunc(cfg.Columns, func(c config.Column) bool { return c.Name == column }) {
-		return "", "", rule("unknown column %q", column)
+		return "", "", rule("unknown column %q; columns: %s", column, cfg.Roles())
 	}
 	for _, c := range []string{from, column} {
 		if cfg.RoleOf(c) == "" {

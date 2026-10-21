@@ -133,3 +133,16 @@ func TestByRoleAndRoleOf(t *testing.T) {
 		t.Errorf("RoleOf(blocked) в конфиге по умолчанию = %q, ждали waiting", got)
 	}
 }
+
+// Resolve: имя колонки важнее роли; роль даёт колонку с этой ролью; чужое имя - как есть.
+func TestResolve_NameBeforeRole(t *testing.T) {
+	defer guard(t)
+	c := &config.Config{Columns: []config.Column{
+		{Name: "todo", Role: "ready"}, {Name: "ready", Role: "inbox"}, {Name: "blocked", Role: "waiting"},
+	}}
+	for in, want := range map[string]string{"waiting": "blocked", "ready": "ready", "todo": "todo", "nope": "nope"} {
+		if got := c.Resolve(in); got != want {
+			t.Errorf("Resolve(%q) = %q, ждали %q", in, got, want)
+		}
+	}
+}
