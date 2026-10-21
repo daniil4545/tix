@@ -1,4 +1,4 @@
-// Package e2e проверяет бинарь tk как чёрный ящик: процессы, лок, git, kill -9.
+// Package e2e проверяет бинарь tix как чёрный ящик: процессы, лок, git, kill -9.
 // Сценарии: docs/plans/z1-core.md, раздел 3; docs/spec.md, 2.1 и 7.
 // Допущение по CLI (раздел 5 плана, макет): флаги --as, -v, --json идут после позиционных.
 package e2e
@@ -23,7 +23,7 @@ import (
 const warnCommitFailed = "warn T-1: commit not recorded"
 
 var (
-	tkBin  string
+	tixBin string
 	gitBin string
 )
 
@@ -32,18 +32,18 @@ func TestMain(m *testing.M) {
 }
 
 func runMain(m *testing.M) int {
-	dir, err := os.MkdirTemp("", "tk-e2e-")
+	dir, err := os.MkdirTemp("", "tix-e2e-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 2
 	}
 	defer os.RemoveAll(dir)
 	root, _ := filepath.Abs("..")
-	tkBin = filepath.Join(dir, "tk")
-	build := exec.CommandContext(context.Background(), "go", "build", "-o", tkBin, "./cmd/tk")
+	tixBin = filepath.Join(dir, "tix")
+	build := exec.CommandContext(context.Background(), "go", "build", "-o", tixBin, "./cmd/tix")
 	build.Dir = root
 	if out, err := build.CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "build tk: %v\n%s\n", err, out)
+		fmt.Fprintf(os.Stderr, "build tix: %v\n%s\n", err, out)
 		return 2
 	}
 	gitBin, err = exec.LookPath("git")
@@ -57,7 +57,7 @@ func runMain(m *testing.M) int {
 type box struct {
 	t    *testing.T
 	root string // временный корень теста
-	home string // TRACKER_HOME
+	home string // TIX_HOME
 	cwd  string // не git-папка
 	env  []string
 	// stale - rev, оставшийся позади файла (для сценариев слияния).
@@ -76,9 +76,9 @@ func newBox(t *testing.T) *box {
 	b.env = []string{
 		"PATH=" + os.Getenv("PATH"),
 		"HOME=" + filepath.Join(root, "home"),
-		"TRACKER_HOME=" + b.home,
-		"TRACKER_GIT=" + gitBin,
-		"TRACKER_LOCK_TIMEOUT=30s",
+		"TIX_HOME=" + b.home,
+		"TIX_GIT=" + gitBin,
+		"TIX_LOCK_TIMEOUT=30s",
 		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_CONFIG_NOSYSTEM=1",
 	}
@@ -110,7 +110,7 @@ type res struct {
 }
 
 func (b *box) cmd(env []string, stdin string, args ...string) *exec.Cmd {
-	c := exec.CommandContext(context.Background(), tkBin, args...)
+	c := exec.CommandContext(context.Background(), tixBin, args...)
 	c.Dir = b.cwd
 	c.Env = env
 	c.Stdin = strings.NewReader(stdin)
@@ -132,21 +132,21 @@ func (b *box) runEnv(env []string, stdin string, args ...string) res {
 	case <-done:
 	case <-time.After(90 * time.Second):
 		_ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL)
-		b.t.Fatalf("tk %v завис дольше 90 с", args)
+		b.t.Fatalf("tix %v завис дольше 90 с", args)
 	}
 	return res{o.String(), e.String(), c.ProcessState.ExitCode()}
 }
 
-func (b *box) tk(stdin string, args ...string) res {
+func (b *box) tix(stdin string, args ...string) res {
 	b.t.Helper()
 	return b.runEnv(b.env, stdin, args...)
 }
 
 func (b *box) ok(stdin string, args ...string) res {
 	b.t.Helper()
-	r := b.tk(stdin, args...)
+	r := b.tix(stdin, args...)
 	if r.code != 0 {
-		b.t.Fatalf("tk %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
+		b.t.Fatalf("tix %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
 	}
 	return r
 }
@@ -247,7 +247,7 @@ func (b *box) snapshot() map[string]string {
 			}
 			return nil
 		}
-		if rel == ".tracker/log" || rel == ".tracker/lock" || strings.HasPrefix(rel, ".tracker/tmp") {
+		if rel == ".tix/log" || rel == ".tix/lock" || strings.HasPrefix(rel, ".tix/tmp") {
 			return nil
 		}
 		d, _ := os.ReadFile(p)
@@ -258,7 +258,7 @@ func (b *box) snapshot() map[string]string {
 	return snap
 }
 
-// noTmpLeft: временных файлов нет. После kill -9 остаток в .tracker/tmp (в .gitignore) допустим: strictTmp=false.
+// noTmpLeft: временных файлов нет. После kill -9 остаток в .tix/tmp (в .gitignore) допустим: strictTmp=false.
 func (b *box) noTmpLeft(strictTmp bool) {
 	b.t.Helper()
 	_ = filepath.Walk(b.home, func(p string, info os.FileInfo, err error) error {
@@ -269,14 +269,14 @@ func (b *box) noTmpLeft(strictTmp bool) {
 		if info.IsDir() && rel == ".git" {
 			return filepath.SkipDir
 		}
-		if !strictTmp && strings.HasPrefix(rel, ".tracker/tmp") {
+		if !strictTmp && strings.HasPrefix(rel, ".tix/tmp") {
 			return nil
 		}
 		if !info.IsDir() && (strings.Contains(info.Name(), ".tmp") || strings.HasSuffix(info.Name(), "~")) {
 			b.t.Errorf("остался временный файл: %s", rel)
 		}
-		if !info.IsDir() && strings.HasPrefix(rel, ".tracker/tmp/") {
-			b.t.Errorf("остался файл в .tracker/tmp: %s", rel)
+		if !info.IsDir() && strings.HasPrefix(rel, ".tix/tmp/") {
+			b.t.Errorf("остался файл в .tix/tmp: %s", rel)
 		}
 		return nil
 	})
@@ -401,7 +401,7 @@ func TestScenario_Main_CommitPerOperation(t *testing.T) {
 	}
 	first := strings.Fields(b.git("log", "--reverse", "--format=%H", "-1", "--max-parents=0"))[0]
 	files := b.git("show", "--name-only", "--format=", first)
-	for _, f := range []string{".gitignore", ".tracker/config.toml", ".tracker/next_id", filepath.Base(file)} {
+	for _, f := range []string{".gitignore", ".tix/config.toml", ".tix/next_id", filepath.Base(file)} {
 		if !strings.Contains(files, f) {
 			t.Errorf("первый коммит без %s; файлы:\n%s", f, files)
 		}
@@ -416,7 +416,7 @@ func TestScenario_Main_CommitPerOperation(t *testing.T) {
 		t.Errorf("после rm дерево не чистое:\n%s", st)
 	}
 	ign := b.read(filepath.Join(b.home, ".gitignore"))
-	for _, p := range []string{".tracker/lock", ".tracker/log", ".tracker/tmp", ".obsidian/workspace", ".trash/", "*.swp"} {
+	for _, p := range []string{".tix/lock", ".tix/log", ".tix/tmp", ".obsidian/workspace", ".trash/", "*.swp"} {
 		if !strings.Contains(ign, p) {
 			t.Errorf(".gitignore без %q:\n%s", p, ign)
 		}
@@ -437,7 +437,7 @@ func TestScenario_TwoAgents_Race5x20(t *testing.T) {
 		go func(w int) {
 			defer wg.Done()
 			for i := 0; i < 20; i++ {
-				r := b.tk("", "comment", "T-1", fmt.Sprintf("w%d-i%d", w, i), "--as", fmt.Sprintf("agent:%d", w))
+				r := b.tix("", "comment", "T-1", fmt.Sprintf("w%d-i%d", w, i), "--as", fmt.Sprintf("agent:%d", w))
 				if r.code != 0 {
 					mu.Lock()
 					fails = append(fails, fmt.Sprintf("w%d i%d: exit %d %q", w, i, r.code, r.err))
@@ -511,7 +511,7 @@ func TestScenario_EditStaleBase_MergeAndConflict(t *testing.T) {
 
 	// Те же строки: конфликт, отказ, файл цел.
 	before := b.snapshot()
-	r := b.tk(body("C-first", "l10"), "edit", "T-1", "--base", revA)
+	r := b.tix(body("C-first", "l10"), "edit", "T-1", "--base", revA)
 	if r.code != 3 {
 		t.Fatalf("конфликт: код %d, ждали 3 (ErrConflict); stdout %q", r.code, r.out)
 	}
@@ -523,9 +523,9 @@ func TestScenario_EditStaleBase_MergeAndConflict(t *testing.T) {
 	}
 
 	// База не из git: просьба перечитать.
-	r = b.tk(body("X", "Y"), "edit", "T-1", "--base", strings.Repeat("ab", 20))
-	if r.code != 1 || !strings.Contains(r.err, "tk show") {
-		t.Errorf("база не из git: код %d, stderr %q, ждали err с `tk show`", r.code, r.err)
+	r = b.tix(body("X", "Y"), "edit", "T-1", "--base", strings.Repeat("ab", 20))
+	if r.code != 1 || !strings.Contains(r.err, "tix show") {
+		t.Errorf("база не из git: код %d, stderr %q, ждали err с `tix show`", r.code, r.err)
 	}
 }
 
@@ -547,7 +547,7 @@ func TestScenario_EditLastBodyLine_FirstCommentAndOtherEdit_MergesClean(t *testi
 	rev := b.showRev("T-1")
 	b.ok(body("A-first", "l12"), "edit", "T-1", "--base", rev)
 	b.ok("", "comment", "T-1", "агент")
-	r := b.tk(body("l01", "B-last"), "edit", "T-1", "--base", rev)
+	r := b.tix(body("l01", "B-last"), "edit", "T-1", "--base", rev)
 	if r.code != 0 {
 		t.Fatalf("правка последней строки по старой базе после первого комментария: код %d, stderr %q", r.code, r.err)
 	}
@@ -648,7 +648,7 @@ func TestScenario_NoteCommentDoNotCarryOtherFiles(t *testing.T) {
 func TestScenario_LockBusy_ErrOneLine(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	lock, err := os.OpenFile(filepath.Join(b.home, ".tracker", "lock"), os.O_RDWR|os.O_CREATE, 0o644)
+	lock, err := os.OpenFile(filepath.Join(b.home, ".tix", "lock"), os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +658,7 @@ func TestScenario_LockBusy_ErrOneLine(t *testing.T) {
 	}
 	before := b.snapshot()
 	start := time.Now()
-	r := b.runEnv(b.with("TRACKER_LOCK_TIMEOUT=200ms"), "", "comment", "T-1", "busy")
+	r := b.runEnv(b.with("TIX_LOCK_TIMEOUT=200ms"), "", "comment", "T-1", "busy")
 	elapsed := time.Since(start)
 	if r.code != 2 || !regexp.MustCompile(`^err .+\n$`).MatchString(r.err) {
 		t.Errorf("лок занят: код %d, stderr %q, ждали код 2 (занято) и одну строку err", r.code, r.err)
@@ -689,9 +689,9 @@ func TestScenario_StaleGitLocks_Dropped(t *testing.T) {
 			t.Errorf("%s не удалён", p)
 		}
 	}
-	log := b.read(filepath.Join(b.home, ".tracker", "log"))
+	log := b.read(filepath.Join(b.home, ".tix", "log"))
 	if !strings.Contains(log, "WARN") || !strings.Contains(log, "drop_index_lock") {
-		t.Errorf("в .tracker/log нет WARN op=drop_index_lock:\n%s", log)
+		t.Errorf("в .tix/log нет WARN op=drop_index_lock:\n%s", log)
 	}
 }
 
@@ -702,7 +702,7 @@ func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
 	lock := filepath.Join(b.home, ".git", "index.lock")
 	b.write(lock, "")
 	before := b.snapshot()
-	r := b.tk("", "comment", "T-1", "busy")
+	r := b.tix("", "comment", "T-1", "busy")
 	if r.code != 2 || r.err != "err T-1: git is busy\n" {
 		t.Errorf("свежий lock: код %d, stderr %q, ждали код 2 и `err T-1: git is busy`", r.code, r.err)
 	}
@@ -720,7 +720,7 @@ func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
 	}
 }
 
-// Текст stderr git не попадает в ответ ни на одном пути; полный текст - в .tracker/log.
+// Текст stderr git не попадает в ответ ни на одном пути; полный текст - в .tix/log.
 func TestScenario_GitStderr_NotInReply(t *testing.T) {
 	const secret = "boom-secret"
 	body := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\n"
@@ -744,7 +744,7 @@ func TestScenario_GitStderr_NotInReply(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			b := newBox(t)
 			script, dir := b.fakeGit()
-			env := b.with("TRACKER_GIT=" + script)
+			env := b.with("TIX_GIT=" + script)
 			if c.name != "init" {
 				b.ok(body, "new", "Alpha")
 				b.ok(body, "edit", "T-1", "--base", b.showRev("T-1"))
@@ -762,8 +762,8 @@ func TestScenario_GitStderr_NotInReply(t *testing.T) {
 					t.Errorf("в ответе текст git %q: stdout %q, stderr %q", bad, r.out, r.err)
 				}
 			}
-			if log := b.read(filepath.Join(b.home, ".tracker", "log")); !strings.Contains(log, secret) {
-				t.Errorf("полного текста git нет в .tracker/log:\n%s", log)
+			if log := b.read(filepath.Join(b.home, ".tix", "log")); !strings.Contains(log, secret) {
+				t.Errorf("полного текста git нет в .tix/log:\n%s", log)
 			}
 		})
 	}
@@ -774,7 +774,7 @@ func TestScenario_CommitFails_WarnExitZero(t *testing.T) {
 	b.ok("", "new", "Alpha")
 	script, dir := b.fakeGit()
 	b.write(filepath.Join(dir, "mode"), "fail")
-	env := b.with("TRACKER_GIT=" + script)
+	env := b.with("TIX_GIT=" + script)
 	r := b.runEnv(env, "", "comment", "T-1", "без коммита")
 	if r.code != 0 || r.out != "ok T-1 comment\n" {
 		t.Errorf("коммит упал: код %d, stdout %q, ждали код 0 и `ok T-1 comment`", r.code, r.out)
@@ -788,8 +788,8 @@ func TestScenario_CommitFails_WarnExitZero(t *testing.T) {
 	if !strings.Contains(b.read(b.taskFile("T-1")), "без коммита") {
 		t.Error("правка не попала в файл")
 	}
-	if log := b.read(filepath.Join(b.home, ".tracker", "log")); strings.TrimSpace(log) == "" {
-		t.Error("упавший коммит не записан в .tracker/log")
+	if log := b.read(filepath.Join(b.home, ".tix", "log")); strings.TrimSpace(log) == "" {
+		t.Error("упавший коммит не записан в .tix/log")
 	}
 	// Следующая операция коммитит записанное как external edit.
 	b.write(filepath.Join(dir, "mode"), "pass")
@@ -810,7 +810,7 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 	b.ok("", "new", "Alpha")
 	script, dir := b.fakeGit()
 	b.write(filepath.Join(dir, "mode"), "hang")
-	env := b.with("TRACKER_GIT=" + script)
+	env := b.with("TIX_GIT=" + script)
 	c := b.cmd(env, "", "comment", "T-1", "zzz")
 	if err := c.Start(); err != nil {
 		t.Fatal(err)
@@ -833,11 +833,11 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 	}
 	b.write(filepath.Join(dir, "mode"), "pass")
 	// Пока lock свежий, git мог быть живым: отказ без записи.
-	if r := b.tk("", "note", "T-1", "рано"); r.code != 2 || !strings.Contains(r.err, "git is busy") {
+	if r := b.tix("", "note", "T-1", "рано"); r.code != 2 || !strings.Contains(r.err, "git is busy") {
 		t.Errorf("свежий lock после kill: код %d, stderr %q, ждали git is busy", r.code, r.err)
 	}
 	b.ageLocks()
-	r := b.runEnv(b.with("TRACKER_LOCK_TIMEOUT=5s"), "", "note", "T-1", "после kill")
+	r := b.runEnv(b.with("TIX_LOCK_TIMEOUT=5s"), "", "note", "T-1", "после kill")
 	if r.code != 0 {
 		t.Fatalf("после kill -9 операция не прошла (лок не снят?): код %d, %q", r.code, r.err)
 	}
@@ -876,7 +876,7 @@ func TestScenario_Kill9Random_RepoStaysConsistent(t *testing.T) {
 	}
 	fin := b.ok("", "note", "T-1", "финал")
 	if st := b.git("status", "--porcelain"); st != "" {
-		t.Errorf("после финальной операции дерево не чистое:\n%s\nstderr note: %q\ndiff:\n%s\nlog:\n%s", st, fin.err, b.git("diff", "HEAD"), b.read(filepath.Join(b.home, ".tracker", "log")))
+		t.Errorf("после финальной операции дерево не чистое:\n%s\nstderr note: %q\ndiff:\n%s\nlog:\n%s", st, fin.err, b.git("diff", "HEAD"), b.read(filepath.Join(b.home, ".tix", "log")))
 	}
 	have := map[string]bool{}
 	for _, c := range b.showJSON("T-1").Comments {

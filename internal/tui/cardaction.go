@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/task"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // cardActs - состояние действий карточки. open запускает переход в сессию; nil - команда `open`

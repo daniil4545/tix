@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"tracker/internal/config"
+	"github.com/daniil4545/tix/internal/config"
 )
 
 // Detect возвращает имя проекта для cwd: имя папки над .git (у worktree - над

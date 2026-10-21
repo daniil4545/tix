@@ -12,8 +12,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"tracker/internal/history"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/history"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files in testdata")

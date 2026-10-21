@@ -7,8 +7,8 @@
 # Агенты и модели не запускаются; claude в PATH тестов нет: скрипту он не нужен.
 #
 # Запуск: scripts/test-connect.sh [имя_теста ...]
-# Окружение: TK_BIN=<путь к настоящему tk> - прогнать хук и на нём (иначе заглушка);
-#            TK_TEST_KEEP=1 - не удалять временный каталог.
+# Окружение: TIX_BIN=<путь к настоящему tix> - прогнать хук и на нём (иначе заглушка);
+#            TIX_TEST_KEEP=1 - не удалять временный каталог.
 set -uo pipefail
 
 SELF_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -16,7 +16,7 @@ REPO=$(cd "$SELF_DIR/.." && pwd)
 CONNECT=$REPO/scripts/connect.sh
 FIX=$REPO/connectors/testdata
 CONN=$REPO/connectors
-SKILL_SRC=$CONN/agents/skills/tk
+SKILL_SRC=$CONN/agents/skills/tix
 NOW1=2026-10-20T10:00:00Z
 NOW2=2026-10-20T11:00:00Z
 MATCHER_WORDS="startup resume clear compact"
@@ -25,15 +25,15 @@ MATCHER_WORDS="startup resume clear compact"
 REAL_HOME=$(eval "echo ~$(id -un)")
 [ -n "$REAL_HOME" ] && [ "$REAL_HOME" != "~$(id -un)" ] || { echo "не удалось определить настоящий HOME" >&2; exit 2; }
 
-BASE=$(mktemp -d "${TMPDIR:-/tmp}/tk-connect-test.XXXXXX") || exit 2
+BASE=$(mktemp -d "${TMPDIR:-/tmp}/tix-connect-test.XXXXXX") || exit 2
 BASE=$(cd -P "$BASE" && pwd)
 HOMES=$BASE/homes
 TOOLS=$BASE/tools
 mkdir -p "$HOMES" "$TOOLS" "$BASE/tmp"
 
 cleanup() {
-  [ "${TK_TEST_KEEP:-}" = 1 ] && { echo "временный каталог оставлен: $BASE" >&2; return; }
-  case "$BASE" in */tk-connect-test.??????) rm -rf -- "$BASE" ;; esac
+  [ "${TIX_TEST_KEEP:-}" = 1 ] && { echo "временный каталог оставлен: $BASE" >&2; return; }
+  case "$BASE" in */tix-connect-test.??????) rm -rf -- "$BASE" ;; esac
 }
 trap cleanup EXIT
 
@@ -46,8 +46,8 @@ mode() { "${STAT_MODE[@]}" "$1"; }
 sha() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 <"$1" | cut -d' ' -f1; else sha256sum <"$1" | cut -d' ' -f1; fi; }
 
 REAL_WATCH=(
-  .claude/settings.json .claude/skills/tk .codex/hooks.json .codex/rules/tk.rules
-  .codex/rules/default.rules .codex/config.toml .agents/skills/tk tasks/.tracker/connect-state.json
+  .claude/settings.json .claude/skills/tix .codex/hooks.json .codex/rules/tix.rules
+  .codex/rules/default.rules .codex/config.toml .agents/skills/tix tasks/.tix/connect-state.json
 )
 
 real_fingerprint() {
@@ -61,14 +61,14 @@ real_fingerprint() {
     fi
   done
   find "$REAL_HOME/.claude" "$REAL_HOME/.codex" \
-    -maxdepth 2 -name '*.tk-bak-*' 2>/dev/null | LC_ALL=C sort
+    -maxdepth 2 -name '*.tix-bak-*' 2>/dev/null | LC_ALL=C sort
 }
 
 REAL_BEFORE=$(real_fingerprint)
 
-# ---------- окружение: каталог утилит и заглушка tk ----------
+# ---------- окружение: каталог утилит и заглушка tix ----------
 
-# PATH тестов - только этот каталог: так видно, что скрипт требует jq и tk,
+# PATH тестов - только этот каталог: так видно, что скрипт требует jq и tix,
 # и можно убрать любую из утилит.
 BASE_TOOLS=(bash env sh cat mv cp rm mkdir date dirname basename realpath stat chmod ln mktemp sed awk
   grep sort cut tr head tail readlink cmp diff ls printf touch find shasum sha256sum tee wc uname id
@@ -81,12 +81,12 @@ link_tools() { # каталог, исключение
     [ "$t" = "$skip" ] && continue
     p=$(command -v "$t" 2>/dev/null) && [ -x "$p" ] && ln -sf "$p" "$dir/$t"
   done
-  [ "$skip" = tk ] && return 0
-  if [ -n "${TK_BIN:-}" ]; then ln -sf "$TK_BIN" "$dir/tk"; else cp "$BASE/tk-stub" "$dir/tk"; fi
+  [ "$skip" = tix ] && return 0
+  if [ -n "${TIX_BIN:-}" ]; then ln -sf "$TIX_BIN" "$dir/tix"; else cp "$BASE/tix-stub" "$dir/tix"; fi
 }
 
-# Заглушка tk: знает `ctx`, `ctx --hook` и `inbox --hook` (пустой ответ), любая другая форма - код 64.
-cat >"$BASE/tk-stub" <<'EOF'
+# Заглушка tix: знает `ctx`, `ctx --hook` и `inbox --hook` (пустой ответ), любая другая форма - код 64.
+cat >"$BASE/tix-stub" <<'EOF'
 #!/bin/sh
 if [ "$#" -eq 2 ] && [ "$1" = inbox ] && [ "$2" = --hook ]; then
   cat >/dev/null 2>&1 || true
@@ -94,15 +94,15 @@ if [ "$#" -eq 2 ] && [ "$1" = inbox ] && [ "$2" = --hook ]; then
 fi
 if { [ "$#" -eq 1 ] && [ "$1" = ctx ]; } || { [ "$#" -eq 2 ] && [ "$1" = ctx ] && [ "$2" = --hook ]; }; then
   cat >/dev/null 2>&1 || true
-  echo "tk ctx: stub, 0 tasks"
+  echo "tix ctx: stub, 0 tasks"
   exit 0
 fi
-echo "tk stub: unexpected args: $*" >&2
+echo "tix stub: unexpected args: $*" >&2
 exit 64
 EOF
-chmod +x "$BASE/tk-stub"
+chmod +x "$BASE/tix-stub"
 link_tools "$TOOLS"
-for x in jq tk; do link_tools "$BASE/tools-no-$x" "$x"; done
+for x in jq tix; do link_tools "$BASE/tools-no-$x" "$x"; done
 
 # ---------- проверки и утилиты ----------
 
@@ -147,10 +147,10 @@ jq_ok() { jq -e "$2" "$1" >/dev/null 2>&1 || fail "${3:-$2}: не выполне
 same_bytes() { cmp -s "$1" "$2" || fail "${3:-файл изменён}: $1"; }
 must_exist() { [ -e "$1" ] || [ -L "$1" ] || fail "нет $1"; }
 must_absent() { [ ! -e "$1" ] && [ ! -L "$1" ] || fail "остался $1"; }
-baks() { find "$HOME" -name '*.tk-bak-*' | LC_ALL=C sort; }
+baks() { find "$HOME" -name '*.tix-bak-*' | LC_ALL=C sort; }
 # Наши группы хуков во всех событиях; пустые массивы событий после удаления тоже уходят.
-DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tk ctx" or .command == "tk ctx --hook" or .command == "tk inbox --hook") | not))) | with_entries(select(.value | length > 0)))'
-MANIFEST() { echo "$HOME/tasks/.tracker/connect-state.json"; }
+DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tix ctx" or .command == "tix ctx --hook" or .command == "tix inbox --hook") | not))) | with_entries(select(.value | length > 0)))'
+MANIFEST() { echo "$HOME/tasks/.tix/connect-state.json"; }
 files_in_home() { (cd "$HOME" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort); }
 
 snap() { # снимок файлов, которые трогает connect.sh: путь, ссылка, права, хэш
@@ -205,7 +205,7 @@ t_plan_writes_nothing_and_lists_targets() {
   [ "$before" = "$after" ] || fail "plan изменил файлы HOME"
   [ -z "$(files_in_home)" ] || fail "plan создал файлы: $(files_in_home)"
   run plan --agent all
-  all_out | grep -qF 'Bash(tk *)' || fail "plan не называет ключ Bash(tk *): $(all_out | head -5)"
+  all_out | grep -qF 'Bash(tix *)' || fail "plan не называет ключ Bash(tix *): $(all_out | head -5)"
   all_out | grep -qF 'hooks.json' || fail "plan не называет .codex/hooks.json"
 }
 
@@ -213,25 +213,25 @@ t_apply_clean_writes_exact_paths() {
   new_home
   apply
   local want
-  want=$(printf '%s\n' ./.agents/skills/tk/SKILL.md ./.claude/settings.json ./.claude/skills/tk/SKILL.md \
-    ./.codex/hooks.json ./.codex/rules/tk.rules ./tasks/.tracker/connect-state.json | LC_ALL=C sort)
+  want=$(printf '%s\n' ./.agents/skills/tix/SKILL.md ./.claude/settings.json ./.claude/skills/tix/SKILL.md \
+    ./.codex/hooks.json ./.codex/rules/tix.rules ./tasks/.tix/connect-state.json | LC_ALL=C sort)
   [ "$(files_in_home)" = "$want" ] || fail "набор файлов HOME другой:"$'\n'"$(diff <(echo "$want") <(files_in_home) | head -8)"
   [ -z "$(baks)" ] || fail "после apply остались бэкапы: $(baks)"
 
   local s=$HOME/.claude/settings.json
-  jq_ok "$s" '.permissions.allow | index("Bash(tk *)") != null' 'Claude: Bash(tk *) в allow'
-  jq_ok "$s" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx --hook")] | length == 1' 'Claude: группа SessionStart с tk ctx --hook'
+  jq_ok "$s" '.permissions.allow | index("Bash(tix *)") != null' 'Claude: Bash(tix *) в allow'
+  jq_ok "$s" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tix ctx --hook")] | length == 1' 'Claude: группа SessionStart с tix ctx --hook'
   jq_ok "$s" 'keys | sort == ["hooks","permissions"]' 'Claude: лишние ключи в settings.json'
   local h=$HOME/.codex/hooks.json
-  jq_ok "$h" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Codex: группа SessionStart с tk ctx'
+  jq_ok "$h" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tix ctx")] | length == 1' 'Codex: группа SessionStart с tix ctx'
   local ev
   for ev in PostToolUse UserPromptSubmit Stop; do
-    jq_ok "$s" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Claude: хук $ev с tk inbox --hook"
-    jq_ok "$h" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Codex: хук $ev с tk inbox --hook"
+    jq_ok "$s" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tix inbox --hook\" and .timeout == 10)] | length == 1" "Claude: хук $ev с tix inbox --hook"
+    jq_ok "$h" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tix inbox --hook\" and .timeout == 10)] | length == 1" "Codex: хук $ev с tix inbox --hook"
   done
   jq_ok "$s" '.hooks.PostToolUse[0].matcher == "*"' 'Claude: matcher PostToolUse'
   jq_ok "$h" '.hooks.Stop | length == 1' 'Codex: в чистом HOME одна группа Stop'
-  grep -qF 'prefix_rule(pattern=["tk"], decision="allow")' "$HOME/.codex/rules/tk.rules" || fail "Codex: tk.rules без prefix_rule для tk"
+  grep -qF 'prefix_rule(pattern=["tix"], decision="allow")' "$HOME/.codex/rules/tix.rules" || fail "Codex: tix.rules без prefix_rule для tix"
   jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'манифест'
 
   run plan --agent all
@@ -239,11 +239,11 @@ t_apply_clean_writes_exact_paths() {
   [ -z "$(printf '%s' "$OUT" | tr -d '[:space:]')" ] || fail "повторный plan не пуст: $(echo "$OUT" | head -5)"
 }
 
-t_tracker_home_sets_manifest_place() {
+t_tix_home_sets_manifest_place() {
   new_home
-  RUN_ENV=("TRACKER_HOME=$H/alt")
+  RUN_ENV=("TIX_HOME=$H/alt")
   apply
-  jq_ok "$H/alt/.tracker/connect-state.json" '.version == 1' 'манифест в TRACKER_HOME'
+  jq_ok "$H/alt/.tix/connect-state.json" '.version == 1' 'манифест в TIX_HOME'
   must_absent "$HOME/tasks"
   undo
   RUN_ENV=()
@@ -274,10 +274,10 @@ t_failed_apply_keeps_and_names_backups() {
   chmod 555 "$HOME/.codex/rules"
   run apply --agent all --now "$NOW1"
   chmod 755 "$HOME/.codex/rules"
-  [ "$RC" -ne 0 ] || fail "apply вернул 0, хотя запись tk.rules невозможна"
+  [ "$RC" -ne 0 ] || fail "apply вернул 0, хотя запись tix.rules невозможна"
   local f
   for f in .claude/settings.json .codex/hooks.json; do
-    set -- "$HOME/$f".tk-bak-*
+    set -- "$HOME/$f".tix-bak-*
     [ -e "$1" ] && [ "$#" -eq 1 ] || fail "ожидался один бэкап рядом с $f, есть: $*"
     same_bytes "$1" "$ORIG/$(basename "$f")" "бэкап не равен исходному файлу"
     [ "$(mode "$1")" = "$(mode "$HOME/$f")" ] || fail "права бэкапа $(mode "$1") не равны правам цели"
@@ -295,8 +295,8 @@ t_undo_restores_original_json() {
   jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" . 'Codex hooks.json после undo'
   same_bytes "$HOME/.codex/rules/default.rules" "$ORIG/default.rules"
   same_bytes "$HOME/.codex/config.toml" "$ORIG/config.toml"
-  must_absent "$HOME/.codex/rules/tk.rules"
-  must_absent "$HOME/.agents/skills/tk"
+  must_absent "$HOME/.codex/rules/tix.rules"
+  must_absent "$HOME/.agents/skills/tix"
   must_absent "$HOME/.claude/skills"
   must_absent "$(MANIFEST)"
   [ -z "$(baks)" ] || fail "undo оставил бэкапы: $(baks)"
@@ -310,25 +310,25 @@ t_undo_on_pristine_home_leaves_no_trace() {
 
 t_existing_tk_permission_survives_undo() {
   new_home
-  jq '.permissions.allow += ["Bash(tk *)"]' "$FIX/claude-settings.json" >"$BASE/s.json"
+  jq '.permissions.allow += ["Bash(tix *)"]' "$FIX/claude-settings.json" >"$BASE/s.json"
   seed_claude claude-settings.json
   cp "$BASE/s.json" "$HOME/.claude/settings.json"; cp "$BASE/s.json" "$ORIG/settings.json"
   apply
-  jq_ok "$HOME/.claude/settings.json" '[.permissions.allow[] | select(. == "Bash(tk *)")] | length == 1' 'Bash(tk *) не продублирован'
+  jq_ok "$HOME/.claude/settings.json" '[.permissions.allow[] | select(. == "Bash(tix *)")] | length == 1' 'Bash(tix *) не продублирован'
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" '.permissions' 'allow изменён apply, хотя ключ уже был'
   undo
-  jq_ok "$HOME/.claude/settings.json" '.permissions.allow | index("Bash(tk *)") != null' 'undo снял чужой Bash(tk *)'
+  jq_ok "$HOME/.claude/settings.json" '.permissions.allow | index("Bash(tix *)") != null' 'undo снял чужой Bash(tix *)'
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" '.permissions' 'permissions после undo'
 }
 
 t_existing_own_hook_upgraded_and_restored() {
   new_home; seed_claude claude-settings-ownhook.json
   apply
-  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'свой хук tk ctx не стал tk ctx --hook'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tix ctx --hook")] | length == 1' 'свой хук tk ctx не стал tix ctx --hook'
   jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 0' 'остался старый хук tk ctx'
   run apply --agent all --now "$NOW2"
   [ "$RC" -eq 0 ] || fail "повторный apply: код $RC"
-  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | startswith("tk ctx"))] | length == 1' 'повторный apply продублировал хук'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | startswith("tix ctx"))] | length == 1' 'повторный apply продублировал хук'
   undo
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'свой хук tk ctx должен вернуться как был'
 }
@@ -339,60 +339,92 @@ t_old_installed_hook_upgraded() {
   local old=$BASE/oldroot cur=$CONNECT
   rm -rf "$old"; mkdir -p "$old/scripts"
   cp "$CONNECT" "$old/scripts/connect.sh"; cp -R "$CONN" "$old/connectors"
-  sed -i.bak 's/tk ctx --hook/tk ctx/' "$old/connectors/claude/hooks.json"; rm -f "$old/connectors/claude/hooks.json.bak"
+  sed -i.bak 's/tix ctx --hook/tk ctx/' "$old/connectors/claude/hooks.json"; rm -f "$old/connectors/claude/hooks.json.bak"
   CONNECT=$old/scripts/connect.sh apply
   jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'старый коннектор не поставил tk ctx'
   CONNECT=$cur
   apply
-  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'хук не обновлён на tk ctx --hook'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tix ctx --hook")] | length == 1' 'хук не обновлён на tix ctx --hook'
   jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 0' 'остался старый хук tk ctx'
   jq_ok "$HOME/.claude/settings.json" '.hooks.SessionStart | length == 1' 'группа SessionStart продублирована'
-  jq_ok "$HOME/.codex/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'Codex: хук должен остаться tk ctx'
+  jq_ok "$HOME/.codex/hooks.json" '[.. | objects | select(.command? == "tix ctx")] | length == 1' 'Codex: хук должен остаться tix ctx'
   undo
   [ -z "$(find "$HOME" -mindepth 1)" ] || fail "после undo остались следы: $(find "$HOME" -mindepth 1 | head -5)"
+}
+
+# Установка прежней версии (имя tk, манифест в .tracker): apply переводит всё на tix, undo чистит дочиста.
+t_legacy_tk_install_migrated() {
+  new_home
+  cp -R "$FIX/legacy-home/." "$HOME/"
+  sed -i.bak "s#@HOME@#$HOME#g" "$HOME/tasks/.tracker/connect-state.json"; rm -f "$HOME/tasks/.tracker/connect-state.json.bak"
+  printf '.tracker/lock\n*.swp\n' >"$HOME/tasks/.gitignore"
+  run plan
+  [ "$RC" -eq 0 ] || fail "plan на старой установке: код $RC"
+  must_exist "$HOME/tasks/.tracker/connect-state.json"
+  must_absent "$HOME/tasks/.tix"
+  apply
+  must_exist "$(MANIFEST)"
+  must_absent "$HOME/tasks/.tracker"
+  grep -q '^\.tix/lock$' "$HOME/tasks/.gitignore" || fail ".gitignore базы не переведён на .tix: $(cat "$HOME/tasks/.gitignore")"
+  grep -q 'tracker' "$HOME/tasks/.gitignore" && fail ".gitignore базы хранит .tracker"
+  local f
+  for f in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json"; do
+    jq_ok "$f" '[.. | objects | select((.command? // "") | test("^tk "))] | length == 0' "в $f остался хук tk"
+    jq_ok "$f" '[.. | objects | select((.command? // "") | test("^tix "))] | length == 4' "в $f не четыре хука tix"
+  done
+  jq_ok "$HOME/.claude/settings.json" '.permissions.allow | index("Bash(tix *)") != null and index("Bash(tk *)") == null' 'allow не переведён на Bash(tix *)'
+  must_exist "$HOME/.claude/skills/tix/SKILL.md"; must_absent "$HOME/.claude/skills/tk"
+  must_exist "$HOME/.agents/skills/tix/SKILL.md"; must_absent "$HOME/.agents/skills/tk"
+  must_exist "$HOME/.codex/rules/tix.rules"; must_absent "$HOME/.codex/rules/tk.rules"
+  jq_ok "$(MANIFEST)" '[.entries[].key | select(test("/tk(\\.rules)?\\|?"))] | length == 0' 'в манифесте остались записи tk'
+  run plan
+  [ -z "$OUT" ] || fail "повторный plan после миграции не пуст: $OUT"
+  undo
+  [ -z "$(find "$HOME" -mindepth 1 \( -type f -o -type l \) ! -name .gitignore)" ] || fail "после undo остались файлы: $(find "$HOME" -type f | head -5)"
+  [ -z "$(find "$HOME" -mindepth 1 -type d -empty)" ] || fail "после undo остались пустые каталоги: $(find "$HOME" -type d -empty | head -5)"
 }
 
 t_modified_own_files_skipped_without_force() {
   new_home
   apply
   local f
-  echo '# mine' >>"$HOME/.codex/rules/tk.rules"
-  echo 'mine' >>"$HOME/.claude/skills/tk/SKILL.md"
-  echo 'mine' >>"$HOME/.agents/skills/tk/SKILL.md"
+  echo '# mine' >>"$HOME/.codex/rules/tix.rules"
+  echo 'mine' >>"$HOME/.claude/skills/tix/SKILL.md"
+  echo 'mine' >>"$HOME/.agents/skills/tix/SKILL.md"
   local before
   before=$(snap)
   apply "$NOW2"
   [ "$before" = "$(snap)" ] || fail "apply без --force перезаписал изменённые файлы"
-  for f in "$HOME/.codex/rules/tk.rules" "$HOME/.claude/skills/tk" "$HOME/.agents/skills/tk"; do
+  for f in "$HOME/.codex/rules/tix.rules" "$HOME/.claude/skills/tix" "$HOME/.agents/skills/tix"; do
     all_out | grep -iF 'warn' | grep -qF "$f" || fail "нет warn с путём $f: $(all_out | head -6)"
   done
   [ -z "$(baks)" ] || fail "бэкапы после apply: $(baks)"
   run apply --agent all --now "$NOW2" --force
   [ "$RC" -eq 0 ] || fail "apply --force: код $RC: $(all_out | head -5)"
-  same_bytes "$HOME/.codex/rules/tk.rules" "$CONN/codex/tk.rules" 'tk.rules после --force'
-  diff -r "$SKILL_SRC" "$HOME/.claude/skills/tk" >/dev/null || fail "скилл Claude после --force отличается от источника"
-  diff -r "$SKILL_SRC" "$HOME/.agents/skills/tk" >/dev/null || fail "скилл Codex после --force отличается от источника"
+  same_bytes "$HOME/.codex/rules/tix.rules" "$CONN/codex/tix.rules" 'tix.rules после --force'
+  diff -r "$SKILL_SRC" "$HOME/.claude/skills/tix" >/dev/null || fail "скилл Claude после --force отличается от источника"
+  diff -r "$SKILL_SRC" "$HOME/.agents/skills/tix" >/dev/null || fail "скилл Codex после --force отличается от источника"
 }
 
 t_undo_removes_only_manifest_files() {
   new_home
   apply
-  echo mine >"$HOME/.claude/skills/tk/extra.txt"
-  mkdir -p "$HOME/.agents/skills/tk/sub"
-  echo mine >"$HOME/.agents/skills/tk/sub/note.txt"
+  echo mine >"$HOME/.claude/skills/tix/extra.txt"
+  mkdir -p "$HOME/.agents/skills/tix/sub"
+  echo mine >"$HOME/.agents/skills/tix/sub/note.txt"
   run undo --agent all --now "$NOW2"
   [ "$RC" -eq 0 ] || fail "undo: код $RC: $(all_out | head -5)"
-  must_exist "$HOME/.claude/skills/tk/extra.txt"
-  must_exist "$HOME/.agents/skills/tk/sub/note.txt"
-  must_absent "$HOME/.claude/skills/tk/SKILL.md"
-  must_absent "$HOME/.agents/skills/tk/SKILL.md"
-  must_absent "$HOME/.codex/rules/tk.rules"
-  all_out | grep -qF "$HOME/.claude/skills/tk" || fail "undo не назвал оставленный каталог: $(all_out | head -6)"
+  must_exist "$HOME/.claude/skills/tix/extra.txt"
+  must_exist "$HOME/.agents/skills/tix/sub/note.txt"
+  must_absent "$HOME/.claude/skills/tix/SKILL.md"
+  must_absent "$HOME/.agents/skills/tix/SKILL.md"
+  must_absent "$HOME/.codex/rules/tix.rules"
+  all_out | grep -qF "$HOME/.claude/skills/tix" || fail "undo не назвал оставленный каталог: $(all_out | head -6)"
 }
 
 t_undo_skips_paths_outside_whitelist() {
   new_home
-  mkdir -p "$HOME/tasks/.tracker" "$HOME/victimdir"
+  mkdir -p "$HOME/tasks/.tix" "$HOME/victimdir"
   echo keep >"$HOME/victim.txt"
   echo keep >"$HOME/victimdir/a.txt"
   echo '{"keep":1}' >"$HOME/other.json"
@@ -417,11 +449,11 @@ t_undo_skips_paths_outside_whitelist() {
 t_undo_without_manifest_says_so() {
   new_home
   undo
-  [ "$OUT" = "nothing to undo: no manifest at $HOME/tasks/.tracker/connect-state.json" ] || fail "вывод: '$OUT'"
-  RUN_ENV=("TRACKER_HOME=$H/alt")
+  [ "$OUT" = "nothing to undo: no manifest at $HOME/tasks/.tix/connect-state.json" ] || fail "вывод: '$OUT'"
+  RUN_ENV=("TIX_HOME=$H/alt")
   undo
   RUN_ENV=()
-  [ "$OUT" = "nothing to undo: no manifest at $H/alt/.tracker/connect-state.json" ] || fail "вывод с TRACKER_HOME: '$OUT'"
+  [ "$OUT" = "nothing to undo: no manifest at $H/alt/.tix/connect-state.json" ] || fail "вывод с TIX_HOME: '$OUT'"
 }
 
 t_symlinked_configs_stay_symlinks() {
@@ -440,9 +472,9 @@ t_symlinked_configs_stay_symlinks() {
     [ "$(readlink "$HOME/$rel")" = "$HOME/dotfiles/$name" ] || fail "$rel указывает на $(readlink "$HOME/$rel")"
     [ "$(mode "$HOME/dotfiles/$name")" = "$want" ] || fail "права цели $name: $(mode "$HOME/dotfiles/$name"), ожидалось $want"
   done
-  jq_ok "$HOME/dotfiles/settings.json" '.permissions.allow | index("Bash(tk *)") != null' 'запись ушла в цель симлинка'
-  jq_ok "$HOME/dotfiles/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'хук Claude ушёл в цель симлинка'
-  jq_ok "$HOME/dotfiles/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук Codex ушёл в цель симлинка'
+  jq_ok "$HOME/dotfiles/settings.json" '.permissions.allow | index("Bash(tix *)") != null' 'запись ушла в цель симлинка'
+  jq_ok "$HOME/dotfiles/settings.json" '[.. | objects | select(.command? == "tix ctx --hook")] | length == 1' 'хук Claude ушёл в цель симлинка'
+  jq_ok "$HOME/dotfiles/hooks.json" '[.. | objects | select(.command? == "tix ctx")] | length == 1' 'хук Codex ушёл в цель симлинка'
   undo
   for link in .claude/settings.json:settings.json .codex/hooks.json:hooks.json; do
     IFS=: read -r rel name <<<"$link"
@@ -460,10 +492,10 @@ t_symlinked_skill_dir_target_untouched() {
   ln -s "$HOME/dotfiles/skills" "$HOME/.agents/skills"
   apply
   [ -L "$HOME/.agents/skills" ] || fail ".agents/skills перестал быть ссылкой"
-  must_exist "$HOME/dotfiles/skills/tk/SKILL.md"
+  must_exist "$HOME/dotfiles/skills/tix/SKILL.md"
   undo
   [ -L "$HOME/.agents/skills" ] || fail ".agents/skills перестал быть ссылкой после undo"
-  must_absent "$HOME/dotfiles/skills/tk"
+  must_absent "$HOME/dotfiles/skills/tix"
 }
 
 t_permissions_600_preserved() {
@@ -517,7 +549,7 @@ t_agent_filter_touches_only_that_agent() {
 
 t_missing_tools_err_and_files_intact() {
   local missing
-  for missing in jq tk; do
+  for missing in jq tix; do
     new_home; seed_all
     local before after
     before=$(snap)
@@ -562,9 +594,9 @@ t_hook_reads_stdin_and_output_is_short() {
     for w in $MATCHER_WORDS; do
       jq_ok "$HOME/${f#*:}" "[.hooks.SessionStart[].matcher // \"\" | split(\"|\") | index(\"$w\")] | any(. != null)" "$name: matcher SessionStart без $w"
     done
-    while IFS= read -r c; do cmds+=("$name|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; (.command | startswith("tk ctx")))) | .hooks[].command' "$HOME/${f#*:}")
+    while IFS= read -r c; do cmds+=("$name|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; (.command | startswith("tix ctx")))) | .hooks[].command' "$HOME/${f#*:}")
   done
-  [ "${#cmds[@]}" -eq 2 ] || fail "найдено хуков tk ctx: ${#cmds[@]}, нужно по одному в Claude и Codex"
+  [ "${#cmds[@]}" -eq 2 ] || fail "найдено хуков tix ctx: ${#cmds[@]}, нужно по одному в Claude и Codex"
   for c in "${cmds[@]}"; do
     name=${c%%|*}; c=${c#*|}
     out=$(env -i HOME="$HOME" PATH="$TOOLS" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" 2>"$H.err"); rc=$?
@@ -585,7 +617,7 @@ t_inbox_hook_commands_run() {
         env -i HOME="$HOME" PATH="$TOOLS" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" >/dev/null 2>"$H.err"; rc=$?
         [ "$rc" -eq 0 ] || fail "$f $ev: '$c' вернул $rc: $(head -3 "$H.err")"
         n=$((n + 1))
-      done < <(jq -r ".hooks.${ev}[] | select(any(.hooks[]?; .command | startswith(\"tk inbox\"))) | .hooks[].command" "$HOME/$f")
+      done < <(jq -r ".hooks.${ev}[] | select(any(.hooks[]?; .command | startswith(\"tix inbox\"))) | .hooks[].command" "$HOME/$f")
     done
   done
   [ "$n" -eq 6 ] || fail "запущено хуков inbox: $n, нужно 6 (три события у двух агентов)"
@@ -596,11 +628,11 @@ t_skill_copies_identical_and_small() {
   apply
   local a=$SKILL_SRC/SKILL.md d
   [ -f "$a" ] || fail "нет $a"
-  for d in "$HOME/.claude/skills/tk" "$HOME/.agents/skills/tk"; do
+  for d in "$HOME/.claude/skills/tix" "$HOME/.agents/skills/tix"; do
     diff -r "$SKILL_SRC" "$d" >/dev/null || fail "копия скилла $d отличается от источника"
   done
   [ "$(wc -c <"$a")" -le 1536 ] || fail "SKILL.md больше 1,5 КБ: $(wc -c <"$a")"
-  head -8 "$a" | grep -q '^name: tk$' || fail "в SKILL.md нет name: tk"
+  head -8 "$a" | grep -q '^name: tix$' || fail "в SKILL.md нет name: tix"
   head -8 "$a" | grep -q '^description:.*Use when' || fail "в description нет 'Use when'"
 }
 
@@ -611,13 +643,14 @@ TESTS=(
   t_validate_connectors
   t_plan_writes_nothing_and_lists_targets
   t_apply_clean_writes_exact_paths
-  t_tracker_home_sets_manifest_place
+  t_tix_home_sets_manifest_place
   t_apply_twice_no_changes
   t_backups_live_only_during_apply
   t_failed_apply_keeps_and_names_backups
   t_undo_restores_original_json
   t_undo_on_pristine_home_leaves_no_trace
   t_existing_tk_permission_survives_undo
+  t_legacy_tk_install_migrated
   t_existing_own_hook_upgraded_and_restored
   t_old_installed_hook_upgraded
   t_modified_own_files_skipped_without_force

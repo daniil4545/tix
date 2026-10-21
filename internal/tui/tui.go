@@ -13,15 +13,15 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/config"
-	"tracker/internal/core"
-	"tracker/internal/gitx"
-	"tracker/internal/task"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // Deps - что TUI получает снаружи. Project - начальный фильтр (папка проекта), пусто - все.
-// GitBin - сырое значение TRACKER_GIT для истории карточки.
+// GitBin - сырое значение TIX_GIT для истории карточки.
 type Deps struct {
 	Store                *core.Store
 	Root, Actor, Project string
@@ -30,8 +30,8 @@ type Deps struct {
 }
 
 const (
-	// oneshotEnv: нарисовать первый кадр в stdout и выйти (замер открытия, tkbench).
-	oneshotEnv = "TRACKER_TUI_ONESHOT"
+	// oneshotEnv: нарисовать первый кадр в stdout и выйти (замер открытия, tixbench).
+	oneshotEnv = "TIX_TUI_ONESHOT"
 	// oneshotW, oneshotH - размер кадра без терминала.
 	oneshotW, oneshotH = 120, 40
 	// watchDelay: наблюдатель стартует после первого кадра (kqueue держит дескриптор на файл).

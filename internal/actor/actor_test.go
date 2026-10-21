@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/actor"
+	"github.com/daniil4545/tix/internal/actor"
 )
 
 func guard(t *testing.T) {
@@ -13,7 +13,7 @@ func guard(t *testing.T) {
 	}
 }
 
-// Спека 2.4: порядок --as, окружение агента, TRACKER_ACTOR.
+// Спека 2.4: порядок --as, окружение агента, TIX_ACTOR.
 func TestResolve_Order(t *testing.T) {
 	defer guard(t)
 	cases := []struct {
@@ -24,12 +24,12 @@ func TestResolve_Order(t *testing.T) {
 		wantKnown bool
 	}{
 		{"флаг главнее окружения", "opencode:f1",
-			map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1", "TRACKER_ACTOR": "ta"}, "opencode:f1", true},
+			map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1", "TIX_ACTOR": "ta"}, "opencode:f1", true},
 		{"сессия Claude", "", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1"}, "claude:c1", true},
 		{"поток Codex", "", map[string]string{"CODEX_THREAD_ID": "x1"}, "codex:x1", true},
 		{"Claude раньше Codex", "", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1"}, "claude:c1", true},
-		{"окружение агента раньше TRACKER_ACTOR", "", map[string]string{"CODEX_THREAD_ID": "x1", "TRACKER_ACTOR": "opencode:o1"}, "codex:x1", true},
-		{"только TRACKER_ACTOR", "", map[string]string{"TRACKER_ACTOR": "opencode:o1"}, "opencode:o1", true},
+		{"окружение агента раньше TIX_ACTOR", "", map[string]string{"CODEX_THREAD_ID": "x1", "TIX_ACTOR": "opencode:o1"}, "codex:x1", true},
+		{"только TIX_ACTOR", "", map[string]string{"TIX_ACTOR": "opencode:o1"}, "opencode:o1", true},
 		{"ничего", "", map[string]string{}, "unknown", false},
 	}
 	for _, c := range cases {

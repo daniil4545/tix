@@ -19,7 +19,7 @@ import (
 const (
 	gitTimeout    = 30 * time.Second // зависший git не держит лок вечно
 	xcrunTimeout  = 10 * time.Second
-	cacheDirName  = "tracker"
+	cacheDirName  = "tix"
 	cacheFileName = "git-path"
 )
 
@@ -70,7 +70,7 @@ type result struct {
 	code        int
 }
 
-// Resolve находит путь к git: override (TRACKER_GIT), кеш, xcrun на darwin.
+// Resolve находит путь к git: override (TIX_GIT), кеш, xcrun на darwin.
 // На darwin /usr/bin/git - заглушка xcode-select (+5,5 мс на вызов), поэтому
 // путь к настоящему git ищется один раз и кешируется в os.UserCacheDir().
 func Resolve(override string) (string, error) {
@@ -210,8 +210,8 @@ func (r Repo) command(ctx context.Context, reader bool, args ...string) *exec.Cm
 	full := []string{
 		"-c", "commit.gpgsign=false",
 		"-c", "core.hooksPath=/dev/null",
-		"-c", "user.name=tracker",
-		"-c", "user.email=tracker@localhost",
+		"-c", "user.name=tix",
+		"-c", "user.email=tix@localhost",
 		"-c", "gc.auto=0",
 		"-c", "maintenance.auto=false",
 		"--literal-pathspecs",
@@ -224,7 +224,7 @@ func (r Repo) command(ctx context.Context, reader bool, args ...string) *exec.Cm
 	if bin == "" {
 		bin = "git"
 	}
-	cmd := exec.CommandContext(ctx, bin, full...) //nolint:gosec // бинарь git задаёт Resolve или TRACKER_GIT
+	cmd := exec.CommandContext(ctx, bin, full...) //nolint:gosec // бинарь git задаёт Resolve или TIX_GIT
 	cmd.Dir = r.Dir
 	cmd.Env = r.env()
 	cmd.WaitDelay = 2 * time.Second
@@ -496,7 +496,7 @@ func (r Repo) Blob(rev string) ([]byte, error) {
 
 // MergeFile сливает три версии через git merge-file. conflict: в out остались маркеры.
 func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, err error) {
-	dir, err := os.MkdirTemp("", "tkmerge-")
+	dir, err := os.MkdirTemp("", "tixmerge-")
 	if err != nil {
 		return nil, false, &Error{Op: "merge-file", Stderr: err.Error()}
 	}

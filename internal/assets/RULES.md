@@ -1,41 +1,41 @@
-# Tracker rules
+# tix rules
 
-Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tk`. Run `tk ctx` at the start of a session and after the context is compacted.
+Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. Run `tix ctx` at the start of a session and after the context is compacted.
 
 ## Cycle
 
-1. `tk take T-12`: the task moves to the active column and you hold it for 3 hours.
-2. Work. Log progress with `tk note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
-3. `tk check T-12 1 2`: mark finished criteria.
-4. `tk set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
-5. `tk comment T-12 "text"`: comments are only appended.
-6. `tk done T-12 -m "result"`: closes the task and releases it.
+1. `tix take T-12`: the task moves to the active column and you hold it for 3 hours.
+2. Work. Log progress with `tix note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
+3. `tix check T-12 1 2`: mark finished criteria.
+4. `tix set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
+5. `tix comment T-12 "text"`: comments are only appended.
+6. `tix done T-12 -m "result"`: closes the task and releases it.
 
-When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tk take T-12 --release`.
+When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`.
 
 ## Progress
 
 The human reads the task instead of your session. Keep it short and current.
 
 - Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
-- Whoever answers a question in `ask`, you or the human, record it: `tk comment T-12 "Answer: ..."`, then `tk set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
+- Whoever answers a question in `ask`, you or the human, record it: `tix comment T-12 "Answer: ..."`, then `tix set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
 - New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
-- A task should fit one session. It grew past that: create tasks for the rest, then `tk done T-12 --force -m "rest in T-15, T-16"`.
+- A task should fit one session. It grew past that: create tasks for the rest, then `tix done T-12 --force -m "rest in T-15, T-16"`.
 
 ## Identity
 
-The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `TRACKER_ACTOR`. In OpenCode pass `--as opencode:<id>`. `take` fails without a name. Other commands then write `unknown`.
+The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `TIX_ACTOR`. In OpenCode pass `--as opencode:<id>`. `take` fails without a name. Other commands then write `unknown`.
 
 ## Hold
 
-- Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tk take T-12 --steal`.
+- Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- `take` works from ready, waiting and active columns. From any other column move the task first: `tk move T-12 <ready column>`.
+- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 <ready column>`.
 
 ## Checks
 
 - Into ready: at least one criterion.
-- Into waiting: say why with `-m "reason"` or `tk set T-12 waiting="reason"`. Leaving waiting clears the field.
+- Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
 - A column without a role is not yours.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
@@ -48,7 +48,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to the inbox column with project `personal`.
-- A task needs the user? Put the question in `ask`: `tk set T-12 ask="what you need"`. The board marks it.
+- A task needs the user? Put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it.
 
 ## Ticket template
 
@@ -69,4 +69,4 @@ What is next, in the first line.
 ## Comments
 ```
 
-`## Comments` is appended by `tk comment` only. Do not write `## Comments` inside other sections.
+`## Comments` is appended by `tix comment` only. Do not write `## Comments` inside other sections.

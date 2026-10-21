@@ -1,7 +1,7 @@
 package cli_test
 
 // Доставка комментариев человека агенту: docs/plans/mvp-inbox.md, разделы 3 и 5.
-// Пишутся по спеке, без чтения кода зоны I. Каталог отметок вне базы: TRACKER_INBOX_DIR.
+// Пишутся по спеке, без чтения кода зоны I. Каталог отметок вне базы: TIX_INBOX_DIR.
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	inboxHeader = "New comments on your tasks (from tk):"
+	inboxHeader = "New comments on your tasks (from tix):"
 	inboxLimit  = 8000
 )
 
@@ -28,7 +28,7 @@ func (b *box) inboxMark() string { return filepath.Join(b.inboxDir(), "claude-c1
 func newInboxBox(t *testing.T) *box {
 	t.Helper()
 	b := newBox(t)
-	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TRACKER_INBOX_DIR": b.inboxDir()}
+	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_INBOX_DIR": b.inboxDir()}
 	return b
 }
 
@@ -53,7 +53,7 @@ func hookIn(event string, kv ...string) string {
 	return string(data)
 }
 
-// inbox запускает `tk inbox --hook` с входом хука и возвращает доставленный текст ("" - пусто).
+// inbox запускает `tix inbox --hook` с входом хука и возвращает доставленный текст ("" - пусто).
 // Код выхода всегда 0; формат ответа сверяется с событием.
 func (b *box) inbox(event string, kv ...string) string {
 	b.t.Helper()
@@ -62,7 +62,7 @@ func (b *box) inbox(event string, kv ...string) string {
 
 func (b *box) inboxRaw(stdin, event string) string {
 	b.t.Helper()
-	r := b.tk(stdin, "inbox", "--hook")
+	r := b.tix(stdin, "inbox", "--hook")
 	if r.code != 0 {
 		b.t.Fatalf("inbox --hook %q: код %d, stdout %q, stderr %q, ждали 0", stdin, r.code, r.out, r.err)
 	}
@@ -113,7 +113,7 @@ func TestInbox_FirstCallEmptyThenHumanCommentDeliveredOnce(t *testing.T) {
 	b.comment("T-1", "old remark before first call", "human")
 
 	if got := b.inbox("PostToolUse"); got != "" {
-		t.Fatalf("первый вызов: %q, ждали пусто (старое читают через tk show)", got)
+		t.Fatalf("первый вызов: %q, ждали пусто (старое читают через tix show)", got)
 	}
 	if _, err := os.Stat(b.inboxMark()); err != nil {
 		t.Fatalf("после первого вызова нет файла отметок %s: %v", b.inboxMark(), err)
@@ -240,8 +240,8 @@ func TestInbox_ManyComments_TruncatedWithMoreTail(t *testing.T) {
 	if !strings.Contains(got, "n1 ") {
 		t.Errorf("первый комментарий не доставлен")
 	}
-	if last := got[strings.LastIndex(strings.TrimRight(got, "\n"), "\n")+1:]; !strings.HasPrefix(strings.TrimRight(last, "\n"), "... more: tk show T-1") {
-		t.Errorf("последняя строка %q, ждали `... more: tk show T-1`", last)
+	if last := got[strings.LastIndex(strings.TrimRight(got, "\n"), "\n")+1:]; !strings.HasPrefix(strings.TrimRight(last, "\n"), "... more: tix show T-1") {
+		t.Errorf("последняя строка %q, ждали `... more: tix show T-1`", last)
 	}
 	if again := b.inbox("Stop"); again != "" {
 		t.Errorf("повторный Stop: %q, ждали пусто", again)
@@ -372,9 +372,9 @@ func TestInbox_BadInputOrEnvironment_EmptyExitZero(t *testing.T) {
 				c.setup(b)
 			}
 			if c.env != nil {
-				b.extra = map[string]string{"TRACKER_INBOX_DIR": b.inboxDir()}
+				b.extra = map[string]string{"TIX_INBOX_DIR": b.inboxDir()}
 			}
-			r := b.tk(c.stdin, "inbox", "--hook")
+			r := b.tix(c.stdin, "inbox", "--hook")
 			if r.code != 0 || r.out != "" {
 				t.Fatalf("stdin %q: код %d, stdout %q, stderr %q, ждали код 0 и пустой stdout", c.stdin, r.code, r.out, r.err)
 			}
@@ -387,7 +387,7 @@ func TestInbox_NoEnvIdentity_UsesSessionIDFromInput(t *testing.T) {
 	defer guard(t)
 	b := newInboxBox(t)
 	b.hold()
-	b.extra = map[string]string{"TRACKER_INBOX_DIR": b.inboxDir()}
+	b.extra = map[string]string{"TIX_INBOX_DIR": b.inboxDir()}
 	b.inbox("PostToolUse")
 	b.comment("T-1", "found by session id", "human")
 	wantLine(t, b.inbox("PostToolUse"), "T-1", "human", "found by session id")

@@ -41,15 +41,15 @@ func FocusFile(name string) string {
 	return strings.TrimLeft(out, ".")
 }
 
-// FocusDir - каталог файлов фокуса: данные машины, не базы. TRACKER_FOCUS_DIR перекрывает путь
-// (тесты), иначе os.UserCacheDir()/tk/focus. Пусто, если каталог кэша неизвестен.
+// FocusDir - каталог файлов фокуса: данные машины, не базы. TIX_FOCUS_DIR перекрывает путь
+// (тесты), иначе os.UserCacheDir()/tix/focus. Пусто, если каталог кэша неизвестен.
 func FocusDir(getenv func(string) string) string {
-	if dir := getenv("TRACKER_FOCUS_DIR"); dir != "" {
+	if dir := getenv("TIX_FOCUS_DIR"); dir != "" {
 		return dir
 	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(cache, "tk", "focus")
+	return filepath.Join(cache, "tix", "focus")
 }

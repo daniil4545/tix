@@ -1,4 +1,4 @@
-// Команда tk - CLI трекера.
+// Команда tix - CLI трекера.
 package main
 
 import (
@@ -9,15 +9,22 @@ import (
 	"runtime/debug"
 	"syscall"
 
-	"tracker/internal/cli"
-	"tracker/internal/tui"
+	"github.com/daniil4545/tix/internal/cli"
+	"github.com/daniil4545/tix/internal/tui"
 )
+
+// version задаётся сборкой: -ldflags "-X main.version=<значение>". Без флага - dev.
+var version = "dev"
 
 func main() {
 	os.Exit(run())
 }
 
 func run() int {
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println(version)
+		return 0
+	}
 	// Процесс короткий, куча на 1000 задач единицы МБ: реже GC - list 18 -> 14 мс (замер).
 	debug.SetGCPercent(400)
 	cwd, err := os.Getwd()
@@ -34,7 +41,7 @@ func run() int {
 		Getenv: os.Getenv,
 		Cwd:    cwd,
 	}
-	if len(os.Args) == 1 && (isTerminal(os.Stdout) || env.Getenv("TRACKER_TUI_ONESHOT") == "1") {
+	if len(os.Args) == 1 && (isTerminal(os.Stdout) || env.Getenv("TIX_TUI_ONESHOT") == "1") {
 		return runTUI(ctx, env)
 	}
 	return cli.Run(ctx, os.Args[1:], env)
@@ -55,7 +62,7 @@ func runTUI(ctx context.Context, env cli.Env) int {
 	}
 	d := tui.Deps{
 		Store: store, Root: root, Actor: "human", Project: proj,
-		GitBin: env.Getenv("TRACKER_GIT"), Log: log,
+		GitBin: env.Getenv("TIX_GIT"), Log: log,
 	}
 	if err := tui.Run(ctx, d); err != nil {
 		log.Error("tui failed", "err", err)

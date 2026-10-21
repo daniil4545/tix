@@ -141,7 +141,7 @@ func boardHeader(b Board, first, last int) string {
 	if b.Total == 1 {
 		noun = "task"
 	}
-	left := accentStyle.Render("tracker") + dimStyle.Render("  project: ") +
+	left := accentStyle.Render("tix") + dimStyle.Render("  project: ") +
 		accentStyle.Render(truncate(clean(project), colWidth)) + dimStyle.Render(fmt.Sprintf("  %d %s", b.Total, noun))
 	if b.ByDue {
 		left += dimStyle.Render("  order: due")

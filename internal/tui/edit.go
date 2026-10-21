@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 // editSession - одна правка тела в $EDITOR. rev - версия файла, против которой править;
@@ -30,7 +30,7 @@ type (
 
 const conflictMarker = "<<<<<<<"
 
-// startEdit читает задачу с её rev и кладёт копию тела в .tracker/tmp.
+// startEdit читает задачу с её rev и кладёт копию тела в .tix/tmp.
 func (m *Model) startEdit() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -50,9 +50,9 @@ func (m *Model) startEdit() tea.Cmd {
 	})
 }
 
-// writeCopy создаёт .tracker/tmp/ed-<id>-<n>.md (0600) с текстом; n первый свободный.
+// writeCopy создаёт .tix/tmp/ed-<id>-<n>.md (0600) с текстом; n первый свободный.
 func (m *Model) writeCopy(id, text string) (string, error) {
-	dir := filepath.Join(m.d.Root, ".tracker", "tmp")
+	dir := filepath.Join(m.d.Root, ".tix", "tmp")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", fmt.Errorf("editor copy: %w", err)
 	}

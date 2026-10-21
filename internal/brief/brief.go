@@ -1,4 +1,4 @@
-// Package brief собирает вывод `tk ctx`. Без IO.
+// Package brief собирает вывод `tix ctx`. Без IO.
 package brief
 
 import (
@@ -9,16 +9,16 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"tracker/internal/actor"
-	"tracker/internal/config"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // maxLine - длина строки задачи в тексте, руны.
 const maxLine = 160
 
 // howto - вторая строка ctx: три команды цикла агента.
-const howto = "- take: tk take; step: tk note; end: tk set summary="
+const howto = "- take: tix take; step: tix note; end: tix set summary="
 
 // ctxRoles - роли колонок в порядке показа.
 var ctxRoles = []string{"active", "waiting", "ready"}
@@ -182,7 +182,7 @@ func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// Text печатает Brief строками `tk ctx`.
+// Text печатает Brief строками `tix ctx`.
 func (b Brief) Text() string {
 	head := "project " + b.Project
 	if b.Rules != "" {

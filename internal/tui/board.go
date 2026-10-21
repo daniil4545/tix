@@ -9,10 +9,10 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/actor"
-	"tracker/internal/core"
-	"tracker/internal/task"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // unknownColumn - колонка для задач, чей статус не описан в config.toml (в конце доски).

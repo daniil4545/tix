@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // Сообщения между фоновыми командами и Update.

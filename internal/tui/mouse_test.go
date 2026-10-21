@@ -14,8 +14,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // Роли разложены так, чтобы перенос между соседями не спрашивал причину.
@@ -146,7 +146,7 @@ func TestMouse_Click_RowWindowStaysInScrolledColumn(t *testing.T) {
 // reopenWith переписывает config.toml и открывает ядро заново: задачи вне конфига уходят в колонку "?".
 func reopenWith(t *testing.T, e *mvEnv, cfg string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(e.root, ".tracker", "config.toml"), []byte(cfg), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(e.root, ".tix", "config.toml"), []byte(cfg), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	s, err := core.Open(e.root, core.Options{GitBin: mvGit(t)})

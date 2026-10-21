@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/core"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // Рабочий цикл агента, З2: docs/plans/z2-agent-cycle.md, разделы 3 и 5.
@@ -62,7 +62,7 @@ func (e *env) openAt(c *clock) *core.Store {
 // withConfig пишет config.toml и открывает базу заново.
 func (e *env) withConfig(c *clock, text string) *core.Store {
 	e.t.Helper()
-	if err := os.WriteFile(filepath.Join(e.root, ".tracker", "config.toml"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(e.root, ".tix", "config.toml"), []byte(text), 0o644); err != nil {
 		e.t.Fatal(err)
 	}
 	return e.openAt(c)
@@ -252,7 +252,7 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 	before := e.text(ready)
 	for _, c := range []struct{ name, id string }{{"inbox", inbox}, {"closed", closed}, {"колонка без роли", norole}} {
 		_, err := s.Take(c.id, core.Take, "claude:a")
-		wantRule(t, "Take из "+c.name, err, "tk move")
+		wantRule(t, "Take из "+c.name, err, "tix move")
 	}
 	for _, who := range []string{"", "unknown"} {
 		if _, err := s.Take(ready, core.Take, who); !errors.Is(err, core.ErrNoIdentity) {
@@ -352,8 +352,8 @@ func TestMove_Close_CriteriaForceResult(t *testing.T) {
 	n := e.count()
 	_, err := s.Move(a, "done", core.MoveOpts{}, "claude:a")
 	wantRule(t, "закрытие с неотмеченными", err, "1/3 criteria checked")
-	if err != nil && !strings.Contains(err.Error(), "tk check "+a+" 2 3") {
-		t.Errorf("текст %q, ждали подсказку `tk check %s 2 3`", err, a)
+	if err != nil && !strings.Contains(err.Error(), "tix check "+a+" 2 3") {
+		t.Errorf("текст %q, ждали подсказку `tix check %s 2 3`", err, a)
 	}
 	_, err = s.Move(a, "done", core.MoveOpts{Force: true}, "claude:a")
 	wantRule(t, "--force без -m", err, "")
@@ -529,7 +529,7 @@ func TestSet_Rules(t *testing.T) {
 	n, before := e.count(), e.text(id)
 	for _, name := range []string{"status", "claim", "rank"} {
 		_, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1")
-		wantRule(t, "Set "+name, err, "tk move")
+		wantRule(t, "Set "+name, err, "tix move")
 	}
 	for _, name := range []string{"id", "created", "nosuch"} {
 		if _, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1"); err == nil {

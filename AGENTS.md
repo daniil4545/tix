@@ -1,9 +1,9 @@
-# tracker - контекст AI-агентов
+# tix - контекст AI-агентов
 
 ## Проект
 
 Личный трекер задач в терминале для человека и агентов: задачи - md-файлы в `~/tasks` под git,
-агенты работают через CLI `tk`, человек - через TUI. Решает пользователь. Канон по поведению -
+агенты работают через CLI `tix`, человек - через TUI. Решает пользователь. Канон по поведению -
 `docs/spec.md`, задачи - `docs/backlog.md`, планы задач - `docs/plans/`.
 
 ## Принципы
@@ -13,7 +13,7 @@
 
 ## Стек
 
-Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
+Go, один бинарь `tix`; Bubble Tea с З4. Версии - в `go.mod`.
 
 ## Структура
 
@@ -21,14 +21,14 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 
 | Путь | Роль |
 |---|---|
-| `cmd/tk` | точка входа CLI |
-| `cmd/tkbench` | замер скорости `tk` для `make bench` |
+| `cmd/tix` | точка входа CLI |
+| `cmd/tixbench` | замер скорости `tix` для `make bench` |
 | `internal/cli` | разбор команд и печать ответа |
 | `internal/core` | единственный путь записи в `~/tasks`: лок, rename, коммит |
 | `internal/task` | разбор и печать файла задачи, без IO |
-| `internal/config` | `.tracker/config.toml`: колонки и роли |
+| `internal/config` | `.tix/config.toml`: колонки и роли |
 | `internal/actor` | личность записи: источники, проверка имени |
-| `internal/brief` | сборка вывода `tk ctx`, без IO |
+| `internal/brief` | сборка вывода `tix ctx`, без IO |
 | `internal/assets` | `RULES.md`, встроенный в бинарь |
 | `internal/gitx` | все вызовы git, единственный `os/exec` в `internal` |
 | `internal/project` | проект по рабочей папке и HEAD проекта, без git |
@@ -40,8 +40,8 @@ Go, один бинарь `tk`; Bubble Tea с З4. Версии - в `go.mod`.
 |---|---|
 | `make check` | формат, vet, линтер, тесты, сборка; приёмка |
 | `make test-fast` | быстрый ярус (`-short`); `RUN=Имя` - один тест |
-| `make bench` | собирает `bin/tk`, замер скорости на 1000 задач, включая `ctx`, `take`, `move` |
-| `make build` | `go build ./...` и `bin/tk` |
+| `make bench` | собирает `bin/tix`, замер скорости на 1000 задач, включая `ctx`, `take`, `move` |
+| `make build` | `go build ./...` и `bin/tix`; `VERSION=1.2.3` задаёт `tix --version` |
 | `make fmt` | `gofmt -l -w .` |
 | `make e2e-agents` | заглушка до З3 |
 

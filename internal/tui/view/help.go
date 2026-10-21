@@ -38,7 +38,7 @@ const helpKeyWidth = 20
 
 // RenderHelp рисует экран справки: все клавиши и действия мыши. W, H <= 0: размер не ограничен.
 func RenderHelp(w, h int) string {
-	lines := []string{accentStyle.Render("tracker help") + dimStyle.Render("  esc or ? back")}
+	lines := []string{accentStyle.Render("tix help") + dimStyle.Render("  esc or ? back")}
 	for _, e := range helpEntries {
 		if e.keys == "" {
 			lines = append(lines, accentStyle.Render(e.what))

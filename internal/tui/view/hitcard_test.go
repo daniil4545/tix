@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // cardRow ищет строку кадра с подстрокой: номер строки и колонка подстроки.

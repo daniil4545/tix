@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/cli"
+	"github.com/daniil4545/tix/internal/cli"
 )
 
 // Тексты интерфейса и формата: при смене языка правятся здесь.
@@ -35,7 +35,7 @@ func codeMatches(got, want int) bool {
 }
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "tk-cli-")
+	dir, err := os.MkdirTemp("", "tix-cli-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -91,10 +91,10 @@ func (b *box) runIn(cwd, stdin string, args ...string) res {
 	b.t.Helper()
 	var o, e bytes.Buffer
 	vars := map[string]string{
-		"TRACKER_HOME":         b.home,
-		"TRACKER_GIT":          gitBin,
-		"TRACKER_LOCK_TIMEOUT": "2s",
-		"HOME":                 os.Getenv("HOME"),
+		"TIX_HOME":         b.home,
+		"TIX_GIT":          gitBin,
+		"TIX_LOCK_TIMEOUT": "2s",
+		"HOME":             os.Getenv("HOME"),
 	}
 	for k, v := range b.extra {
 		vars[k] = v
@@ -106,16 +106,16 @@ func (b *box) runIn(cwd, stdin string, args ...string) res {
 	return res{o.String(), e.String(), code}
 }
 
-func (b *box) tk(stdin string, args ...string) res {
+func (b *box) tix(stdin string, args ...string) res {
 	b.t.Helper()
 	return b.runIn(b.cwd, stdin, args...)
 }
 
 func (b *box) ok(stdin string, args ...string) res {
 	b.t.Helper()
-	r := b.tk(stdin, args...)
+	r := b.tix(stdin, args...)
 	if r.code != 0 {
-		b.t.Fatalf("tk %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
+		b.t.Fatalf("tix %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
 	}
 	return r
 }
@@ -159,7 +159,7 @@ func (b *box) snapshot() string {
 			}
 			return nil
 		}
-		if rel == ".tracker/log" || rel == ".tracker/lock" || strings.HasPrefix(rel, ".tracker/tmp") {
+		if rel == ".tix/log" || rel == ".tix/lock" || strings.HasPrefix(rel, ".tix/tmp") {
 			return nil
 		}
 		d, _ := os.ReadFile(p)
@@ -177,14 +177,14 @@ func oneErrLine(s string) bool { return regexp.MustCompile(`^err( T-\d+)?:? .+\n
 func TestCLI_EmptyBase_ListOneLine_NewCreatesHome(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	r := b.tk("", "list")
+	r := b.tix("", "list")
 	if r.code != 0 || r.out != msgNoTasks+"\n" || r.err != "" {
 		t.Fatalf("list в пустой базе: код %d, stdout %q, stderr %q, ждали %q", r.code, r.out, r.err, msgNoTasks)
 	}
 	if _, err := os.Stat(filepath.Join(b.home, ".git")); err == nil {
 		t.Error("list создал репозиторий: чтение не должно писать")
 	}
-	r = b.tk("", "new", "Первая")
+	r = b.tix("", "new", "Первая")
 	if r.code != 0 || r.out != "ok T-1 idea\n" {
 		t.Fatalf("new: код %d, stdout %q, ждали `ok T-1 idea`; stderr %q", r.code, r.out, r.err)
 	}
@@ -359,7 +359,7 @@ func TestCLI_Project_FromCwdGitFolder(t *testing.T) {
 	if got := b.runIn(sub, "", "list").out; !strings.Contains(got, "T-2") || strings.Contains(got, "T-1") {
 		t.Errorf("list из проекта должен показать только его задачи: %q", got)
 	}
-	if got := b.tk("", "list").out; !strings.Contains(got, "T-2") || !strings.Contains(got, "T-1") {
+	if got := b.tix("", "list").out; !strings.Contains(got, "T-2") || !strings.Contains(got, "T-1") {
 		t.Errorf("list вне проекта показывает все задачи: %q", got)
 	}
 	if got := b.runIn(sub, "", "list", "--project", personalProject).out; !strings.Contains(got, "T-1") || strings.Contains(got, "T-2") {
@@ -393,7 +393,7 @@ func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			defer guard(t)
 			before := b.snapshot()
-			r := b.tk(c.stdin, c.args...)
+			r := b.tix(c.stdin, c.args...)
 			if !codeMatches(r.code, c.want) {
 				t.Errorf("код %d, ждали %d (anyInput: 1 или 6); stdout %q stderr %q", r.code, c.want, r.out, r.err)
 			}
@@ -408,7 +408,7 @@ func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 			}
 		})
 	}
-	if r := b.tk("", "show", "T-99"); !strings.HasPrefix(r.err, "err T-99: ") {
+	if r := b.tix("", "show", "T-99"); !strings.HasPrefix(r.err, "err T-99: ") {
 		t.Errorf("show T-99: stderr %q, ждали префикс `err T-99: `", r.err)
 	}
 }
@@ -422,7 +422,7 @@ func TestCLI_BrokenTaskFile_WarnOnListNoOverwriteOnWrite(t *testing.T) {
 	if err := os.WriteFile(broken, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r := b.tk("", "list")
+	r := b.tix("", "list")
 	if r.code != 0 {
 		t.Errorf("list с битым файлом: код %d, ждали 0", r.code)
 	}
@@ -432,7 +432,7 @@ func TestCLI_BrokenTaskFile_WarnOnListNoOverwriteOnWrite(t *testing.T) {
 	if !regexp.MustCompile(`T-3-broken\.md:\d+`).MatchString(r.err) {
 		t.Errorf("list: stderr %q, ждали warn с `путь:строка` (T-3-broken.md:N)", r.err)
 	}
-	r = b.tk("", "comment", "T-3", "x")
+	r = b.tix("", "comment", "T-3", "x")
 	if r.code != 1 || !regexp.MustCompile(`T-3-broken\.md:\d+`).MatchString(r.err) {
 		t.Errorf("comment в битый файл: код %d, stderr %q, ждали err с путём и строкой", r.code, r.err)
 	}
@@ -445,16 +445,16 @@ func TestCLI_BrokenConfig_ErrPathLine_NothingWritten(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	cfg := filepath.Join(b.home, ".tracker", "config.toml")
+	cfg := filepath.Join(b.home, ".tix", "config.toml")
 	data := "[[column]\nname = \"idea\"\n"
 	if err := os.WriteFile(cfg, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	before := b.snapshot()
 	for _, args := range [][]string{{"new", "Beta"}, {"comment", "T-1", "x"}, {"list"}} {
-		r := b.tk("", args...)
+		r := b.tix("", args...)
 		if r.code != 1 || !regexp.MustCompile(`config\.toml:\d+`).MatchString(r.err) {
-			t.Errorf("tk %v: код %d, stderr %q, ждали err с `config.toml:N`", args, r.code, r.err)
+			t.Errorf("tix %v: код %d, stderr %q, ждали err с `config.toml:N`", args, r.code, r.err)
 		}
 	}
 	if after := b.snapshot(); after != before {
@@ -468,12 +468,12 @@ func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	cfg := filepath.Join(b.home, ".tracker", "config.toml")
+	cfg := filepath.Join(b.home, ".tix", "config.toml")
 	data := "[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n[[column]]\nname = \"ideas\"\nrole = \"inbox\"\n"
 	if err := os.WriteFile(cfg, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if r := b.ok("", "new", "Beta"); r.out != "ok T-2 ideas\n" {
-		t.Errorf("tk new Beta: stdout %q, ждали %q", r.out, "ok T-2 ideas\n")
+		t.Errorf("tix new Beta: stdout %q, ждали %q", r.out, "ok T-2 ideas\n")
 	}
 }

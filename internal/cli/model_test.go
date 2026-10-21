@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/cli"
+	"github.com/daniil4545/tix/internal/cli"
 )
 
 // Модель в истории: docs/plans/mvp-finish.md, раздел 6.
@@ -40,7 +40,7 @@ func TestCtxHook_Stdin_WritesModelOnlyWhenSafe(t *testing.T) {
 		stdin string
 		want  string
 	}{
-		{"valid", `{"model":"claude-opus-4-8[1m]","source":"startup"}`, "export TRACKER_MODEL='claude-opus-4-8[1m]'\n"},
+		{"valid", `{"model":"claude-opus-4-8[1m]","source":"startup"}`, "export TIX_MODEL='claude-opus-4-8[1m]'\n"},
 		{"semicolon", `{"model":"a;rm -rf ~"}`, ""},
 		{"command substitution", `{"model":"a$(id)"}`, ""},
 		{"backtick", "{\"model\":\"a`id`\"}", ""},
@@ -58,7 +58,7 @@ func TestCtxHook_Stdin_WritesModelOnlyWhenSafe(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			b := newBox(t)
 			b.extra = map[string]string{"CLAUDE_ENV_FILE": b.envFile()}
-			r := b.tk(c.stdin, "ctx", "--hook")
+			r := b.tix(c.stdin, "ctx", "--hook")
 			if r.code != 0 {
 				t.Fatalf("ctx --hook %q: код %d, stderr %q", c.stdin, r.code, r.err)
 			}
@@ -80,7 +80,7 @@ func TestCtxHook_Repeated_AppendsToExistingFile(t *testing.T) {
 	}
 	b.ok(`{"model":"m1"}`, "ctx", "--hook")
 	b.ok(`{"model":"m2"}`, "ctx", "--hook")
-	if got, want := b.envFileText(), "export A=1\nexport TRACKER_MODEL='m1'\nexport TRACKER_MODEL='m2'\n"; got != want {
+	if got, want := b.envFileText(), "export A=1\nexport TIX_MODEL='m1'\nexport TIX_MODEL='m2'\n"; got != want {
 		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
 	}
 }
@@ -100,7 +100,7 @@ func TestCtx_WithoutHook_DoesNotReadStdin(t *testing.T) {
 	b := newBox(t)
 	var o, e bytes.Buffer
 	vars := map[string]string{
-		"TRACKER_HOME": b.home, "TRACKER_GIT": gitBin, "CLAUDE_ENV_FILE": b.envFile(),
+		"TIX_HOME": b.home, "TIX_GIT": gitBin, "CLAUDE_ENV_FILE": b.envFile(),
 	}
 	code := cli.Run(context.Background(), []string{"ctx"}, cli.Env{
 		Stdin: tripwire{t}, Stdout: &o, Stderr: &e, Cwd: b.cwd,
@@ -126,7 +126,7 @@ func TestCommit_ModelTrailer(t *testing.T) {
 	}
 	for _, c := range tests {
 		t.Run(c.name, func(t *testing.T) {
-			t.Setenv("TRACKER_MODEL", c.model)
+			t.Setenv("TIX_MODEL", c.model)
 			b := newBox(t)
 			b.ok("", "new", "task", "--to", "todo")
 			msg := b.git("log", "-1", "--format=%B")
@@ -165,7 +165,7 @@ func TestCtxHook_StdinNeverClosed_CompleteObjectStillRead(t *testing.T) {
 	if r.code != 0 {
 		t.Fatalf("код %d, err %q", r.code, r.err)
 	}
-	if got, want := b.envFileText(), "export TRACKER_MODEL='m1'\n"; got != want {
+	if got, want := b.envFileText(), "export TIX_MODEL='m1'\n"; got != want {
 		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
 	}
 }
@@ -177,16 +177,16 @@ func TestCtxHook_EnvFileWithoutFinalNewline_KeepsForeignLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	b.ok(`{"model":"m1"}`, "ctx", "--hook")
-	if got, want := b.envFileText(), "export A=1\nexport TRACKER_MODEL='m1'\n"; got != want {
+	if got, want := b.envFileText(), "export A=1\nexport TIX_MODEL='m1'\n"; got != want {
 		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
 	}
 }
 
-// runWith запускает tk с произвольным stdin и CLAUDE_ENV_FILE.
+// runWith запускает tix с произвольным stdin и CLAUDE_ENV_FILE.
 func runWith(t *testing.T, b *box, stdin io.Reader, args ...string) res {
 	t.Helper()
 	var o, e bytes.Buffer
-	vars := map[string]string{"TRACKER_HOME": b.home, "TRACKER_GIT": gitBin, "CLAUDE_ENV_FILE": b.envFile()}
+	vars := map[string]string{"TIX_HOME": b.home, "TIX_GIT": gitBin, "CLAUDE_ENV_FILE": b.envFile()}
 	code := cli.Run(context.Background(), args, cli.Env{
 		Stdin: stdin, Stdout: &o, Stderr: &e, Cwd: b.cwd,
 		Getenv: func(k string) string { return vars[k] },

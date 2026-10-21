@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tracker/internal/config"
-	"tracker/internal/project"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/project"
 )
 
 func guard(t *testing.T) {

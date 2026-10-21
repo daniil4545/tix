@@ -13,7 +13,7 @@ import (
 // stubScript - заглушка EDITOR. Вызов n: пишет seen.n (копия при запуске) и started.n; если есть
 // wait.n - ждёт go.n (не дольше 10 с); затем выполняет script.n с путём копии первым аргументом.
 const stubScript = `#!/bin/sh
-d="$TK_STUB_DIR"; f="$1"
+d="$TIX_STUB_DIR"; f="$1"
 n=$(( $(cat "$d/count" 2>/dev/null || echo 0) + 1 )); echo $n > "$d/count"
 cp "$f" "$d/seen.$n"; echo "$f" > "$d/path.$n"; : > "$d/started.$n"
 if [ -f "$d/wait.$n" ]; then i=0; while [ ! -f "$d/go.$n" ] && [ $i -lt 500 ]; do sleep 0.02; i=$((i+1)); done; fi
@@ -34,7 +34,7 @@ func newStub(t *testing.T) *stub {
 		t.Fatal(err)
 	}
 	t.Setenv("EDITOR", bin)
-	t.Setenv("TK_STUB_DIR", dir)
+	t.Setenv("TIX_STUB_DIR", dir)
 	return &stub{t: t, dir: dir}
 }
 
@@ -73,7 +73,7 @@ func (s *stub) calls() int {
 }
 
 func copies(e *env) []string {
-	m, _ := filepath.Glob(filepath.Join(e.root, ".tracker", "tmp", "ed-T-1-*"))
+	m, _ := filepath.Glob(filepath.Join(e.root, ".tix", "tmp", "ed-T-1-*"))
 	return m
 }
 
@@ -143,7 +143,7 @@ func TestEditor_Conflict_ReopensWithMarkersAndRetrySaves(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.touch("go.1")
-	e.until("второй запуск редактора", func() bool { return st.calls() == 2 })
+	e.until("второй запуск редактора", func() bool { _, err := os.Stat(st.file("started.2")); return err == nil })
 	for _, want := range []string{"<<<<<<<", "USER", "AGENT"} {
 		if !strings.Contains(st.seen(2), want) {
 			t.Errorf("повторный запуск без %q в копии:\n%s", want, st.seen(2))
@@ -214,7 +214,7 @@ func TestEditor_StoreLocked_CopyKeptPathShownNothingWritten(t *testing.T) {
 	e.screenHas("new")
 	e.key("e")
 	e.until("редактор запущен", func() bool { _, err := os.Stat(st.file("started.1")); return err == nil })
-	lock, err := os.OpenFile(filepath.Join(e.root, ".tracker", "lock"), os.O_RDWR|os.O_CREATE, 0o600)
+	lock, err := os.OpenFile(filepath.Join(e.root, ".tix", "lock"), os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}

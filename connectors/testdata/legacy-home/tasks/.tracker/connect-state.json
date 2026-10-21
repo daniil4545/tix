@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "key": "claude-hook|@HOME@/.claude/settings.json|{\"matcher\":\"startup|resume|clear|compact\",\"hooks\":[{\"type\":\"command\",\"command\":\"tk ctx --hook\",\"timeout\":10}]}",
+      "agent": "claude",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.claude/settings.json",
+      "path": [
+        "hooks",
+        "SessionStart"
+      ],
+      "value": {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk ctx --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks"
+        ],
+        [
+          "hooks",
+          "SessionStart"
+        ]
+      ],
+      "file_created": true,
+      "dirs_created": [
+        "@HOME@/.claude"
+      ]
+    },
+    {
+      "key": "claude-hook-PostToolUse|@HOME@/.claude/settings.json|{\"matcher\":\"*\",\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "claude",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.claude/settings.json",
+      "path": [
+        "hooks",
+        "PostToolUse"
+      ],
+      "value": {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "PostToolUse"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "claude-hook-UserPromptSubmit|@HOME@/.claude/settings.json|{\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "claude",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.claude/settings.json",
+      "path": [
+        "hooks",
+        "UserPromptSubmit"
+      ],
+      "value": {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "UserPromptSubmit"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "claude-hook-Stop|@HOME@/.claude/settings.json|{\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "claude",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.claude/settings.json",
+      "path": [
+        "hooks",
+        "Stop"
+      ],
+      "value": {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "Stop"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "allow|@HOME@/.claude/settings.json|\"Bash(tk *)\"",
+      "agent": "claude",
+      "kind": "json",
+      "op": "arr",
+      "file": "@HOME@/.claude/settings.json",
+      "path": [
+        "permissions",
+        "allow"
+      ],
+      "value": "Bash(tk *)",
+      "created": [
+        [
+          "permissions"
+        ],
+        [
+          "permissions",
+          "allow"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "dir|@HOME@/.claude/skills/tk",
+      "agent": "claude",
+      "kind": "dir",
+      "path": "@HOME@/.claude/skills/tk",
+      "files": [
+        "SKILL.md"
+      ],
+      "dirs_created": [
+        "@HOME@/.claude/skills"
+      ]
+    },
+    {
+      "key": "codex-hook|@HOME@/.codex/hooks.json|{\"matcher\":\"startup|resume|clear|compact\",\"hooks\":[{\"type\":\"command\",\"command\":\"tk ctx\",\"timeout\":10}]}",
+      "agent": "codex",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.codex/hooks.json",
+      "path": [
+        "hooks",
+        "SessionStart"
+      ],
+      "value": {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk ctx",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks"
+        ],
+        [
+          "hooks",
+          "SessionStart"
+        ]
+      ],
+      "file_created": true,
+      "dirs_created": [
+        "@HOME@/.codex"
+      ]
+    },
+    {
+      "key": "codex-hook-PostToolUse|@HOME@/.codex/hooks.json|{\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "codex",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.codex/hooks.json",
+      "path": [
+        "hooks",
+        "PostToolUse"
+      ],
+      "value": {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "PostToolUse"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "codex-hook-UserPromptSubmit|@HOME@/.codex/hooks.json|{\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "codex",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.codex/hooks.json",
+      "path": [
+        "hooks",
+        "UserPromptSubmit"
+      ],
+      "value": {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "UserPromptSubmit"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "codex-hook-Stop|@HOME@/.codex/hooks.json|{\"hooks\":[{\"type\":\"command\",\"command\":\"tk inbox --hook\",\"timeout\":10}]}",
+      "agent": "codex",
+      "kind": "json",
+      "op": "hook",
+      "file": "@HOME@/.codex/hooks.json",
+      "path": [
+        "hooks",
+        "Stop"
+      ],
+      "value": {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tk inbox --hook",
+            "timeout": 10
+          }
+        ]
+      },
+      "created": [
+        [
+          "hooks",
+          "Stop"
+        ]
+      ],
+      "file_created": false,
+      "dirs_created": []
+    },
+    {
+      "key": "file|@HOME@/.codex/rules/tk.rules",
+      "agent": "codex",
+      "kind": "file",
+      "path": "@HOME@/.codex/rules/tk.rules",
+      "dirs_created": [
+        "@HOME@/.codex/rules"
+      ]
+    },
+    {
+      "key": "dir|@HOME@/.agents/skills/tk",
+      "agent": "codex",
+      "kind": "dir",
+      "path": "@HOME@/.agents/skills/tk",
+      "files": [
+        "SKILL.md"
+      ],
+      "dirs_created": [
+        "@HOME@/.agents/skills",
+        "@HOME@/.agents"
+      ]
+    }
+  ],
+  "dirs_created": [
+    "@HOME@/tasks/.tracker",
+    "@HOME@/tasks"
+  ]
+}

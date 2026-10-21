@@ -13,7 +13,7 @@ func unitFocusBox(t *testing.T, vars map[string]string) (*box, string) {
 	t.Helper()
 	b := newBox(t)
 	dir := filepath.Join(t.TempDir(), "focus")
-	vars["TRACKER_FOCUS_DIR"] = dir
+	vars["TIX_FOCUS_DIR"] = dir
 	b.extra = vars
 	return b, dir
 }
@@ -28,7 +28,7 @@ func TestFocusUnit_AgentWrite_FileOutsideBase(t *testing.T) {
 	if err != nil || serr != nil || string(data) != unitFocusURL+"\n" || info.Mode().Perm() != 0o600 {
 		t.Fatalf("файл фокуса: %q, %v, %v; ждали одну строку и 0600", data, err, serr)
 	}
-	if _, err := os.Stat(filepath.Join(b.home, ".tracker", "focus")); err == nil {
+	if _, err := os.Stat(filepath.Join(b.home, ".tix", "focus")); err == nil {
 		t.Error("фокус создан внутри базы")
 	}
 	if st := b.git("status", "--porcelain", "--untracked-files=all"); strings.TrimSpace(st) != "" {
@@ -43,13 +43,13 @@ func TestFocusUnit_NotWritten(t *testing.T) {
 		"заглавные":  {"CLAUDE_CODE_SESSION_ID": "s1", "WARP_FOCUS_URL": strings.ToUpper(unitFocusURL)},
 		"с хвостом":  {"CLAUDE_CODE_SESSION_ID": "s1", "WARP_FOCUS_URL": unitFocusURL + "\nx"},
 		"аргумент":   {"CLAUDE_CODE_SESSION_ID": "s1", "WARP_FOCUS_URL": "-a Calculator"},
-		"человек":    {"TRACKER_ACTOR": "human", "WARP_FOCUS_URL": unitFocusURL},
+		"человек":    {"TIX_ACTOR": "human", "WARP_FOCUS_URL": unitFocusURL},
 		"без личной": {"WARP_FOCUS_URL": unitFocusURL},
 	}
 	for name, vars := range cases {
 		t.Run(name, func(t *testing.T) {
 			b, dir := unitFocusBox(t, vars)
-			b.tk("", "new", "task")
+			b.tix("", "new", "task")
 			if entries, err := os.ReadDir(dir); err == nil && len(entries) > 0 {
 				t.Errorf("записано %v", entries)
 			}
@@ -59,7 +59,7 @@ func TestFocusUnit_NotWritten(t *testing.T) {
 
 // Имя файла не выходит из каталога фокуса.
 func TestFocusUnit_ActorWithSlashes_StaysInDir(t *testing.T) {
-	b, dir := unitFocusBox(t, map[string]string{"TRACKER_ACTOR": "x:../../evil", "WARP_FOCUS_URL": unitFocusURL})
+	b, dir := unitFocusBox(t, map[string]string{"TIX_ACTOR": "x:../../evil", "WARP_FOCUS_URL": unitFocusURL})
 	b.ok("", "new", "task")
 	entries, err := os.ReadDir(dir)
 	if err != nil || len(entries) != 1 || strings.ContainsAny(entries[0].Name(), "/\\") {
@@ -73,7 +73,7 @@ func TestFocusUnit_DirIsFile_CommandStillSucceeds(t *testing.T) {
 	if err := os.WriteFile(dir, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if r := b.tk("", "new", "task"); r.code != 0 {
+	if r := b.tix("", "new", "task"); r.code != 0 {
 		t.Errorf("код %d, stderr %q", r.code, r.err)
 	}
 }

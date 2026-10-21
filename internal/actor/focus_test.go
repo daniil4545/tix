@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/actor"
+	"github.com/daniil4545/tix/internal/actor"
 )
 
 func TestValidFocusURL(t *testing.T) {
@@ -38,10 +38,10 @@ func TestFocusFile(t *testing.T) {
 
 func TestFocusDir_EnvOverridesCache(t *testing.T) {
 	if got := actor.FocusDir(func(string) string { return "/x/y" }); got != "/x/y" {
-		t.Errorf("FocusDir с TRACKER_FOCUS_DIR = %q", got)
+		t.Errorf("FocusDir с TIX_FOCUS_DIR = %q", got)
 	}
 	got := actor.FocusDir(func(string) string { return "" })
 	if got != "" && filepath.Base(got) != "focus" {
-		t.Errorf("FocusDir по умолчанию = %q, ждали .../tk/focus", got)
+		t.Errorf("FocusDir по умолчанию = %q, ждали .../tix/focus", got)
 	}
 }

@@ -78,16 +78,16 @@ LOG=$2
 "$1" commit-graph write --reachable --changed-paths --split 2>>"$LOG" || note commit-graph $?`
 
 // SpawnGC запускает в фоне `git gc --quiet` и `commit-graph write`; не ждёт завершения.
-// Сбой запуска - в ошибке, сбой самих команд - строка в .tracker/log.
+// Сбой запуска - в ошибке, сбой самих команд - строка в .tix/log.
 func (r Repo) SpawnGC() error {
 	bin := r.Bin
 	if bin == "" {
 		bin = "git"
 	}
-	cmd := exec.CommandContext(context.Background(), "sh", "-c", gcScript, "sh", bin, filepath.Join(r.Dir, ".tracker", "log")) //nolint:gosec // bin задаёт Resolve или TRACKER_GIT
+	cmd := exec.CommandContext(context.Background(), "sh", "-c", gcScript, "sh", bin, filepath.Join(r.Dir, ".tix", "log")) //nolint:gosec // bin задаёт Resolve или TIX_GIT
 	cmd.Dir = r.Dir
 	cmd.Env = r.env()
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // переживает выход tk
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true} // переживает выход tix
 	if err := cmd.Start(); err != nil {
 		return &Error{Op: "gc", Stderr: err.Error()}
 	}

@@ -1,4 +1,4 @@
-// Package cli разбирает команды tk и печатает ответ.
+// Package cli разбирает команды tix и печатает ответ.
 package cli
 
 import (
@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"tracker/internal/core"
-	"tracker/internal/gitx"
-	"tracker/internal/project"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/project"
 )
 
 // Env - окружение запуска: потоки, переменные, рабочая папка.
@@ -29,7 +29,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tk ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+	usage              = "tix ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -85,7 +85,7 @@ type idError struct {
 func (e *idError) Error() string { return e.Err.Error() }
 func (e *idError) Unwrap() error { return e.Err }
 
-// app - один запуск tk.
+// app - один запуск tix.
 type app struct {
 	env   Env
 	cmd   string
@@ -192,10 +192,10 @@ func firstLine(s string) string {
 	return line
 }
 
-// rootDir: TRACKER_HOME, иначе ~/tasks.
+// rootDir: TIX_HOME, иначе ~/tasks.
 func (a *app) rootDir() (string, error) { return rootDir(a.env) }
 
-// open открывает базу; лог пишется в .tracker/log, если папка уже есть.
+// open открывает базу; лог пишется в .tix/log, если папка уже есть.
 func (a *app) open() error {
 	store, log, root, _, err := OpenStore(a.env)
 	if log != nil {
@@ -230,7 +230,7 @@ func taskID(args []string) (string, error) {
 	return normID(args[0])
 }
 
-// lazyLog открывает .tracker/log при первой записи и только если папка есть:
+// lazyLog открывает .tix/log при первой записи и только если папка есть:
 // писать лог не должно создавать базу.
 type lazyLog struct {
 	dir  string
@@ -239,7 +239,7 @@ type lazyLog struct {
 
 func (l *lazyLog) Write(p []byte) (int, error) {
 	if l.file == nil {
-		// Путь задаёт владелец через TRACKER_HOME: обхода границы доверия нет.
+		// Путь задаёт владелец через TIX_HOME: обхода границы доверия нет.
 		info, err := os.Stat(l.dir) //nolint:gosec
 		if err != nil || !info.IsDir() {
 			return len(p), nil

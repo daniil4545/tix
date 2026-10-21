@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 // Заголовок раздела комментариев: при смене языка формата правится здесь.
@@ -26,7 +26,7 @@ var gitBin string
 const injected = "OUTSIDE-LINE"
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "tk-core-")
+	dir, err := os.MkdirTemp("", "tix-core-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -275,7 +275,7 @@ func TestStore_LockBusy_ErrLocked(t *testing.T) {
 	e := newEnv(t)
 	s := e.open(100 * time.Millisecond)
 	mustCreate(t, s, "Alpha")
-	lock, err := os.OpenFile(filepath.Join(e.root, ".tracker", "lock"), os.O_RDWR|os.O_CREATE, 0o644)
+	lock, err := os.OpenFile(filepath.Join(e.root, ".tix", "lock"), os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}

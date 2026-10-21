@@ -12,13 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/gitx"
+	"github.com/daniil4545/tix/internal/gitx"
 )
 
 var gitBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "tk-gitx-")
+	dir, err := os.MkdirTemp("", "tix-gitx-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

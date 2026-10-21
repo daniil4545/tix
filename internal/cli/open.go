@@ -7,26 +7,26 @@ import (
 	"path/filepath"
 	"time"
 
-	"tracker/internal/core"
-	"tracker/internal/project"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/project"
 )
 
-// rootDir: TRACKER_HOME, иначе ~/tasks.
+// rootDir: TIX_HOME, иначе ~/tasks.
 func rootDir(env Env) (string, error) {
-	if dir := env.Getenv("TRACKER_HOME"); dir != "" {
+	if dir := env.Getenv("TIX_HOME"); dir != "" {
 		return dir, nil
 	}
 	home := env.Getenv("HOME")
 	if home == "" {
 		var err error
 		if home, err = os.UserHomeDir(); err != nil {
-			return "", fmt.Errorf("home directory unknown, set TRACKER_HOME: %w", err)
+			return "", fmt.Errorf("home directory unknown, set TIX_HOME: %w", err)
 		}
 	}
 	return filepath.Join(home, "tasks"), nil
 }
 
-// OpenStore открывает базу: база, лог (.tracker/log, если папка уже есть), корень базы и
+// OpenStore открывает базу: база, лог (.tix/log, если папка уже есть), корень базы и
 // проект рабочей папки (пусто - вне проекта).
 func OpenStore(env Env) (*core.Store, *slog.Logger, string, string, error) {
 	root, err := rootDir(env)
@@ -34,15 +34,15 @@ func OpenStore(env Env) (*core.Store, *slog.Logger, string, string, error) {
 		return nil, nil, "", "", err
 	}
 	timeout := defaultLockTimeout
-	if raw := env.Getenv("TRACKER_LOCK_TIMEOUT"); raw != "" {
+	if raw := env.Getenv("TIX_LOCK_TIMEOUT"); raw != "" {
 		if timeout, err = time.ParseDuration(raw); err != nil || timeout <= 0 {
-			return nil, nil, "", "", fmt.Errorf("TRACKER_LOCK_TIMEOUT %q: duration like 5s required", raw)
+			return nil, nil, "", "", fmt.Errorf("TIX_LOCK_TIMEOUT %q: duration like 5s required", raw)
 		}
 	}
-	log := slog.New(slog.NewTextHandler(&lazyLog{dir: filepath.Join(root, ".tracker")}, nil))
+	log := slog.New(slog.NewTextHandler(&lazyLog{dir: filepath.Join(root, ".tix")}, nil))
 	store, err := core.Open(root, core.Options{
 		LockTimeout: timeout,
-		GitBin:      env.Getenv("TRACKER_GIT"),
+		GitBin:      env.Getenv("TIX_GIT"),
 		Log:         log,
 	})
 	if err != nil {

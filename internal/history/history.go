@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"tracker/internal/gitx"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 const (

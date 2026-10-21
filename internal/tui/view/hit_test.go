@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // hitCases - размеры и положения курсора, где окна колонок и карточек сдвинуты по-разному.

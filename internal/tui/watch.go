@@ -20,7 +20,7 @@ func (m *Model) startWatch() tea.Msg {
 		_ = w.Close()
 		return watchReady{err: err}
 	}
-	// tk note - пустой коммит: файлы не меняются, виден только журнал HEAD.
+	// tix note - пустой коммит: файлы не меняются, виден только журнал HEAD.
 	if err := w.Add(filepath.Join(m.d.Root, ".git", "logs")); err != nil {
 		m.log.Warn("pulse watch off", "err", err)
 	}
@@ -59,7 +59,7 @@ func (m *Model) pump(w *fsnotify.Watcher) {
 	}
 }
 
-// relevant: изменение файла задачи или журнала HEAD (коммит без правки файла). Прочее в .tracker и .git
+// relevant: изменение файла задачи или журнала HEAD (коммит без правки файла). Прочее в .tix и .git
 // шума не даёт, chmod не меняет текст.
 func relevant(ev fsnotify.Event) bool {
 	if ev.Op&^fsnotify.Chmod == 0 {

@@ -72,7 +72,7 @@ func (b *box) actorTrailer() string {
 	return strings.TrimSpace(b.git("log", "-1", "--format=%(trailers:key=Actor,valueonly)"))
 }
 
-// Спека 2.4: личность по порядку --as, окружение агента, TRACKER_ACTOR; take без неё отказывает.
+// Спека 2.4: личность по порядку --as, окружение агента, TIX_ACTOR; take без неё отказывает.
 func TestCLI_Identity_Order(t *testing.T) {
 	defer guard(t)
 	cases := []struct {
@@ -81,10 +81,10 @@ func TestCLI_Identity_Order(t *testing.T) {
 		flag  string
 		want  string
 	}{
-		{"флаг главнее", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TRACKER_ACTOR": "ta:1"}, "codex:f1", "codex:f1"},
-		{"сессия Claude", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1", "TRACKER_ACTOR": "ta:1"}, "", "claude:c1"},
-		{"поток Codex", map[string]string{"CODEX_THREAD_ID": "x1", "TRACKER_ACTOR": "ta:1"}, "", "codex:x1"},
-		{"TRACKER_ACTOR", map[string]string{"TRACKER_ACTOR": "opencode:o1"}, "", "opencode:o1"},
+		{"флаг главнее", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_ACTOR": "ta:1"}, "codex:f1", "codex:f1"},
+		{"сессия Claude", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1", "TIX_ACTOR": "ta:1"}, "", "claude:c1"},
+		{"поток Codex", map[string]string{"CODEX_THREAD_ID": "x1", "TIX_ACTOR": "ta:1"}, "", "codex:x1"},
+		{"TIX_ACTOR", map[string]string{"TIX_ACTOR": "opencode:o1"}, "", "opencode:o1"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -114,14 +114,14 @@ func TestCLI_Identity_Order(t *testing.T) {
 		{"take", "T-1", "--as", "unknown"},
 		{"take", "T-1", "--as", "a b"},
 	} {
-		r := b.tk("", args...)
+		r := b.tix("", args...)
 		if r.code != 6 || !oneErrLine(r.err) || !strings.Contains(r.err, "--as") {
-			t.Errorf("tk %v: код %d, stderr %q, ждали код 6 и одну строку с подсказкой --as", args, r.code, r.err)
+			t.Errorf("tix %v: код %d, stderr %q, ждали код 6 и одну строку с подсказкой --as", args, r.code, r.err)
 		}
 	}
-	b.extra = map[string]string{"TRACKER_ACTOR": "bad|name"}
-	if r := b.tk("", "take", "T-1"); r.code != 6 {
-		t.Errorf("take с TRACKER_ACTOR=bad|name: код %d, ждали 6", r.code)
+	b.extra = map[string]string{"TIX_ACTOR": "bad|name"}
+	if r := b.tix("", "take", "T-1"); r.code != 6 {
+		t.Errorf("take с TIX_ACTOR=bad|name: код %d, ждали 6", r.code)
 	}
 	b.extra = nil
 	if b.commitCount() != n || b.claimOf("T-1") != "" {
@@ -153,14 +153,14 @@ func TestCLI_Take_ForeignClaimStealReleaseCodes(t *testing.T) {
 		t.Errorf("повторный take: %q, коммитов %d, было %d", r.out, b.commitCount(), n)
 	}
 
-	r := b.tk("", "take", "T-1", "--as", "claude:b")
-	if r.code != 2 || !oneErrLine(r.err) || !strings.Contains(r.err, "claude:a") || !strings.Contains(r.err, "tk take T-1 --steal") {
-		t.Errorf("take чужого: код %d, stderr %q, ждали код 2 и `claimed by claude:a ... tk take T-1 --steal`", r.code, r.err)
+	r := b.tix("", "take", "T-1", "--as", "claude:b")
+	if r.code != 2 || !oneErrLine(r.err) || !strings.Contains(r.err, "claude:a") || !strings.Contains(r.err, "tix take T-1 --steal") {
+		t.Errorf("take чужого: код %d, stderr %q, ждали код 2 и `claimed by claude:a ... tix take T-1 --steal`", r.code, r.err)
 	}
 	if b.commitCount() != n {
 		t.Error("отказ take добавил коммит")
 	}
-	if r := b.tk("", "take", "T-1", "--release", "--as", "claude:b"); r.code != 2 {
+	if r := b.tix("", "take", "T-1", "--release", "--as", "claude:b"); r.code != 2 {
 		t.Errorf("release чужого живого claim: код %d, ждали 2", r.code)
 	}
 	b.ok("", "take", "T-1", "--steal", "--as", "claude:b")
@@ -185,13 +185,13 @@ func TestCLI_Take_ForeignClaimStealReleaseCodes(t *testing.T) {
 		{[]string{"take", "foo", "--as", "claude:a"}, 6, "плохой id"},
 		{[]string{"take", "--as", "claude:a"}, 6, "нет id"},
 	} {
-		r := b.tk("", c.args...)
+		r := b.tix("", c.args...)
 		if r.code != c.code || r.out != "" || !oneErrLine(r.err) {
-			t.Errorf("%s: tk %v: код %d, stdout %q, stderr %q, ждали код %d и одну строку err", c.why, c.args, r.code, r.out, r.err, c.code)
+			t.Errorf("%s: tix %v: код %d, stdout %q, stderr %q, ждали код %d и одну строку err", c.why, c.args, r.code, r.out, r.err, c.code)
 		}
 	}
-	if r := b.tk("", "take", "T-2", "--as", "claude:a"); !strings.Contains(r.err, "tk move T-2") {
-		t.Errorf("take из inbox: %q, ждали подсказку `tk move T-2 ...`", r.err)
+	if r := b.tix("", "take", "T-2", "--as", "claude:a"); !strings.Contains(r.err, "tix move T-2") {
+		t.Errorf("take из inbox: %q, ждали подсказку `tix move T-2 ...`", r.err)
 	}
 	// Номер без T- разворачивается в T-N.
 	b.ok("", "take", "1", "--as", "claude:c")
@@ -243,7 +243,7 @@ func ruleBox(t *testing.T) *box {
 	b.ok("", "new", "Bare")
 	b.newTask("Crit", "idea")
 	b.ok("", "new", "Doing", "--to", "doing")
-	cfg := filepath.Join(b.home, ".tracker", "config.toml")
+	cfg := filepath.Join(b.home, ".tix", "config.toml")
 	if err := os.WriteFile(cfg, []byte(cliReviewConfig), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -255,9 +255,9 @@ func ruleBox(t *testing.T) *box {
 func (b *box) rule(args ...string) string {
 	b.t.Helper()
 	n := b.commitCount()
-	r := b.tk("", args...)
-	ensure(b.t, r.code == 5 && r.out == "" && oneErrLine(r.err), "tk %v: код %d, stdout %q, stderr %q, ждали код 5 и одну строку err", args, r.code, r.out, r.err)
-	ensure(b.t, b.commitCount() == n, "tk %v: отказ добавил коммит", args)
+	r := b.tix("", args...)
+	ensure(b.t, r.code == 5 && r.out == "" && oneErrLine(r.err), "tix %v: код %d, stdout %q, stderr %q, ждали код 5 и одну строку err", args, r.code, r.out, r.err)
+	ensure(b.t, b.commitCount() == n, "tix %v: отказ добавил коммит", args)
 	return r.err
 }
 
@@ -266,7 +266,7 @@ func (b *box) noCommit(args ...string) {
 	b.t.Helper()
 	n := b.commitCount()
 	b.ok("", args...)
-	ensure(b.t, b.commitCount() == n, "tk %v: повтор сделал коммит", args)
+	ensure(b.t, b.commitCount() == n, "tix %v: повтор сделал коммит", args)
 }
 
 // Раздел 3: move отказы (Р51), waiting (Р52), повтор.
@@ -288,14 +288,14 @@ func TestCLI_Move_RefusalsWaitingRepeat(t *testing.T) {
 	var js struct{ Waiting, Status string }
 	_ = json.Unmarshal([]byte(b.ok("", "show", "T-3", "--json").out), &js)
 	ensure(t, js.Waiting == "" && js.Status == "doing", "take из waiting: status %q, waiting %q, ждали doing и пусто", js.Status, js.Waiting)
-	ensure(t, b.tk("", "move", "T-99", "todo").code == 4, "move несуществующей: ждали код 4")
+	ensure(t, b.tix("", "move", "T-99", "todo").code == 4, "move несуществующей: ждали код 4")
 }
 
 // Раздел 3: set status= отказ; поля; повтор; значение после первого знака =.
 func TestCLI_Set_RulesRepeatFirstEquals(t *testing.T) {
 	defer guard(t)
 	b := ruleBox(t)
-	ensure(t, strings.Contains(b.rule("set", "T-3", "status=done"), "tk move"), "set status=: ждали подсказку `tk move`")
+	ensure(t, strings.Contains(b.rule("set", "T-3", "status=done"), "tix move"), "set status=: ждали подсказку `tix move`")
 	b.rule("set", "T-3", "title=")
 	r := b.ok("", "set", "T-2", "summary=a=b")
 	ensure(t, r.out == "ok T-2 summary\n", "set: %q", r.out)
@@ -312,7 +312,7 @@ func TestCLI_CheckDone_CriteriaForceRepeat(t *testing.T) {
 	r := b.ok("", "check", "T-2", "1")
 	ensure(t, r.out == "ok T-2 1/2\n", "check: %q", r.out)
 	e := b.rule("done", "T-2")
-	ensure(t, strings.Contains(e, "1/2 criteria checked") && strings.Contains(e, "tk check T-2 2"), "done с неотмеченными: %q", e)
+	ensure(t, strings.Contains(e, "1/2 criteria checked") && strings.Contains(e, "tix check T-2 2"), "done с неотмеченными: %q", e)
 	b.rule("done", "T-2", "--force")
 	b.ok("", "check", "2", "2") // номер без T-
 	r = b.ok("", "done", "T-2")
@@ -364,7 +364,7 @@ func TestCLI_Move_FirstAfterSameColumn(t *testing.T) {
 	if b.commitCount() != n+2 || join(b.columnOrder("doing")) != "T-1,T-2,T-3" {
 		t.Errorf("--after 2 (номер без T-): коммитов %d (ждали %d), порядок %v", b.commitCount(), n+2, b.columnOrder("doing"))
 	}
-	r := b.tk("", "move", "T-1", "doing", "--after", "T-4")
+	r := b.tix("", "move", "T-1", "doing", "--after", "T-4")
 	if r.code != 5 || !oneErrLine(r.err) {
 		t.Errorf("--after задачи из другой колонки: код %d, stderr %q, ждали код 5", r.code, r.err)
 	}
@@ -464,8 +464,8 @@ func TestCLI_Ctx_NoGit_LimitsAndOwnClaim(t *testing.T) {
 	}
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "me1"}
 	b.ok("", "take", "T-2") // doing: своя
-	b.extra["TRACKER_GIT"] = "/nonexistent/git"
-	r := b.tk("", "ctx")
+	b.extra["TIX_GIT"] = "/nonexistent/git"
+	r := b.tix("", "ctx")
 	if r.code != 0 {
 		t.Fatalf("ctx без git: код %d, stderr %q", r.code, r.err)
 	}
@@ -515,7 +515,7 @@ func TestCLI_Backup_NoRemote_OneLineHint(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Work")
-	r := b.tk("", "backup")
+	r := b.tix("", "backup")
 	if r.code == 0 || r.out != "" || !oneErrLine(r.err) || !strings.Contains(r.err, "git remote add origin") {
 		t.Errorf("backup без origin: код %d, stdout %q, stderr %q, ждали ошибку с подсказкой `git remote add origin`", r.code, r.out, r.err)
 	}

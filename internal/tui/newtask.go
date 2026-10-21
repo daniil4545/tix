@@ -3,7 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 // bodyTemplate - тело новой задачи в редакторе: шаблон из RULES.md, раздел "Ticket template".

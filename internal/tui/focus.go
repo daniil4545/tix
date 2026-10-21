@@ -9,8 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/actor"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // focusReadLimit - сколько байт файла фокуса читается: адрес короче.

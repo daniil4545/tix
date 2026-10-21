@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/gitx"
+	"github.com/daniil4545/tix/internal/gitx"
 )
 
 var hashRe = regexp.MustCompile(`^[0-9a-f]{40,64}$`)

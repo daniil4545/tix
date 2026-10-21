@@ -16,17 +16,17 @@ const lockWait = 3 * time.Second
 // Marks - отметки доставки: id задачи и число комментариев, уже учтённых агентом.
 type Marks map[string]int
 
-// InboxDir - каталог отметок доставки: данные машины, не базы. TRACKER_INBOX_DIR перекрывает
-// путь (тесты), иначе os.UserCacheDir()/tk/inbox. Пусто, если каталог кэша неизвестен.
+// InboxDir - каталог отметок доставки: данные машины, не базы. TIX_INBOX_DIR перекрывает
+// путь (тесты), иначе os.UserCacheDir()/tix/inbox. Пусто, если каталог кэша неизвестен.
 func InboxDir(getenv func(string) string) string {
-	if dir := getenv("TRACKER_INBOX_DIR"); dir != "" {
+	if dir := getenv("TIX_INBOX_DIR"); dir != "" {
 		return dir
 	}
 	cache, err := os.UserCacheDir()
 	if err != nil {
 		return ""
 	}
-	return filepath.Join(cache, "tk", "inbox")
+	return filepath.Join(cache, "tix", "inbox")
 }
 
 // HookActor - личность агента в хуке: окружение (Resolve), иначе session_id входа хука

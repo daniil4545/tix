@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/core"
-	"tracker/internal/gitx"
-	"tracker/internal/history"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/history"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 var gitBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "tk-history-")
+	dir, err := os.MkdirTemp("", "tix-history-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // prompt - строка ввода внизу экрана. done получает текст после enter. Пустой текст отдаётся

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 const (

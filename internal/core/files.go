@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // taskRef - файл задачи в корне базы.
@@ -83,7 +83,7 @@ func (s *Store) nextNum(refs []taskRef) (int, error) {
 	if n := len(refs); n > 0 {
 		num = refs[n-1].num + 1
 	}
-	path := filepath.Join(s.root, trackerDir, nextIDFile)
+	path := filepath.Join(s.root, tixDir, nextIDFile)
 	data, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
 	switch {
 	case err == nil:
@@ -152,9 +152,9 @@ func readTask(path string) (*task.Task, error) {
 	return t, nil
 }
 
-// stage пишет данные во временный файл .tracker/tmp и сбрасывает на диск.
+// stage пишет данные во временный файл .tix/tmp и сбрасывает на диск.
 func (s *Store) stage(data []byte, mode os.FileMode) (string, error) {
-	f, err := os.CreateTemp(filepath.Join(s.root, trackerDir, tmpDir), tmpPrefix+"*.tmp")
+	f, err := os.CreateTemp(filepath.Join(s.root, tixDir, tmpDir), tmpPrefix+"*.tmp")
 	if err != nil {
 		return "", fmt.Errorf("temp file: %w", err)
 	}

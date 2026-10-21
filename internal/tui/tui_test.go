@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 func TestBoard_NavigateOpenCardEscKeepsSelection(t *testing.T) {
