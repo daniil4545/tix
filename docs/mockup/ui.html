@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Макет tracker</title>
+<title>tix mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap">
@@ -34,46 +34,46 @@ pre{margin:0;padding:14px 16px;font:13px/1.55 var(--mono);min-width:1080px;min-h
 </style>
 <body>
 <div class="wrap">
-  <h1>tracker: макет в стиле ASCII</h1>
-  <p class="lead"><strong>Образец смысла, не точный текст.</strong> Отклонения от спеки: интерфейс и разделы файла на английском (Р46); личность в <code>Actor:</code> и <code>claim</code> - полный id сессии, на экране 8 знаков (Р56); Kaiten, GitHub и <code>external_state</code> - после MVP (<code>docs/specs/integrations.md</code>).</p>
-  <p class="lead">Пять экранов терминала: доска, карточка, что видит агент, файл задачи, интеграции. Доска живая: кликните по терминалу и нажимайте h j k l, enter, m и M, p, s, esc. Жёлтая звёздочка - нужно ваше действие. Перенос карточки сразу пишет коммит, а для связанной задачи в фоне отправляет статус в Kaiten или GitHub; нижняя строка показывает оба шага. Кнопка «агент работает» по шагам показывает, как агенты меняют доску, пока вы смотрите. Данные выдуманные.</p>
+  <h1>tix: mockup in the ASCII style</h1>
+  <p class="lead"><strong>A sample of meaning, not the exact text.</strong> Deviations from the spec: interface and file sections in English (D46); identity in <code>Actor:</code> and <code>claim</code> is the full session id, 8 characters on screen (D56); Kaiten, GitHub and <code>external_state</code> come after the MVP (<code>docs/specs/integrations.md</code>).</p>
+  <p class="lead">Five terminal screens: board, card, what the agent sees, task file, integrations. The board is live: click the terminal and press h j k l, enter, m and M, p, s, esc. A yellow star means your action is needed. Moving a card writes a commit at once, and for a linked task sends the status to Kaiten or GitHub in the background; the bottom line shows both steps. The button "agent at work" shows step by step how agents change the board while you watch. The data is made up.</p>
   <div class="tabs" role="tablist">
-    <button role="tab" aria-selected="true" data-tab="board">доска</button>
-    <button role="tab" aria-selected="false" data-tab="card">карточка</button>
-    <button role="tab" aria-selected="false" data-tab="agent">агент</button>
-    <button role="tab" aria-selected="false" data-tab="file">файл</button>
-    <button role="tab" aria-selected="false" data-tab="sync">интеграции</button>
-    <button id="sim" type="button">агент работает</button>
+    <button role="tab" aria-selected="true" data-tab="board">board</button>
+    <button role="tab" aria-selected="false" data-tab="card">card</button>
+    <button role="tab" aria-selected="false" data-tab="agent">agent</button>
+    <button role="tab" aria-selected="false" data-tab="file">file</button>
+    <button role="tab" aria-selected="false" data-tab="sync">integrations</button>
+    <button id="sim" type="button">agent at work</button>
   </div>
-  <div class="term" id="term" tabindex="0" aria-label="Терминал">
+  <div class="term" id="term" tabindex="0" aria-label="Terminal">
     <pre id="scr"></pre>
   </div>
-  <p class="hint">h l колонка  j k карточка  enter открыть  m M перенести  p проект  s синхронизация  esc назад</p>
+  <p class="hint">h l column  j k card  enter open  m M move  p project  s sync  esc back</p>
 </div>
 <script>
 const COLS=["idea","todo","doing","blocked","done"];
-const KAI={todo:"Очередь",doing:"В работе",blocked:"В работе",done:"Готово"};
+const KAI={todo:"Queue",doing:"In progress",blocked:"In progress",done:"Done"};
 const T=[
- {id:"T-21",p:"личное",t:"Трекер задач для агентов",s:"Собираем спеку и макет",st:"idea"},
- {id:"T-23",p:"ST-project",t:"Замер Natasha на длинных звонках",s:"",st:"idea"},
- {id:"T-9",p:"личное",t:"Прочитать про CRDT",s:"Отложено до зимы",st:"idea"},
- {id:"T-17",p:"ST-project",t:"Очистка ПДн перед моделью",s:"Сначала телефон словами",st:"todo",ck:"0/3",due:"28.10",x:"kai",xs:"ok"},
- {id:"T-19",p:"ST-project",t:"Сквозной прогон make e2e",s:"",st:"todo",ck:"0/2"},
- {id:"T-20",p:"Galera",t:"Анонсы встреч на ноябрь",s:"Таблица спикеров на 80%",st:"todo",due:"01.11",x:"gh",xs:"ok"},
- {id:"T-12",p:"ST-project",t:"Отчёт по тексту звонка",s:"Жду ответ по полю needs",st:"doing",ck:"1/3",cl:"@claude",x:"kai",xs:"ok",nw:1,ask:"решите: пустые потребности писать как \"-\" или опускать поле"},
- {id:"T-18",p:"Galera",t:"Посещаемость встречи 10-011",s:"Осталось отметить 3 человек",st:"doing",ck:"2/3",cl:"@codex",x:"gh",xs:"!"},
- {id:"T-15",p:"ST-project",t:"Доступ к GPU-серверу",s:"Ждём: оплату от бухгалтерии",st:"blocked",x:"kai",xs:"ok"},
- {id:"T-8",p:"pii-scrub",t:"Каркас репозитория",s:"README и AGENTS.md готовы",st:"done",ck:"3/3"},
- {id:"T-11",p:"Galera",t:"Пост недели 14-20.10",s:"Отправлен в три канала",st:"done",ck:"2/2",x:"gh",xs:"ok"}
+ {id:"T-21",p:"personal",t:"Task tracker for agents",s:"Writing spec, mockup",st:"idea"},
+ {id:"T-23",p:"ST-project",t:"Measure Natasha on long calls",s:"",st:"idea"},
+ {id:"T-9",p:"personal",t:"Read about CRDT",s:"Postponed until winter",st:"idea"},
+ {id:"T-17",p:"ST-project",t:"PII scrub before model",s:"Phones as words first",st:"todo",ck:"0/3",due:"10-28",x:"kai",xs:"ok"},
+ {id:"T-19",p:"ST-project",t:"End-to-end make e2e run",s:"",st:"todo",ck:"0/2"},
+ {id:"T-20",p:"Galera",t:"November meeting posts",s:"Speaker table 80% done",st:"todo",due:"11-01",x:"gh",xs:"ok"},
+ {id:"T-12",p:"ST-project",t:"Call transcript report",s:"Awaiting reply on needs",st:"doing",ck:"1/3",cl:"@claude",x:"kai",xs:"ok",nw:1,ask:"decide: write empty needs as \"-\" or omit the field"},
+ {id:"T-18",p:"Galera",t:"Attendance, meeting 10-011",s:"3 people left to mark",st:"doing",ck:"2/3",cl:"@codex",x:"gh",xs:"!"},
+ {id:"T-15",p:"ST-project",t:"Access to GPU server",s:"Waiting: payment from accounting",st:"blocked",x:"kai",xs:"ok"},
+ {id:"T-8",p:"pii-scrub",t:"Repository skeleton",s:"README and AGENTS.md done",st:"done",ck:"3/3"},
+ {id:"T-11",p:"Galera",t:"Week post 10-14..10-20",s:"Sent to three channels",st:"done",ck:"2/2",x:"gh",xs:"ok"}
 ];
-const PROJ=["все","ST-project","Galera","личное","pii-scrub"];
+const PROJ=["all","ST-project","Galera","personal","pii-scrub"];
 const HIST=[
- ["18.10 09:40","claude","создал в idea",""],
- ["18.10 09:52","claude","idea > todo",""],
- ["19.10 09:00","claude","взял задачу, todo > doing","kaiten: В работе  ok"],
- ["19.10 11:02","claude","сделал разбор полей отчёта",""],
- ["19.10 14:03","claude","комментарий","Сделано: отчёт по 5 звонкам. Решено: нет. Ждём: ответ по needs."],
- ["20.10 10:12","daniil","комментарий","Пустую строку в потребностях заменяем на \"-\"."]
+ ["10-18 09:40","claude","created in idea",""],
+ ["10-18 09:52","claude","idea > todo",""],
+ ["10-19 09:00","claude","took the task, todo > doing","kaiten: In progress  ok"],
+ ["10-19 11:02","claude","parsed the report fields",""],
+ ["10-19 14:03","claude","comment","Done: report for 5 calls. Decided: nothing. Waiting: reply on needs."],
+ ["10-20 10:12","daniil","comment","Replace the empty line in needs with \"-\"."]
 ];
 let view="board",ci=2,ri=0,pi=0,status="",sha=0x5e2b8f,cur=null,simStep=0;
 const W=24,G="  ";
@@ -87,7 +87,7 @@ function syncTag(x){if(!x.x)return "";return x.x+(x.xs==="ok"?":ok":x.xs==="!"?"
 function board(){
   const lines=[];
   const tot=COLS.reduce((a,c)=>a+vis(c).length,0);
-  lines.push(sp("a","tracker")+sp("d","  ~/tasks  проект: ")+sp("a",PROJ[pi])+sp("d",`  ${tot} задач`)+" ".repeat(42)+sp("d","sync 12:40  backup 14:00"));
+  lines.push(sp("a","tix")+sp("d","  ~/tasks  project: ")+sp("a",PROJ[pi])+sp("d",`  ${tot} tasks`)+" ".repeat(45)+sp("d","sync 12:40  backup 14:00"));
   lines.push(sp("d",rule(W*5+G.length*4)));
   lines.push(COLS.map(c=>pad(`${c} ${vis(c).length}`,W)).join(G));
   lines.push(sp("d",COLS.map(()=>rule(W)).join(G)));
@@ -95,7 +95,7 @@ function board(){
     const out=[];
     vis(c).forEach((x,j)=>{
       const sel=i===ci&&j===ri;
-      const meta=[x.ck,x.due?"до "+x.due:"",x.cl,syncTag(x)].filter(Boolean).join(" ");
+      const meta=[x.ck,x.due?"due "+x.due:"",x.cl,syncTag(x)].filter(Boolean).join(" ");
       const rows=[[(sel?">":" ")+x.id+" "+x.p,x.nw?"n":""],[" "+x.t,""],[" "+(x.s||""),"d"],[" "+meta,x.xs==="!"?"w":"d"],["",""]];
       rows.forEach(([t,c2],k)=>{
         const txt=pad(t,W);
@@ -108,146 +108,146 @@ function board(){
   const h=Math.max(28,...cells.map(c=>c.length));
   for(let r=0;r<h;r++)lines.push(cells.map(c=>c[r]||" ".repeat(W)).join(G));
   lines.push(sp("d",rule(W*5+G.length*4)));
-  lines.push(status||sp("d","готово"));
+  lines.push(status||sp("d","ready"));
   return lines.join("\n");
 }
 function card(x){
   const L=[],R=104;
   const head=`${x.id}  ${x.t}`;
   L.push(sp("a",head)+" ".repeat(Math.max(2,R-head.length-x.st.length-2))+"["+x.st+"]");
-  const meta=[x.p,x.x?(x.x==="kai"?"kaiten:71768617":"gh:galera/club#41")+(x.xs==="ok"?" sync ok 12:40":x.xs==="!"?" sync ошибка, повтор при s":" отправка..."):"",x.cl?x.cl+" до 18:00":"",x.due?"до "+x.due:"","#calls"].filter(Boolean).join("   ");
+  const meta=[x.p,x.x?(x.x==="kai"?"kaiten:71768617":"gh:galera/club#41")+(x.xs==="ok"?" sync ok 12:40":x.xs==="!"?" sync error, retry on s":" sending..."):"",x.cl?x.cl+" until 18:00":"",x.due?"due "+x.due:"","#calls"].filter(Boolean).join("   ");
   L.push(sp(x.xs==="!"?"w":"d",meta));
-  if(x.nw)L.push(sp("n","* нужно от вас: "+(x.ask||"")));
+  if(x.nw)L.push(sp("n","* needs you: "+(x.ask||"")));
   L.push(sp("d",rule(R)));
-  L.push("абстракт");
-  L.push("  Руководитель видит итог звонка без прослушивания. Делаем отчёт по тексту");
-  L.push("  расшифровки: итог, потребности, возражения.");
+  L.push("abstract");
+  L.push("  The manager sees the call result without listening. We build a report from");
+  L.push("  the transcript: result, needs, objections.");
   L.push("");
-  L.push("сводка");
-  L.push("  "+(x.s||"пока пусто"));
-  L.push(sp("d","  Готово 1 из 3: отчёты по 5 звонкам. Риск: пустая строка в потребностях."));
+  L.push("summary");
+  L.push("  "+(x.s||"empty so far"));
+  L.push(sp("d","  Done 1 of 3: reports for 5 calls. Risk: empty line in needs."));
   L.push("");
-  L.push("подробно"+" ".repeat(R-8-(x.ck||"").length)+(x.ck||""));
-  L.push("  [x] отчёт по 5 звонкам");
-  L.push("  [ ] все отчёты проходят схему");
-  L.push("  [ ] сравнение с эталоном");
-  L.push(sp("d","  спека: ~/Dev/ST-project/docs/plans/report.md"));
+  L.push("details"+" ".repeat(R-7-(x.ck||"").length)+(x.ck||""));
+  L.push("  [x] report for 5 calls");
+  L.push("  [ ] all reports pass the schema");
+  L.push("  [ ] comparison with the reference");
+  L.push(sp("d","  spec: ~/Dev/ST-project/docs/plans/report.md"));
   L.push("");
-  L.push("история");
+  L.push("history");
   (x.hist||HIST).forEach(([d,who,what,extra])=>{
-    const isC=what==="комментарий";
+    const isC=what==="comment";
     L.push(sp("d","  "+d+"  ")+pad(who,8)+(isC?sp("d",what):what)+(extra&&!isC?"   "+sp(extra.includes("!")?"w":"d",extra):""));
     if(isC)L.push(" ".repeat(23)+extra);
   });
   L.push("");
   L.push(sp("d",rule(R)));
-  L.push(status||sp("d","e редактор  c комментарий  m M перенести  o открыть в Kaiten  esc назад"));
+  L.push(status||sp("d","e editor  c comment  m M move  o open in Kaiten  esc back"));
   return L.join("\n");
 }
-const AGENT=`<span class="d"># хук старта сессии сам вызывает tk ctx; агент получает это в контекст, ~120 токенов</span>
-<span class="a">$</span> tk ctx
+const AGENT=`<span class="d"># the session start hook calls tix ctx itself; the agent gets this in its context, ~120 tokens</span>
+<span class="a">$</span> tix ctx
 project ST-project   <span class="d">rules: ~/tasks/RULES.md</span>
-<span class="d">- взял задачу: tk take; сделал шаг: tk note; конец сессии: tk set summary=</span>
-doing   T-12 Отчёт по тексту звонка | Жду ответ по полю needs   @claude
-blocked T-15 Доступ к GPU-серверу | Ждём: оплату от бухгалтерии
-todo    T-17 Очистка ПДн перед моделью | 0/3  kai
-todo    T-19 Сквозной прогон make e2e | 0/2
+<span class="d">- took a task: tix take; did a step: tix note; end of session: tix set summary=</span>
+doing   T-12 Call transcript report | Awaiting reply on needs   @claude
+blocked T-15 Access to GPU server | Waiting: payment from accounting
+todo    T-17 PII scrub before model | 0/3  kai
+todo    T-19 End-to-end make e2e run | 0/2
 next    T-17
 
-<span class="a">$</span> tk take T-17
-ok T-17 todo > doing  @claude до 20:40  kaiten: В работе ok
+<span class="a">$</span> tix take T-17
+ok T-17 todo > doing  @claude until 20:40  kaiten: In progress ok
 
-<span class="a">$</span> tk check T-17 1
+<span class="a">$</span> tix check T-17 1
 ok T-17 1/3
 
-<span class="a">$</span> tk note T-17 "маска телефона словами готова"
+<span class="a">$</span> tix note T-17 "phone mask in words done"
 ok T-17 note
 
-<span class="a">$</span> tk set T-17 summary="Телефон словами готов. Дальше ФИО в двух порядках."
+<span class="a">$</span> tix set T-17 summary="Phone in words done. Next: full name in two orders."
 ok T-17 summary
 
-<span class="a">$</span> tk new "Замер Natasha на длинных звонках" --to idea
+<span class="a">$</span> tix new "Measure Natasha on long calls" --to idea
 ok T-23 idea
 
-<span class="a">$</span> tk done T-12 -m "все 5 отчётов проходят схему"
-<span class="w">err</span> T-12: отмечено 1/3 критериев; отметь: tk check T-12 2 3
+<span class="a">$</span> tix done T-12 -m "all 5 reports pass the schema"
+<span class="w">err</span> T-12: 1/3 criteria checked; check: tix check T-12 2 3
 
-<span class="d"># ответ - одна строка; JSON только по флагу --json; хеш коммита по флагу -v</span>`;
-const FILE=`<span class="d">~/tasks/T-12 otchet-po-tekstu-zvonka.md   (так же его видит Obsidian)</span>
+<span class="d"># the reply is one line; JSON only with the --json flag; commit hash with the -v flag</span>`;
+const FILE=`<span class="d">~/tasks/T-12 call-transcript-report.md   (Obsidian sees it the same way)</span>
 
 ---
 id: T-12
-title: Отчёт по тексту звонка
+title: Call transcript report
 project: ST-project
 status: doing
 rank: 1
 created: 2026-10-18T09:40:00
 external: kaiten:71768617
-external_state: doing        <span class="d"># что знает Kaiten; расходится с status - ждёт отправки</span>
+external_state: doing        <span class="d"># what Kaiten knows; if it differs from status - waits to be sent</span>
 waiting:
-claim: agent:claude до 2026-10-20T18:00
+claim: agent:claude until 2026-10-20T18:00
 due: 2026-10-25
 tags: [calls]
 ---
-## Абстракт
-Руководитель видит итог звонка без прослушивания. Делаем отчёт
-по тексту расшифровки: итог, потребности, возражения.
+## Abstract
+The manager sees the call result without listening. We build a report
+from the transcript: result, needs, objections.
 
-## Сводка
-Жду ответ по полю needs.
-Готово 1 из 3: отчёты по 5 звонкам.
+## Summary
+Awaiting reply on needs.
+Done 1 of 3: reports for 5 calls.
 
-## Подробно
-- [x] отчёт по 5 звонкам
-- [ ] все отчёты проходят схему
-- [ ] сравнение с эталоном
-Спека: ~/Dev/ST-project/docs/plans/report.md
+## Details
+- [x] report for 5 calls
+- [ ] all reports pass the schema
+- [ ] comparison with the reference
+Spec: ~/Dev/ST-project/docs/plans/report.md
 
-## Комментарии
+## Comments
 &lt;!-- c: 2026-10-19T14:03 | agent:claude --&gt;
-Сделано: отчёт по 5 звонкам. Решено: нет. Ждём: ответ по needs.
+Done: report for 5 calls. Decided: nothing. Waiting: reply on needs.
 
-<span class="d"># история шагов (взял, перенёс, "сделал разбор полей") живёт в git log:</span>
-<span class="d"># a91f3c2 T-12: note "сделал разбор полей отчёта" (agent:claude)</span>`;
-const SYNC=`<span class="a">как вы двигаете связанную карточку</span>
+<span class="d"># step history (took, moved, "parsed the report fields") lives in git log:</span>
+<span class="d"># a91f3c2 T-12: note "parsed the report fields" (agent:claude)</span>`;
+const SYNC=`<span class="a">how you move a linked card</span>
 
-  m на T-12 в TUI
-  1. ядро: status = doing, коммит                      <span class="d">сразу</span>
-  2. status != external_state, карточка ждёт отправки  <span class="d">kai:..</span>
-  3. адаптер в фоне: kaiten card move 71768617 --column "В работе"
-  4. ответ ok: external_state = doing                  <span class="d">kai:ok</span>
-     нет сети или 5xx: локально остаётся doing         <span class="w">kai:!</span>  <span class="d">повтор по s и при следующем запуске</span>
+  m on T-12 in the TUI
+  1. core: status = doing, commit                      <span class="d">at once</span>
+  2. status != external_state, the card waits to be sent  <span class="d">kai:..</span>
+  3. adapter in the background: kaiten card move 71768617 --column "In progress"
+  4. reply ok: external_state = doing                  <span class="d">kai:ok</span>
+     no network or 5xx: locally it stays doing         <span class="w">kai:!</span>  <span class="d">retry on s and at the next start</span>
 
-<span class="a">как приходят изменения снаружи</span>  <span class="d">(s в TUI, tk pull, старт TUI)</span>
+<span class="a">how changes come in from outside</span>  <span class="d">(s in the TUI, tix pull, TUI start)</span>
 
-  коллега перенёс карточку в Kaiten в "Готово"
-  - у нас задача не менялась: переносим в done, в историю "kaiten: перенесено в Готово"
-  - у нас тоже перенесли: конфликт, карточка помечена !, решает правило из конфига
-  - карточка удалена в Kaiten (404): пометка, задачу не трогаем
+  a colleague moved the card in Kaiten to "Done"
+  - our task did not change: we move it to done, history gets "kaiten: moved to Done"
+  - ours was moved too: conflict, the card is marked !, the rule from the config decides
+  - the card was deleted in Kaiten (404): a mark, we do not touch the task
 
-<span class="a">~/tasks/.tracker/config.toml</span>
+<span class="a">~/tasks/.tix/config.toml</span>
 
 [adapters.kaiten]
-cmd = "tracker-ext-kaiten"              <span class="d"># скрипт поверх kaiten CLI, JSON в stdin и stdout</span>
-[adapters.kaiten.columns]               <span class="d"># наша колонка = колонка Kaiten</span>
-todo = "Очередь"
-doing = "В работе"
-blocked = "В работе"                    <span class="d"># в Kaiten ожидание - строка "Ждём" в карточке</span>
-done = "Готово"
+cmd = "tix-ext-kaiten"              <span class="d"># a script on top of the kaiten CLI, JSON on stdin and stdout</span>
+[adapters.kaiten.columns]               <span class="d"># our column = Kaiten column</span>
+todo = "Queue"
+doing = "In progress"
+blocked = "In progress"                 <span class="d"># in Kaiten, waiting is a "Waiting" line in the card</span>
+done = "Done"
 
 [adapters.gh]
-cmd = "tracker-ext-gh"                  <span class="d"># скрипт поверх gh</span>
-done = "close"                          <span class="d"># done закрывает issue, выход из done открывает</span>
-project = "galera/3"                    <span class="d"># если есть Projects v2: поле Status</span>
+cmd = "tix-ext-gh"                  <span class="d"># a script on top of gh</span>
+done = "close"                          <span class="d"># done closes the issue, leaving done reopens it</span>
+project = "galera/3"                    <span class="d"># if Projects v2 exists: field Status</span>
 [adapters.gh.status]
 todo = "Todo"
 doing = "In Progress"
 done = "Done"
 
-<span class="a">что отправляем наружу</span>
-  статус   да, всегда
-  заметки  нет по умолчанию: в рабочем трекере читают коллеги
-  итог     комментарием при done, если включено`;
+<span class="a">what we send outward</span>
+  status   yes, always
+  notes    no by default: colleagues read the working tracker
+  result   as a comment at done, if enabled`;
 function render(){
   const s=document.getElementById("scr");
   if(view==="board")s.innerHTML=board();
@@ -266,7 +266,7 @@ function moveCard(x,dir,who){
   if(x.x&&KAI[x.st]!==undefined){
     x.xs="..";const name=x.x==="kai"?"kaiten: "+KAI[x.st]:"github: "+(x.st==="done"?"close":"Status "+x.st);
     status=msg+"   "+sp("d",name+" ...");render();
-    setTimeout(()=>{x.xs=x.id==="T-18"?"!":"ok";status=msg+"   "+(x.xs==="ok"?sp("d",name+" ok"):sp("w",name+" нет сети, повтор по s"));render()},900);
+    setTimeout(()=>{x.xs=x.id==="T-18"?"!":"ok";status=msg+"   "+(x.xs==="ok"?sp("d",name+" ok"):sp("w",name+" no network, retry on s"));render()},900);
   }else{status=msg}
   if(view==="board"){ci=to;ri=vis(x.st).indexOf(x)}
   render();
@@ -283,11 +283,11 @@ document.addEventListener("keydown",e=>{
     else if(k==="m"){const x=sel();if(x)return e.preventDefault(),moveCard(x,1,"daniil")}
     else if(k==="M"){const x=sel();if(x)return e.preventDefault(),moveCard(x,-1,"daniil")}
     else if(k==="p"){pi=(pi+1)%PROJ.length;ri=0}
-    else if(k==="s"){T.forEach(x=>{if(x.xs==="!")x.xs="ok"});status=sp("d","sync: отправлено 1, получено 0, конфликтов 0")}
+    else if(k==="s"){T.forEach(x=>{if(x.xs==="!")x.xs="ok"});status=sp("d","sync: sent 1, received 0, conflicts 0")}
     else used=false;
   }else if(view==="card"){
     if(k==="Escape"||k==="q"){view="board";status=""}
-    else if(k==="m"||k==="M"){const x=cur;if(x){x.hist=(x.hist||HIST.slice());const from=x.st;moveCard(x,k==="m"?1:-1,"daniil");if(x.st!==from)x.hist.push(["20.10 12:40","daniil",`${from} > ${x.st}`,x.x?(x.x==="kai"?"kaiten: "+(KAI[x.st]||"-"):"github: "+x.st)+"  ok":""]);render()}}
+    else if(k==="m"||k==="M"){const x=cur;if(x){x.hist=(x.hist||HIST.slice());const from=x.st;moveCard(x,k==="m"?1:-1,"daniil");if(x.st!==from)x.hist.push(["10-20 12:40","daniil",`${from} > ${x.st}`,x.x?(x.x==="kai"?"kaiten: "+(KAI[x.st]||"-"):"github: "+x.st)+"  ok":""]);render()}}
     else used=false;
   }else used=false;
   if(used){e.preventDefault();render()}
@@ -295,10 +295,10 @@ document.addEventListener("keydown",e=>{
 document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.addEventListener("click",()=>{view=b.dataset.tab;status="";render();document.getElementById("term").focus()}));
 document.getElementById("sim").addEventListener("click",()=>{
   const steps=[
-    ()=>{const x=T.find(x=>x.id==="T-17");x.cl="@claude";x.s="Телефон словами в работе";moveCard(x,1,"agent:claude")},
-    ()=>{const x=T.find(x=>x.id==="T-17");x.ck="1/3";x.s="Телефон словами готов, дальше ФИО";status=sp("d",hash())+"  T-17: note \"маска телефона словами готова\"  "+sp("d","(agent:claude)")},
-    ()=>{const x=T.find(x=>x.id==="T-18");x.ck="3/3";x.cl="";x.s="Все отметки внесены";moveCard(x,2,"agent:codex")},
-    ()=>{T.push({id:"T-24",p:"Galera",t:"Баннер встречи 11-002",s:"Нужно фото спикера",st:"idea",nw:1,ask:"пришлите фото спикера"});status=sp("d",hash())+"  T-24: new idea  "+sp("d","(agent:opencode)")}
+    ()=>{const x=T.find(x=>x.id==="T-17");x.cl="@claude";x.s="Phone in words in progress";moveCard(x,1,"agent:claude")},
+    ()=>{const x=T.find(x=>x.id==="T-17");x.ck="1/3";x.s="Phone in words done, next full name";status=sp("d",hash())+"  T-17: note \"phone mask in words done\"  "+sp("d","(agent:claude)")},
+    ()=>{const x=T.find(x=>x.id==="T-18");x.ck="3/3";x.cl="";x.s="All marks entered";moveCard(x,2,"agent:codex")},
+    ()=>{T.push({id:"T-24",p:"Galera",t:"Banner for meeting 11-002",s:"Speaker photo needed",st:"idea",nw:1,ask:"send the speaker photo"});status=sp("d",hash())+"  T-24: new idea  "+sp("d","(agent:opencode)")}
   ];
   view="board";if(simStep<steps.length)steps[simStep++]();render();document.getElementById("term").focus();
 });

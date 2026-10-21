@@ -12,7 +12,7 @@ import (
 
 func guard(t *testing.T) {
 	if r := recover(); r != nil {
-		t.Fatalf("паника: %v", r)
+		t.Fatalf("panic: %v", r)
 	}
 }
 
@@ -23,7 +23,7 @@ func TestDefault_FiveRolesOneColumnEach(t *testing.T) {
 		{Name: "blocked", Role: "waiting"}, {Name: "done", Role: "closed"},
 	}
 	if got := config.Default().Columns; !reflect.DeepEqual(got, want) {
-		t.Errorf("колонки по умолчанию %+v, ждали (спека 2.5) %+v", got, want)
+		t.Errorf("default columns %+v, want (spec 2.5) %+v", got, want)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestLoad_MissingFile_Default(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(c.Columns, config.Default().Columns) {
-		t.Errorf("нет файла: %+v, ждали Default", c.Columns)
+		t.Errorf("no file: %+v, want Default", c.Columns)
 	}
 }
 
@@ -51,7 +51,7 @@ func TestLoad_CustomFile_ColumnsOrderAndProjects(t *testing.T) {
 	}
 	want := []config.Column{{Name: "backlog", Role: "inbox"}, {Name: "wip", Role: "active"}, {Name: "misc"}}
 	if !reflect.DeepEqual(c.Columns, want) {
-		t.Errorf("колонки %+v, ждали %+v", c.Columns, want)
+		t.Errorf("columns %+v, want %+v", c.Columns, want)
 	}
 	if c.Projects["tracker"] != "трекер" {
 		t.Errorf("projects %v", c.Projects)
@@ -70,10 +70,10 @@ func TestRender_RoundTrip(t *testing.T) {
 	}
 	out, err := config.Load(p)
 	if err != nil {
-		t.Fatalf("Render не разбирается Load: %v\n%s", err, in.Render())
+		t.Fatalf("Load cannot parse Render output: %v\n%s", err, in.Render())
 	}
 	if !reflect.DeepEqual(out.Columns, in.Columns) || !reflect.DeepEqual(out.Projects, in.Projects) {
-		t.Errorf("круг Render-Load: %+v, ждали %+v", out, in)
+		t.Errorf("Render-Load round trip: %+v, want %+v", out, in)
 	}
 }
 
@@ -85,10 +85,10 @@ func TestLoad_Broken_ErrorHasPathAndLine(t *testing.T) {
 	}
 	_, err := config.Load(p)
 	if err == nil {
-		t.Fatal("битый TOML разобран без ошибки")
+		t.Fatal("broken TOML parsed without an error")
 	}
 	if !regexp.MustCompile(`config\.toml:\d+`).MatchString(err.Error()) {
-		t.Errorf("ошибка %q, ждали `config.toml:<строка>`", err)
+		t.Errorf("error %q, want `config.toml:<line>`", err)
 	}
 }
 
@@ -119,22 +119,22 @@ func TestByRoleAndRoleOf(t *testing.T) {
 		t.Fatal(err)
 	}
 	if col, ok := c.ByRole("inbox"); !ok || col.Name != "ideas" {
-		t.Errorf("ByRole(inbox) = %+v, %v; ждали ideas", col, ok)
+		t.Errorf("ByRole(inbox) = %+v, %v; want ideas", col, ok)
 	}
 	if col, ok := c.ByRole("waiting"); ok {
-		t.Errorf("ByRole(waiting) = %+v, true; роли в конфиге нет", col)
+		t.Errorf("ByRole(waiting) = %+v, true; the config has no such role", col)
 	}
 	for name, want := range map[string]string{"ideas": "inbox", "doing": "active", "review": "", "nosuch": ""} {
 		if got := c.RoleOf(name); got != want {
-			t.Errorf("RoleOf(%q) = %q, ждали %q", name, got, want)
+			t.Errorf("RoleOf(%q) = %q, want %q", name, got, want)
 		}
 	}
 	if got := config.Default().RoleOf("blocked"); got != "waiting" {
-		t.Errorf("RoleOf(blocked) в конфиге по умолчанию = %q, ждали waiting", got)
+		t.Errorf("RoleOf(blocked) in the default config = %q, want waiting", got)
 	}
 }
 
-// Resolve: имя колонки важнее роли; роль даёт колонку с этой ролью; чужое имя - как есть.
+// Resolve: a column name wins over a role; a role gives the column with that role; an unknown name stays as is.
 func TestResolve_NameBeforeRole(t *testing.T) {
 	defer guard(t)
 	c := &config.Config{Columns: []config.Column{
@@ -142,7 +142,7 @@ func TestResolve_NameBeforeRole(t *testing.T) {
 	}}
 	for in, want := range map[string]string{"waiting": "blocked", "ready": "ready", "todo": "todo", "nope": "nope"} {
 		if got := c.Resolve(in); got != want {
-			t.Errorf("Resolve(%q) = %q, ждали %q", in, got, want)
+			t.Errorf("Resolve(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

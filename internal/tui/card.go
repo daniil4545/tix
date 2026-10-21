@@ -15,34 +15,34 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// cardState - карточка: курсор по истории и раскрытые серии правок.
+// cardState - the card: the history cursor and the expanded edit series.
 type cardState struct {
 	id      string
 	entries []history.Entry
 	rows    []shown
 	mtime   time.Time
-	cursor  int             // строки критериев, затем записи истории
-	moved   bool            // пользователь двигал курсор: первая загрузка истории его не сдвигает
-	nCrit   int             // число критериев перед историей; обновляется при открытии и в cardView
-	open    map[string]bool // раскрытые серии "N edits"
-	loaded  bool            // история пришла хотя бы раз
+	cursor  int             // criterion rows, then history entries
+	moved   bool            // the user moved the cursor: the first history load does not shift it
+	nCrit   int             // the number of criteria before the history; updated on open and in cardView
+	open    map[string]bool // expanded "N edits" series
+	loaded  bool            // the history has arrived at least once
 }
 
-// shown - строка истории на экране. group - индекс серии в entries, -1 если запись одиночная.
+// shown - a history row on the screen. group - the series index in entries, -1 for a single entry.
 type shown struct {
 	entry history.Entry
 	group int
 }
 
-// historyMsg - история карточки из git и комментариев файла.
+// historyMsg - the card history from git and the file comments.
 type historyMsg struct {
 	id      string
 	entries []history.Entry
-	mtime   time.Time // запасная дата изменения, если истории нет
+	mtime   time.Time // fallback modification date if there is no history
 	err     error
 }
 
-// openCard открывает карточку выбранной задачи; история грузится в фоне.
+// openCard opens the card of the selected task; the history loads in the background.
 func (m *Model) openCard() tea.Cmd {
 	t := m.selected()
 	if t == nil {
@@ -53,7 +53,7 @@ func (m *Model) openCard() tea.Cmd {
 	return m.historyCmd(t)
 }
 
-// historyCmd читает историю задачи; первый кадр карточки её не ждёт.
+// historyCmd reads the task history; the first card frame does not wait for it.
 func (m *Model) historyCmd(t *task.Task) tea.Cmd {
 	return m.guard(func() tea.Msg {
 		var mtime time.Time
@@ -69,7 +69,7 @@ func (m *Model) historyCmd(t *task.Task) tea.Cmd {
 	})
 }
 
-// set принимает историю и ставит курсор на последнюю запись при первой загрузке.
+// set takes the history and puts the cursor on the last entry on the first load.
 func (c *cardState) set(msg historyMsg) {
 	c.entries, c.mtime = msg.entries, msg.mtime
 	c.rebuild()
@@ -90,7 +90,7 @@ func (m *Model) setHistoryMsg(msg historyMsg) {
 	}
 }
 
-// rebuild раскладывает записи в строки экрана: раскрытая серия заменяется своими правками.
+// rebuild lays the entries out as screen rows: an expanded series is replaced by its edits.
 func (c *cardState) rebuild() {
 	c.rows = c.rows[:0]
 	for i, e := range c.entries {
@@ -111,7 +111,7 @@ func groupKey(e history.Entry) string {
 	return fmt.Sprintf("%d %s", e.Folded[0].At.UnixNano(), e.Actor)
 }
 
-// changed - время последней записи истории (лента идёт от старых к новым), без истории - mtime файла.
+// changed - the time of the last history entry (the feed goes from old to new), without history - the file mtime.
 func (c *cardState) changed() time.Time {
 	if len(c.entries) == 0 {
 		return c.mtime
@@ -119,17 +119,17 @@ func (c *cardState) changed() time.Time {
 	return c.entries[len(c.entries)-1].At
 }
 
-// last - индекс последней выбираемой строки: критерии и история.
+// last - the index of the last selectable row: criteria and history.
 func (c *cardState) last() int { return max(c.nCrit+len(c.rows)-1, 0) }
 
-// step двигает курсор по критериям и истории.
+// step moves the cursor over criteria and history.
 func (c *cardState) step(d int) {
 	c.moved = true
 	c.cursor = min(max(c.cursor+d, 0), c.last())
 }
 
-// toggle раскрывает серию правок под курсором или сворачивает раскрытую. Строка критерия
-// не серия: её переключает cardEnter.
+// toggle expands the edit series under the cursor or collapses an expanded one. A criterion row
+// is not a series: cardEnter toggles it.
 func (c *cardState) toggle() {
 	row := c.cursor - c.nCrit
 	if row < 0 || row >= len(c.rows) || c.rows[row].group < 0 {
@@ -147,7 +147,7 @@ func (c *cardState) toggle() {
 	}
 }
 
-// cardView собирает кадр карточки из текущего файла задачи.
+// cardView builds the card frame from the current task file.
 func (m *Model) cardView() view.Card {
 	if t := m.byID(m.card.id); t != nil {
 		m.card.nCrit = len(selectableCriteria(t))
@@ -174,7 +174,7 @@ func (m *Model) cardView() view.Card {
 	return c
 }
 
-// fields - строка полей карточки: проект, внешняя связь, claim, ожидание, срок, теги, дата изменения.
+// fields - the card fields line: project, external link, claim, wait, due, tags, modification date.
 func fields(t *task.Task, now time.Time, changed time.Time) string {
 	parts := []string{t.Project}
 	if t.External != "" {
@@ -198,7 +198,7 @@ func fields(t *task.Task, now time.Time, changed time.Time) string {
 	return strings.Join(parts, "   ")
 }
 
-// section возвращает текст раздела "## name" тела задачи без пустых краёв.
+// section returns the text of section "## name" of the task body without empty edges.
 func section(body, name string) string {
 	var out []string
 	in := false
@@ -217,8 +217,8 @@ func section(body, name string) string {
 	return strings.TrimSpace(strings.Join(out, "\n"))
 }
 
-// criterionRows - индексы строк-критериев в тексте раздела Details. Число строк должно совпасть
-// с числом критериев задачи, иначе выбор критериев выключен: раздел и ядро прочли разное.
+// criterionRows - indexes of criterion rows in the Details section text. The row count must match
+// the task criteria count, otherwise criterion choice is off: the section and the core read different things.
 func criterionRows(details string, want int) []int {
 	at := task.CriterionRows(details)
 	if len(at) != want {
@@ -227,7 +227,7 @@ func criterionRows(details string, want int) []int {
 	return at
 }
 
-// selectableCriteria - строки критериев задачи в тексте Details, которые выбирает курсор.
+// selectableCriteria - the task criterion rows in the Details text that the cursor selects.
 func selectableCriteria(t *task.Task) []int {
 	return criterionRows(section(t.Body, "Details"), len(t.Criteria()))
 }

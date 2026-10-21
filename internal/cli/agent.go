@@ -26,8 +26,8 @@ const (
 	hookStdinLimit = 64 << 10
 )
 
-// actorOf возвращает автора записи: --as, затем окружение (actor.Resolve);
-// личность не найдена - unknown.
+// actorOf returns the author of a write: --as, then the environment (actor.Resolve);
+// identity not found - unknown.
 func (a *app) actorOf(p *parsed) (string, error) {
 	flag := ""
 	if p.set["as"] {
@@ -50,7 +50,7 @@ func (a *app) actorOf(p *parsed) (string, error) {
 	return name, nil
 }
 
-// what возвращает хвост строки ok: Info ядра или запасной текст.
+// what returns the tail of the ok line: the core's Info or a fallback text.
 func what(res core.Result, fallback string) string {
 	if res.Info != "" {
 		return res.Info
@@ -58,7 +58,7 @@ func what(res core.Result, fallback string) string {
 	return fallback
 }
 
-// target разбирает `<id>` и проверяет число позиционных аргументов.
+// target parses `<id>` and checks the number of positional arguments.
 func target(p *parsed, positional int, usage string) (string, error) {
 	id, err := taskID(p.pos)
 	if err != nil {
@@ -89,7 +89,7 @@ func (a *app) cmdCtx(args []string) error {
 		return err
 	}
 	var tasks []*task.Task
-	// Пустая база: читать нечего.
+	// Empty store: nothing to read.
 	if _, statErr := os.Stat(a.root); statErr == nil {
 		var errs []error
 		tasks, errs = a.store.List()
@@ -128,11 +128,11 @@ func (a *app) cmdCtx(args []string) error {
 	return nil
 }
 
-// hookReadTimeout - общий срок чтения stdin хука: раннер мог не закрыть pipe.
+// hookReadTimeout - the shared hook stdin read timeout: the runner may not have closed the pipe.
 var hookReadTimeout = 2 * time.Second
 
-// readHookModel читает один JSON-объект со stdin (до hookStdinLimit) и отдаёт model.
-// Срок вышел или ввод не JSON - пусто. Горутина чтения при сроке остаётся до конца процесса.
+// readHookModel reads one JSON object from stdin (up to hookStdinLimit) and returns model.
+// Timeout or non-JSON input - empty. On timeout the reading goroutine lives until the process ends.
 func readHookModel(r io.Reader) string {
 	done := make(chan string, 1)
 	go func() {
@@ -153,9 +153,9 @@ func readHookModel(r io.Reader) string {
 	}
 }
 
-// exportModel читает JSON хука SessionStart со stdin и дописывает `export TIX_MODEL='<model>'`; кавычки гасят glob в [1m]
-// в CLAUDE_ENV_FILE. Нет файла, пустой или чужой ввод, модель не проходит проверку - молча
-// пропуск: хук не должен ломать сессию. Файл исполняет shell, поэтому значение проверяется.
+// exportModel reads the SessionStart hook JSON from stdin and appends `export TIX_MODEL='<model>'`; quotes stop glob in [1m]
+// in CLAUDE_ENV_FILE. No file, empty or foreign input, a model that fails validation - silently
+// skipped: the hook must not break the session. A shell executes the file, so the value is validated.
 func (a *app) exportModel() {
 	path := a.env.Getenv("CLAUDE_ENV_FILE")
 	if path == "" || a.env.Stdin == nil {
@@ -165,13 +165,13 @@ func (a *app) exportModel() {
 	if !actor.ValidModel(model) {
 		return
 	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // путь задаёт Claude Code
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // the path is set by Claude Code
 	if err != nil {
 		a.warn("model not exported: %s", firstLine(err.Error()))
 		return
 	}
 	line := "export TIX_MODEL='" + model + "'\n"
-	// Чужая последняя строка без перевода строки слиплась бы с нашей.
+	// A foreign last line without a newline would merge with ours.
 	if st, statErr := f.Stat(); statErr == nil && st.Size() > 0 {
 		last := make([]byte, 1)
 		if _, readErr := f.ReadAt(last, st.Size()-1); readErr == nil && last[0] != '\n' {
@@ -187,7 +187,7 @@ func (a *app) exportModel() {
 	}
 }
 
-// tilde сокращает домашнюю папку до ~.
+// tilde shortens the home folder to ~.
 func tilde(path, home string) string {
 	if home != "" && strings.HasPrefix(path, home+string(filepath.Separator)) {
 		return "~" + path[len(home):]
@@ -257,7 +257,7 @@ func (a *app) cmdMove(args []string) error {
 	return nil
 }
 
-// moveOpts собирает MoveOpts из флагов --first, --after, -m, --force.
+// moveOpts builds MoveOpts from the flags --first, --after, -m, --force.
 func moveOpts(p *parsed) (core.MoveOpts, error) {
 	opts := core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}
 	if p.set["first"] && p.set["after"] {

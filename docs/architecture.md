@@ -1,52 +1,52 @@
-# Архитектура tracker
+# tix architecture
 
-tracker - личный трекер задач для человека и агентов. Задача - md-файл в `~/tasks`, база - git-репозиторий, каждая правка - коммит с автором. Агенты (Claude Code, Codex, OpenCode) пишут через CLI `tk`, человек правит файлы в Obsidian. Система - один бинарь `tk` без демона: процесс запускается на команду и завершается. Состояние лежит в файлах и в git. Все внешние вызовы (git, push) делает пакет `gitx`.
+tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex, OpenCode) write through the `tix` CLI, and the human edits files in Obsidian. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
 
-Как читать: общая картина - раздел 1, как идёт работа - разделы 2 и 3, где править - раздел 9. Почему так решено - `docs/spec.md`, решения Р1-Р62 в `docs/specs/decisions.md`. Факты о git и Codex - `docs/api/git.md`, `docs/api/codex.md`. Запуск - `README.md`, правила для разработчика - `AGENTS.md`.
+How to read: the overall picture is section 1, the flow of work is sections 2 and 3, where to edit is section 9. Why it is built this way: `docs/spec.md`, decisions D1-D62 in `docs/specs/decisions.md`. Facts about git and Codex: `docs/api/git.md`, `docs/api/codex.md`. Setup: `README.md`, developer rules: `AGENTS.md`.
 
-## Оглавление
+## Contents
 
-1. Карта
-2. Основной поток
-3. Процессы
-4. Данные и состояния
-5. Внешние системы и границы доверия
-6. Сбои и повторы
-7. Наблюдаемость
-8. Контуры и конфигурация
-9. Где менять
-10. Ограничения и открытое
+1. Map
+2. Main flow
+3. Processes
+4. Data and states
+5. External systems and trust boundaries
+6. Failures and retries
+7. Observability
+8. Environments and configuration
+9. Where to change
+10. Limits and open items
 
-## 1. Карта
+## 1. Map
 
-### Назначение
+### Purpose
 
-Агент берёт задачу, ведёт её и закрывает командами `tk`; история правок сохраняется в git и привязана к сессии агента. Успех: два агента и человек пишут в одну базу, правки не теряются и не уходят под чужим именем.
+An agent takes a task, works on it and closes it with `tix` commands; the edit history stays in git and is tied to the agent session. Success: two agents and a human write to one store, and edits are neither lost nor committed under a foreign name.
 
-### Контекст
+### Context
 
 ```mermaid
 flowchart LR
-  agent["Агент: claude, codex, opencode"] -->|"tk ... в терминале"| tk["tk (один процесс на команду)"]
-  human["Человек в Obsidian"] -->|"правит md-файлы"| db[("~/tasks: md и git")]
-  tk -->|"читает и пишет файлы"| db
-  tk -->|"git commit, push"| git["git"]
-  git -->|"репозиторий"| db
-  git -->|"push HEAD, по команде backup"| remote["origin"]
-  tk -.->|"читает HEAD проекта"| proj["Репозиторий проекта"]
+  agent["Agent: claude, codex, opencode"] -->|"tix ... in a terminal"| tix["tix (one process per command)"]
+  human["Human in Obsidian"] -->|"edits md files"| db[("~/tasks: md and git")]
+  tix -->|"reads and writes files"| db
+  tix -->|"git commit, push"| git["git"]
+  git -->|"repository"| db
+  git -->|"push HEAD, on backup"| remote["origin"]
+  tix -.->|"reads project HEAD"| proj["Project repository"]
   classDef ours fill:#dbeafe,stroke:#2c5c86,color:#000
   classDef external fill:#f3f4f6,stroke:#6b7280,color:#000
   classDef person fill:#fef3c7,stroke:#8c5a1e,color:#000
   classDef store fill:#dcfce7,stroke:#2e6b45,color:#000
-  class tk ours
+  class tix ours
   class git,remote,proj,agent external
   class human person
   class db store
 ```
 
-Агенты и человек согласуются только через базу: лок, claim, коммиты.
+Agents and the human agree only through the store: lock, claim, commits.
 
-### Модули
+### Modules
 
 ```mermaid
 flowchart LR
@@ -68,180 +68,180 @@ flowchart LR
   class cli,core,brief,project,actor,task,gitx,config,assets ours
 ```
 
-Зависимости идут вниз, циклов нет. `cmd/tk` вызывает только `cli`; `cmd/tkbench` - только `gitx`.
+Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixbench` calls only `gitx`.
 
-| Модуль | За что отвечает | Где лежит | Статус |
+| Module | Responsibility | Where | Status |
 |---|---|---|---|
-| cli | разбирает команды, печатает `ok`/`err`/`warn`, переводит ошибки в коды выхода | `internal/cli` (`cli.go` общее, `agent.go` цикл агента, `commands.go` базовые команды) | работает |
-| core | единственный путь записи: лок, temp, rename, коммит, правила переходов, `backup` | `internal/core` (`tx.go` запись, `agent.go` take/move/set/check/backup, `rank.go` порядок, `history.go` трейлер `Code:` и счётчик gc) | работает |
-| task | разбирает и печатает файл задачи, claim, критерии; без IO | `internal/task` | работает |
-| config | читает `.tracker/config.toml`: колонки и их роли, карта проектов | `internal/config` | работает |
-| brief | собирает вывод `tk ctx`: текст и JSON; без IO | `internal/brief` | работает |
-| actor | личность записи: источники, проверка имени, сокращение | `internal/actor` | работает |
-| project | имя проекта по рабочей папке, HEAD проекта без вызова git | `internal/project` (`project.go`, `head.go`) | работает |
-| gitx | все вызовы git: коммит, merge-file, push, фоновый gc | `internal/gitx` (`gitx.go`, `push.go`) | работает |
-| assets | `RULES.md`, встроенный в бинарь через `go:embed` | `internal/assets` | работает |
-| TUI, коннекторы агентов | интерфейс человека; скилл и хуки в агентах | - | план (З4, З3) |
+| cli | parses commands, prints `ok`/`err`/`warn`, maps errors to exit codes | `internal/cli` (`cli.go` common, `agent.go` agent cycle, `commands.go` base commands) | works |
+| core | the only write path: lock, temp, rename, commit, transition rules, `backup` | `internal/core` (`tx.go` write, `agent.go` take/move/set/check/backup, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
+| task | parses and prints the task file, claim, criteria; no IO | `internal/task` | works |
+| config | reads `.tix/config.toml`: columns and their roles, project map | `internal/config` | works |
+| brief | builds the `tix ctx` output: text and JSON; no IO | `internal/brief` | works |
+| actor | write identity: sources, name check, shortening | `internal/actor` | works |
+| project | project name by working folder, project HEAD without calling git | `internal/project` (`project.go`, `head.go`) | works |
+| gitx | all git calls: commit, merge-file, push, background gc | `internal/gitx` (`gitx.go`, `push.go`) | works |
+| assets | `RULES.md`, embedded in the binary with `go:embed` | `internal/assets` | works |
+| TUI, agent connectors | human interface; skill and hooks in agents | - | planned (S4, S3) |
 
-### Инварианты
+### Invariants
 
-| Инвариант | Где обеспечен | Чем проверяется |
+| Invariant | Enforced by | Checked by |
 |---|---|---|
-| Запись в `~/tasks` только через ядро: лок, temp, rename, коммит; полузаписанных файлов нет | `core.withLock`, `core.replace` | `e2e` `Kill9AtCommit_NoPartialFiles`, `Kill9Random_RepoStaysConsistent` |
-| Правка мимо ядра не теряется: следующая операция коммитит её как `external edit` | `core.syncExternal` | `e2e` `Obsidian_ExternalEdit` |
-| Файл, который не разбирается, ядро не перезаписывает | `core.modifyOnce`: ошибка разбора до записи | тесты `core`, `task` (broken) |
-| Коммит несёт байты операции, а не файлы дерева: чужая правка после rename не уходит под актора | `core.commit` с `gitx.CommitFiles` | `e2e` `NoteCommentDoNotCarryOtherFiles` |
-| Claim ставит только `take`; `note` его не продлевает | `core.Take`, `core.extendClaim` | тесты `core` (`agent_test.go`) |
-| Живой claim другого актора без `--steal` не перехватывается | `core.take` | `e2e` `FiveTakesRace_OneWinner` |
-| Только `gitx` запускает внешние процессы в `internal` | `gitx`; `gosec` в линтере | `make lint` |
-| `ctx` не вызывает git | `cli.cmdCtx`, `core.List`, `brief` | цель 15 мс в `make bench` |
-| `backup` не держит лок на время сети; push без `--force` и без запроса пароля | `core.Backup`, `gitx.Push` | `e2e` `Backup_BareExternalEditBrokenRemote` |
-| `user:pass@` из URL не попадает в ответ и лог | `gitx.scrub` | `gitx/push_test.go` |
+| Writes to `~/tasks` go only through the core: lock, temp, rename, commit; no half-written files | `core.withLock`, `core.replace` | `e2e` `Kill9AtCommit_NoPartialFiles`, `Kill9Random_RepoStaysConsistent` |
+| An edit that bypasses the core is not lost: the next operation commits it as `external edit` | `core.syncExternal` | `e2e` `Obsidian_ExternalEdit` |
+| The core does not overwrite a file that does not parse | `core.modifyOnce`: parse error before the write | `core`, `task` tests (broken) |
+| A commit carries the bytes of the operation, not the files of the tree: a foreign edit after rename does not go under the actor | `core.commit` with `gitx.CommitFiles` | `e2e` `NoteCommentDoNotCarryOtherFiles` |
+| Only `take` sets a claim; `note` does not extend it | `core.Take`, `core.extendClaim` | `core` tests (`agent_test.go`) |
+| A live claim of another actor is not taken over without `--steal` | `core.take` | `e2e` `FiveTakesRace_OneWinner` |
+| Only `gitx` starts external processes in `internal` | `gitx`; `gosec` in the linter | `make lint` |
+| `ctx` does not call git | `cli.cmdCtx`, `core.List`, `brief` | 15 ms target in `make bench` |
+| `backup` does not hold the lock during network I/O; push has no `--force` and no password prompt | `core.Backup`, `gitx.Push` | `e2e` `Backup_BareExternalEditBrokenRemote` |
+| `user:pass@` from a URL does not reach the reply or the log | `gitx.scrub` | `gitx/push_test.go` |
 
-## 2. Основной поток
+## 2. Main flow
 
-Запись агента: цикл `take`, `note`, `done` на одной задаче. Каждая запись идёт одним путём через ядро.
+An agent write: the `take`, `note`, `done` cycle on one task. Every write goes one way through the core.
 
 ```mermaid
 sequenceDiagram
-  participant A as Агент
+  participant A as Agent
   participant C as cli
   participant K as core
   participant G as git
   participant F as ~/tasks
-  A->>C: tk take T-12
-  C->>C: личность, id, флаги
+  A->>C: tix take T-12
+  C->>C: identity, id, flags
   C->>K: Take(id, actor)
-  K->>F: flock .tracker/lock
-  K->>G: status, commit чужих правок
-  K->>F: чтение, разбор, mutate
-  K->>F: temp, сверка, rename
-  K->>G: commit с Actor и Code
-  K->>F: снять лок
+  K->>F: flock .tix/lock
+  K->>G: status, commit foreign edits
+  K->>F: read, parse, mutate
+  K->>F: temp, check, rename
+  K->>G: commit with Actor and Code
+  K->>F: release lock
   K-->>C: Result
   C-->>A: ok T-12 todo > doing @claude until 20:40
 ```
 
-| Шаг | Модуль | Что делает |
+| Step | Module | What it does |
 |---|---|---|
-| 1 | cli | определяет личность (`actor.Resolve`), разворачивает `12` в `T-12` |
-| 2 | core | берёт `flock` на `.tracker/lock`, ждёт до `TRACKER_LOCK_TIMEOUT` |
-| 3 | core | готовит базу: `git init`, снятие висящего `index.lock`, `.gitignore`, `config.toml`, `RULES.md` (создаёт, если нет) |
-| 4 | core | коммитит правки мимо ядра одним коммитом `external edit` |
-| 5 | core | читает файл, `task.Parse`, применяет правило операции (`mutate`) |
-| 6 | core | файл не изменился - `ok` без коммита; иначе продлевает claim владельца на 3 ч |
-| 7 | core | пишет temp, сверяет файл с прочитанным, rename; файл изменился - до 3 попыток |
-| 8 | gitx | коммитит байты операции с трейлерами `Actor:` и `Code: <проект>@<sha>` |
-| 9 | core | снимает лок; раз в 300 коммитов запускает фоновый `git gc` |
+| 1 | cli | resolves the identity (`actor.Resolve`), expands `12` to `T-12` |
+| 2 | core | takes `flock` on `.tix/lock`, waits up to `TIX_LOCK_TIMEOUT` |
+| 3 | core | prepares the store: `git init`, removal of a stale `index.lock`, `.gitignore`, `config.toml`, `RULES.md` (created if missing) |
+| 4 | core | commits edits that bypass the core in one `external edit` commit |
+| 5 | core | reads the file, `task.Parse`, applies the operation rule (`mutate`) |
+| 6 | core | file unchanged - `ok` without a commit; otherwise extends the owner's claim by 3 h |
+| 7 | core | writes temp, compares the file with what was read, rename; file changed - up to 3 attempts |
+| 8 | gitx | commits the bytes of the operation with trailers `Actor:` and `Code: <project>@<sha>` |
+| 9 | core | releases the lock; every 300 commits starts a background `git gc` |
 
-Сбои на шагах - раздел 6.
+Failures at each step: section 6.
 
-Другие сценарии:
+Other scenarios:
 
-- `tk ctx`: `cli` читает все файлы (`core.List`, 4 воркера), `project.Detect` находит проект по папке, `brief.Build` собирает колонки `active`, `waiting`, `ready`; текст сжимается до 2000 рун. Git и лок не участвуют.
-- `move`, `done`, `set`, `check` идут тем же путём; отличается правило на шаге 5 (раздел 4).
+- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the columns `active`, `waiting`, `ready`; the text is trimmed to 2000 runes. Git and the lock are not involved.
+- `move`, `done`, `set`, `check` follow the same path; only the rule at step 5 differs (section 4).
 
-## 3. Процессы
+## 3. Processes
 
-Постоянных процессов нет.
+There are no long-lived processes.
 
-| Процесс | Запуск | Событие | Что делает |
+| Process | Started by | Event | What it does |
 |---|---|---|---|
-| `tk` | агент или человек, терминал | команда | читает или пишет базу и завершается |
-| gc | `gitx.SpawnGC`, `sh -c` в новой сессии, переживает выход `tk` | счётчик коммитов достиг 300, после снятия лока | `git gc --quiet`, `commit-graph write --reachable --changed-paths --split`; сбой шага - строка в `.tracker/log` |
+| `tix` | agent or human, terminal | command | reads or writes the store and exits |
+| gc | `gitx.SpawnGC`, `sh -c` in a new session, outlives the `tix` exit | commit counter reached 300, after the lock is released | `git gc --quiet`, `commit-graph write --reachable --changed-paths --split`; a failed step becomes a line in `.tix/log` |
 
-Счётчик хранится в `.tracker/lock`.
+The counter lives in `.tix/lock`.
 
-## 4. Данные и состояния
+## 4. Data and states
 
-| Сущность | Источник истины | Кто меняет | Ключ или ограничение |
+| Entity | Source of truth | Changed by | Key or constraint |
 |---|---|---|---|
-| Задача | файл `T-<N> <название>.md` в корне базы | `core` под локом | id `T-<N>`; номер из `.tracker/next_id`, не переиспользуется |
-| Колонки и роли | `.tracker/config.toml` | человек; ядро создаёт при первой записи | роли: `inbox`, `ready`, `active`, `waiting`, `closed` |
-| Claim | поле `claim` во frontmatter задачи | `take` (ставит), `modifyOnce` (продлевает), `move` из `active` и закрытие (снимают) | `<актор> until 2006-01-02T15:04`; истёкший свободен |
-| Порядок в колонке | поле `rank` | `core.place` | число с плавающей точкой; зазор меньше 1e-6 - перенумерация колонки одним коммитом |
-| История | git-репозиторий `~/tasks` | `core` через `gitx` | коммит на правку; трейлеры `Actor:`, `Code:` |
-| Правила для агента | `RULES.md` в базе | ядро создаёт, если файла нет | текст встроен в бинарь; существующий не перезаписывается |
-| Счётчик gc, лог | `.tracker/lock`, `.tracker/log` | `core`, `cli` | не в git |
+| Task | file `T-<N> <title>.md` in the store root | `core` under the lock | id `T-<N>`; number from `.tix/next_id`, never reused |
+| Columns and roles | `.tix/config.toml` | human; the core creates it on the first write | roles: `inbox`, `ready`, `active`, `waiting`, `closed` |
+| Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `active` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
+| Order in a column | field `rank` | `core.place` | floating-point number; a gap below 1e-6 renumbers the column in one commit |
+| History | git repository `~/tasks` | `core` through `gitx` | one commit per edit; trailers `Actor:`, `Code:` |
+| Agent rules | `RULES.md` in the store | the core creates it if the file is missing | text embedded in the binary; an existing file is not overwritten |
+| gc counter, log | `.tix/lock`, `.tix/log` | `core`, `cli` | not in git |
 
-Жизненный цикл задачи по ролям колонок. Имена колонок по умолчанию: `idea`, `todo`, `doing`, `blocked`, `done`.
+The task lifecycle by column roles. Default column names: `idea`, `todo`, `doing`, `blocked`, `done`.
 
 ```mermaid
 stateDiagram-v2
   [*] --> inbox: new
-  inbox --> ready: move [есть критерий]
+  inbox --> ready: move [has criterion]
   ready --> active: take
   waiting --> active: take
-  active --> waiting: move [есть причина]
+  active --> waiting: move [has reason]
   active --> ready: move
-  active --> closed: done [критерии отмечены или --force -m]
+  active --> closed: done [criteria checked or --force -m]
   waiting --> closed: done
   closed --> [*]
 ```
 
-Схема показывает основные пути: `move` разрешён между любыми колонками с ролью. Правила `core.enter`: в `ready` нужен критерий; в `waiting` - причина (`-m` или поле `waiting`); в `closed` - все критерии отмечены, иначе `--force` с `-m`, у задачи без критериев нужен `-m`. Выход из `waiting` чистит поле, выход из `active` и закрытие снимают claim. Переходы инициирует агент или человек; конечная колонка - `closed`.
+The diagram shows the main paths: `move` is allowed between any columns that have a role. Rules of `core.enter`: `ready` needs a criterion; `waiting` needs a reason (`-m` or the field `waiting`); `closed` needs all criteria checked, otherwise `--force` with `-m`, and a task without criteria needs `-m`. Leaving `waiting` clears the field, leaving `active` and closing release the claim. An agent or a human starts the transitions; the final column is `closed`.
 
-## 5. Внешние системы и границы доверия
+## 5. External systems and trust boundaries
 
-| Система или вход | Что отдаём и берём | Где проверяется вход до использования | Карточка |
+| System or input | What we send and take | Where input is checked before use | Card |
 |---|---|---|---|
-| git | коммиты, `status`, `merge-file`, `push`; stderr git | `gitx`: имя remote, ключ трейлера, sha; вывод git идёт только в лог, в ответ - короткая фраза | `docs/api/git.md` |
-| origin (remote) | `push HEAD`, 30 с, без `--force` | `gitx.Push`: имя без ведущего `-`; `user:pass@` вырезается | `docs/api/git.md` |
-| Агент (аргументы, окружение) | команды, `--as`, id, текст | `cli`: id по шаблону `T-N`, `actor.Valid` | `docs/api/codex.md` |
-| Файлы базы (Obsidian) | произвольный md | `task.Parse`; битый файл не перезаписывается, `ctx` даёт `warn` и код 0 | - |
-| Репозиторий проекта | чтение HEAD файлами | `project.Head`: reftable или нет HEAD - трейлер `Code:` не пишется | `docs/api/git.md`, раздел 7 |
+| git | commits, `status`, `merge-file`, `push`; git stderr | `gitx`: remote name, trailer key, sha; git output goes only to the log, the reply gets a short phrase | `docs/api/git.md` |
+| origin (remote) | `push HEAD`, 30 s, no `--force` | `gitx.Push`: name without a leading `-`; `user:pass@` is cut out | `docs/api/git.md` |
+| Agent (arguments, environment) | commands, `--as`, id, text | `cli`: id matches `T-N`, `actor.Valid` | `docs/api/codex.md` |
+| Store files (Obsidian) | arbitrary md | `task.Parse`; a broken file is not overwritten, `ctx` gives `warn` and code 0 | - |
+| Project repository | HEAD read as files | `project.Head`: reftable or no HEAD - the `Code:` trailer is not written | `docs/api/git.md`, section 7 |
 
-## 6. Сбои и повторы
+## 6. Failures and retries
 
-| Действие или сбой | Через что идёт | Ключ идемпотентности | Повтор и потолок | Итог при провале |
+| Action or failure | Goes through | Idempotency key | Retry and ceiling | Result on failure |
 |---|---|---|---|---|
-| Лок занят | `flock` без блокировки, цикл ожидания | - | до `TRACKER_LOCK_TIMEOUT` (5 с) | код 2, `err`, файлы не тронуты |
-| Свежий `index.lock` git | `gitx.DropGitLocks` | - | висящий старше 10 с снимается | свежий: `git is busy`, код 2 |
-| Файл изменился между чтением и rename | `modifyTx` | сверка байтов | 3 попытки, каждая с `external edit` | `file changes during write, retry the command` |
-| Операция без изменения файла | `modifyOnce` | совпадение вывода с файлом | - | `ok` без коммита |
-| Коммит упал | `core.commit` | - | нет | правка в файле, `Warning`, `warn` в stderr, код 0; следующая операция закоммитит её как external edit |
-| Убит процесс (`kill -9`) | flock снимает ОС; `cleanTmp` чистит temp | - | - | полузаписанных файлов нет |
-| Правка `edit` по старой базе | `mergeBody`, `git merge-file` | blob id базы | - | конфликт: `ErrConflict`, код 3 |
-| `backup`: нет `origin` | `core.Backup` | - | - | `no remote origin; run: git remote add origin <url>`, код 1 |
-| `backup`: push упал или завис | `gitx.Push`, `WaitDelay` | - | 30 с, один раз | `err`, код 1, подробности в `.tracker/log` |
-| Фоновый gc упал | `gcScript` | - | на следующем пороге | `WARN` в `.tracker/log` |
+| Lock is busy | non-blocking `flock`, wait loop | - | up to `TIX_LOCK_TIMEOUT` (5 s) | code 2, `err`, files untouched |
+| Fresh git `index.lock` | `gitx.DropGitLocks` | - | a stale one older than 10 s is removed | fresh: `git is busy`, code 2 |
+| File changed between read and rename | `modifyTx` | byte comparison | 3 attempts, each with `external edit` | `file changes during write, retry the command` |
+| Operation without a file change | `modifyOnce` | output equals the file | - | `ok` without a commit |
+| Commit failed | `core.commit` | - | none | the edit is in the file, `Warning`, `warn` on stderr, code 0; the next operation commits it as external edit |
+| Process killed (`kill -9`) | the OS releases flock; `cleanTmp` removes temp | - | - | no half-written files |
+| `edit` against an old base | `mergeBody`, `git merge-file` | base blob id | - | conflict: `ErrConflict`, code 3 |
+| `backup`: no `origin` | `core.Backup` | - | - | `no remote origin; run: git remote add origin <url>`, code 1 |
+| `backup`: push failed or hung | `gitx.Push`, `WaitDelay` | - | 30 s, once | `err`, code 1, details in `.tix/log` |
+| Background gc failed | `gcScript` | - | at the next threshold | `WARN` in `.tix/log` |
 
-Коды выхода: 0 успех; 2 занято (`ErrClaimed`, `ErrLocked`); 3 конфликт; 4 нет задачи; 5 правило (`ErrRule`); 6 ввод (`ErrNoIdentity`, флаг, id); 1 прочее.
+Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task; 5 rule (`ErrRule`); 6 input (`ErrNoIdentity`, flag, id); 1 other.
 
-## 7. Наблюдаемость
+## 7. Observability
 
-- Сквозной ID: id задачи (`T-12`) в каждой записи лога и в теме каждого коммита; актор и проект - трейлеры `Actor:` и `Code:`.
-- Логи: `slog` в `.tracker/log`, файл открывается при первой записи и только если папка уже есть. `Error` - сбой команды, `Warn` - система справилась сама (коммит не записан, висящий лок снят, gc не стартовал). Секретов и вывода git в ответе нет.
-- Метрики: нет; скорость меряет `make bench`.
-- Где смотреть: `git -C ~/tasks log`, `.tracker/log`; ключ `-v` печатает хеш коммита.
+- End-to-end ID: the task id (`T-12`) in every log record and in the subject of every commit; actor and project are the trailers `Actor:` and `Code:`.
+- Logs: `slog` in `.tix/log`; the file opens on the first write and only if the folder already exists. `Error` - a command failure, `Warn` - the system coped on its own (commit not written, stale lock removed, gc did not start). The reply has no secrets and no git output.
+- Metrics: none; `make bench` measures speed.
+- Where to look: `git -C ~/tasks log`, `.tix/log`; the `-v` flag prints the commit hash.
 
-## 8. Контуры и конфигурация
+## 8. Environments and configuration
 
-Контур один: машина пользователя. Переменные `TRACKER_HOME`, `TRACKER_LOCK_TIMEOUT`, `TRACKER_GIT` - в `README.md`. Ещё две настройки:
+There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOCK_TIMEOUT`, `TIX_GIT` are in `README.md`. Two more settings:
 
-| Переменная или режим | Что включает | Где задаётся |
+| Variable or mode | What it enables | Where set |
 |---|---|---|
-| `TRACKER_ACTOR` | личность, если нет флага и окружения агента | окружение |
-| колонки, роли, карта проектов | поведение колонок | `.tracker/config.toml` в базе |
+| `TIX_ACTOR` | identity, if there is no flag and no agent environment | environment |
+| columns, roles, project map | column behavior | `.tix/config.toml` in the store |
 
-## 9. Где менять
+## 9. Where to change
 
-| Хочу изменить | Модуль | Что ещё проверить |
+| I want to change | Module | What else to check |
 |---|---|---|
-| Правило перехода (`ready`, `waiting`, закрытие) | `core.enter`, `core.closeChecks` в `internal/core/agent.go` | `RULES.md`, тесты `core/agent_test.go`, `e2e/cycle_test.go` |
-| Срок claim, правило продления | `core.claimTTL`, `core.extendClaim` | `RULES.md`, строка вывода `take` |
-| Порядок записи, лок | `internal/core/tx.go` | инварианты раздела 1, `e2e` |
-| Новая команда | `cli.dispatch`, `internal/cli/agent.go` или `commands.go`, метод `Store` | usage в `cli.go`, коды выхода, `RULES.md`, `README.md` |
-| Состав `ctx`, лимит текста | `internal/brief`, `cli.ctxPerColumn`, `cli.ctxTextLimit` | цель 15 мс в `cmd/tkbench`, `RULES.md` |
-| Источники личности | `actor.Resolve` | `RULES.md` (раздел Identity), коннекторы З3 |
-| Вызов git | `internal/gitx` | `docs/api/git.md` |
-| Порог gc, трейлер `Code:` | `internal/core/history.go`, `gitx.SpawnGC` | `docs/api/git.md`, разделы 5 и 9 |
-| Колонки и роли | `.tracker/config.toml`, `internal/config` | код ищет колонки по роли, имена не зашиты |
-| Текст `RULES.md` | `internal/assets/RULES.md` | существующие базы не обновляются |
+| A transition rule (`ready`, `waiting`, closing) | `core.enter`, `core.closeChecks` in `internal/core/agent.go` | `RULES.md`, tests `core/agent_test.go`, `e2e/cycle_test.go` |
+| Claim term, extension rule | `core.claimTTL`, `core.extendClaim` | `RULES.md`, the `take` output line |
+| Write order, lock | `internal/core/tx.go` | invariants of section 1, `e2e` |
+| A new command | `cli.dispatch`, `internal/cli/agent.go` or `commands.go`, a `Store` method | usage in `cli.go`, exit codes, `RULES.md`, `README.md` |
+| `ctx` content, text limit | `internal/brief`, `cli.ctxPerColumn`, `cli.ctxTextLimit` | 15 ms target in `cmd/tixbench`, `RULES.md` |
+| Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
+| A git call | `internal/gitx` | `docs/api/git.md` |
+| gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `docs/api/git.md`, sections 5 and 9 |
+| Columns and roles | `.tix/config.toml`, `internal/config` | the code finds columns by role, names are not hardcoded |
+| `RULES.md` text | `internal/assets/RULES.md` | existing stores are not updated |
 
-## 10. Ограничения и открытое
+## 10. Limits and open items
 
-- `RULES.md` не обновляется в существующих базах: правка встроенного текста до них не доходит.
-- `kill -9` во время перенумерации колонки может оставить её частично перенумерованной (сбой принят в плане З2).
-- Фонового бэкапа нет. Push в настоящий remote автотестами не проверяется; remote для `~/tasks` не заведён.
-- TUI (З4), скилл и хуки агентов (З3), публикация (З5) не сделаны: `docs/backlog.md`.
+- `RULES.md` is not updated in existing stores: an edit of the embedded text does not reach them.
+- `kill -9` during a column renumbering can leave it partly renumbered (a known failure, accepted in S2).
+- There is no background backup. Push to a real remote is not covered by autotests; no remote is set up for `~/tasks`.
+- TUI (S4), agent skill and hooks (S3), publication (S5) are not done: `docs/backlog.md`.

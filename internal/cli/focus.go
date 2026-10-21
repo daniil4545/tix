@@ -10,8 +10,8 @@ import (
 
 const focusEnv = "WARP_FOCUS_URL"
 
-// recordFocus после успешной записи агента кладёт адрес его вкладки в actor.FocusDir (кэш пользователя, не база).
-// Ошибка записи - Warn в лог, команда не падает.
+// recordFocus, after a successful agent write, puts the address of its tab into actor.FocusDir (user cache, not the store).
+// A write error is a Warn in the log; the command does not fail.
 func (a *app) recordFocus() {
 	name := actor.FocusFile(a.who)
 	url := a.env.Getenv(focusEnv)
@@ -40,7 +40,7 @@ func writeFocus(dir, name, url string) error {
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("focus close: %w", err)
 	}
-	// CreateTemp создаёт файл с 0600; chmod фиксирует это независимо от umask.
+	// CreateTemp creates the file with 0600; chmod fixes this regardless of umask.
 	if err := os.Chmod(tmp.Name(), 0o600); err != nil {
 		return fmt.Errorf("focus chmod: %w", err)
 	}

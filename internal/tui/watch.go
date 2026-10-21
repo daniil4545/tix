@@ -10,7 +10,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// startWatch открывает наблюдатель за корнем базы. Его горутина живёт до конца ctx.
+// startWatch opens a watcher on the store root. Its goroutine lives until ctx ends.
 func (m *Model) startWatch() tea.Msg {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -20,7 +20,7 @@ func (m *Model) startWatch() tea.Msg {
 		_ = w.Close()
 		return watchReady{err: err}
 	}
-	// tix note - пустой коммит: файлы не меняются, виден только журнал HEAD.
+	// tix note - an empty commit: files do not change, only the HEAD log is visible.
 	if err := w.Add(filepath.Join(m.d.Root, ".git", "logs")); err != nil {
 		m.log.Warn("pulse watch off", "err", err)
 	}
@@ -28,7 +28,7 @@ func (m *Model) startWatch() tea.Msg {
 	return watchReady{}
 }
 
-// pump передаёт события файлов задач в канал events (ёмкость 1: лишнее склеивается).
+// pump passes task file events to the events channel (capacity 1: extras are merged).
 func (m *Model) pump(w *fsnotify.Watcher) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -59,8 +59,8 @@ func (m *Model) pump(w *fsnotify.Watcher) {
 	}
 }
 
-// relevant: изменение файла задачи или журнала HEAD (коммит без правки файла). Прочее в .tix и .git
-// шума не даёт, chmod не меняет текст.
+// relevant: a task file change or a HEAD log change (a commit without a file edit). Other things in .tix and .git
+// give no noise, chmod does not change the text.
 func relevant(ev fsnotify.Event) bool {
 	if ev.Op&^fsnotify.Chmod == 0 {
 		return false
@@ -72,7 +72,7 @@ func relevant(ev fsnotify.Event) bool {
 	return strings.HasPrefix(name, "T-") && strings.HasSuffix(name, ".md")
 }
 
-// waitEvent ждёт события наблюдателя; конец ctx снимает ожидание.
+// waitEvent waits for a watcher event; the end of ctx lifts the wait.
 func (m *Model) waitEvent() tea.Cmd {
 	return func() tea.Msg {
 		select {
@@ -84,7 +84,7 @@ func (m *Model) waitEvent() tea.Cmd {
 	}
 }
 
-// loadCmd перечитывает все задачи; git не трогает (заметки пульса читает notesCmd).
+// loadCmd rereads all tasks; it does not touch git (the pulse notes are read by notesCmd).
 func (m *Model) loadCmd() tea.Cmd {
 	return m.guard(func() tea.Msg {
 		tasks, errs := m.d.Store.List()
@@ -92,7 +92,7 @@ func (m *Model) loadCmd() tea.Cmd {
 	})
 }
 
-// afterLoad применяет список; открытая карточка обновляется или закрывается, если задачи нет.
+// afterLoad applies the list; the open card is updated or closed if the task is gone.
 func (m *Model) afterLoad(msg loaded) tea.Cmd {
 	m.apply(msg.tasks, msg.skipped)
 	if !m.showing {

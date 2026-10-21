@@ -12,17 +12,17 @@ import (
 
 func spaceKey() tea.Msg { return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "} }
 
-// reload перечитывает доску так же, как после события файлов.
+// reload rereads the board the same way as after a file event.
 func reload(t *testing.T, m *Model) {
 	t.Helper()
 	l, ok := m.loadCmd()().(loaded)
 	if !ok {
-		t.Fatal("loadCmd не вернул loaded")
+		t.Fatal("loadCmd did not return loaded")
 	}
 	m.Update(l)
 }
 
-// Агент перенёс захваченную задачу: захват снят, отпускание ничего не пишет.
+// An agent moved the grabbed task: the grab is dropped, a release writes nothing.
 func TestGrab_AgentMovedHeldTask_GrabCancelledNoWrite(t *testing.T) {
 	e := mvNewEnv(t, stickyCfg)
 	id := e.create("A", "c3")
@@ -35,15 +35,15 @@ func TestGrab_AgentMovedHeldTask_GrabCancelledNoWrite(t *testing.T) {
 	before := e.commits()
 	reload(t, m)
 	if m.grab != nil || m.status != id+" moved meanwhile, grab cancelled" {
-		t.Fatalf("захват %v, статус %q", m.grab, m.status)
+		t.Fatalf("grab %v, status %q", m.grab, m.status)
 	}
 	feed(m, spaceKey())
 	if e.commits() != before || e.statusOf(t, id) != "c4" {
-		t.Errorf("перенос агента откачен: статус %s", e.statusOf(t, id))
+		t.Errorf("agent move was rolled back: status %s", e.statusOf(t, id))
 	}
 }
 
-// Колонка "?" исчезла при перечитывании, пока захват стоял на ней: клавиши не падают.
+// Column "?" vanished on reread while the grab stood on it: keys do not crash.
 func TestGrab_UnknownColumnVanishes_ArrowsStayInRange(t *testing.T) {
 	e := mvNewEnv(t, stickyCfg)
 	a := e.create("A", "c3")
@@ -61,7 +61,7 @@ func TestGrab_UnknownColumnVanishes_ArrowsStayInRange(t *testing.T) {
 		}
 		out := strings.Replace(string(data), "status: "+from, "status: "+to, 1)
 		if out == string(data) {
-			t.Fatalf("в %s нет status: %s", tk.Path, from)
+			t.Fatalf("no status in %s: %s", tk.Path, from)
 		}
 		if err := os.WriteFile(tk.Path, []byte(out), 0o600); err != nil {
 			t.Fatal(err)
@@ -75,13 +75,13 @@ func TestGrab_UnknownColumnVanishes_ArrowsStayInRange(t *testing.T) {
 		feed(m, tea.KeyPressMsg{Code: tea.KeyRight})
 	}
 	if m.grab == nil || m.grab.col != len(m.colTasks)-1 {
-		t.Fatalf("захват не дошёл до колонки ?: %+v", m.grab)
+		t.Fatalf("grab did not reach column ?: %+v", m.grab)
 	}
 	setStatus(x, "ghost", "c1")
 	reload(t, m)
 	feed(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
 	feed(m, tea.KeyPressMsg{Code: 'k', Text: "k"})
 	if m.grab == nil || m.grab.col >= len(m.colTasks) {
-		t.Errorf("колонка захвата %+v вне доски из %d колонок", m.grab, len(m.colTasks))
+		t.Errorf("grab column %+v is off a board of %d columns", m.grab, len(m.colTasks))
 	}
 }

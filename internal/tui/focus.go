@@ -13,21 +13,21 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// focusReadLimit - сколько байт файла фокуса читается: адрес короче.
+// focusReadLimit - how many bytes of the focus file are read: an address is shorter.
 const focusReadLimit = 256
 
-// openURL открывает адрес вкладки терминала командой `open` без ожидания её конца.
+// openURL opens the terminal tab address with the `open` command without waiting for it to end.
 func openURL(url string) error {
-	cmd := exec.Command("open", url) //nolint:gosec,noctx // адрес проверен actor.ValidFocusURL; процесс не ждём
+	cmd := exec.Command("open", url) //nolint:gosec,noctx // the address is checked by actor.ValidFocusURL; the process is not awaited
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	go func() { _ = cmd.Wait() }() // забрать код выхода, чтобы не копить зомби
+	go func() { _ = cmd.Wait() }() // collect the exit code to avoid piling up zombies
 	return nil
 }
 
-// startFocus переключает терминал на вкладку агента, который держит задачу (спека 4a):
-// живой захват, файл фокуса владельца с проверенным адресом. Иначе строка состояния.
+// startFocus switches the terminal to the tab of the agent that holds the task:
+// a live claim, the owner focus file with a checked address. Otherwise the status line.
 func (m *Model) startFocus() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -49,8 +49,8 @@ func (m *Model) startFocus() tea.Cmd {
 	return nil
 }
 
-// focusURL - проверенный адрес вкладки владельца захвата; пусто, если захвата нет, он истёк,
-// файла нет или адрес не того вида.
+// focusURL - the checked tab address of the claim owner; empty if there is no claim, it expired,
+// there is no file or the address is of the wrong form.
 func (m *Model) focusURL(t *task.Task) string {
 	c, ok := t.ClaimInfo()
 	if !ok || !c.Until.After(m.now()) {
@@ -60,7 +60,7 @@ func (m *Model) focusURL(t *task.Task) string {
 	if name == "" || dir == "" {
 		return ""
 	}
-	f, err := os.Open(filepath.Join(dir, name)) //nolint:gosec // имя очищено actor.FocusFile
+	f, err := os.Open(filepath.Join(dir, name)) //nolint:gosec // the name is cleaned by actor.FocusFile
 	if err != nil {
 		return ""
 	}

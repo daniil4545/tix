@@ -6,16 +6,16 @@ import (
 	"github.com/daniil4545/tix/internal/core"
 )
 
-// bodyTemplate - тело новой задачи в редакторе: шаблон из RULES.md, раздел "Ticket template".
+// bodyTemplate - the body of a new task in the editor: the template from RULES.md, section "Ticket template".
 const bodyTemplate = "## Abstract\n\n## Summary\n\n## Details\n\n- [ ] \n"
 
-// defaultProject - проект новой задачи, если нет ни фильтра, ни проекта запуска.
+// defaultProject - the project of a new task if there is no filter and no launch project.
 const defaultProject = "personal"
 
-// taskCreated - задача создана; редактор тела откроется следом.
+// taskCreated - the task is created; the body editor opens next.
 type taskCreated struct{ op opDone }
 
-// startNew спрашивает заголовок и создаёт задачу в колонке col доски.
+// startNew asks for the title and creates a task in column col of the board.
 func (m *Model) startNew(col int) tea.Cmd {
 	if col < 0 || col >= len(m.board.Cols) {
 		return nil
@@ -41,7 +41,7 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-// createTask ставит Create в очередь записи; успех приходит как taskCreated.
+// createTask queues Create to the write queue; success arrives as taskCreated.
 func (m *Model) createTask(title, project, column string) tea.Cmd {
 	write := m.submit("new", "created", nil, func() (core.Result, error) {
 		return m.d.Store.Create(title, project, column, m.d.Actor)
@@ -55,8 +55,8 @@ func (m *Model) createTask(title, project, column string) tea.Cmd {
 	}
 }
 
-// created ставит курсор на новую задачу и открывает редактор на шаблоне тела.
-// Выход без правки оставляет тело пустым: копия равна orig.
+// created puts the cursor on the new task and opens the editor on the body template.
+// Leaving without an edit keeps the body empty: the copy equals orig.
 func (m *Model) created(msg taskCreated) tea.Cmd {
 	id := msg.op.res.ID
 	msg.op.id = id

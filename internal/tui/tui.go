@@ -1,4 +1,4 @@
-// Package tui - интерактивная доска: модель Bubble Tea, очередь записи, наблюдатель файлов.
+// Package tui - the interactive board: the Bubble Tea model, the write queue, the file watcher.
 package tui
 
 import (
@@ -20,8 +20,8 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// Deps - что TUI получает снаружи. Project - начальный фильтр (папка проекта), пусто - все.
-// GitBin - сырое значение TIX_GIT для истории карточки.
+// Deps - what the TUI gets from outside. Project - the initial filter (the project folder), empty - all.
+// GitBin - the raw TIX_GIT value for the card history.
 type Deps struct {
 	Store                *core.Store
 	Root, Actor, Project string
@@ -30,17 +30,17 @@ type Deps struct {
 }
 
 const (
-	// oneshotEnv: нарисовать первый кадр в stdout и выйти (замер открытия, tixbench).
+	// oneshotEnv: draw the first frame to stdout and exit (open-time measurement, tixbench).
 	oneshotEnv = "TIX_TUI_ONESHOT"
-	// oneshotW, oneshotH - размер кадра без терминала.
+	// oneshotW, oneshotH - the frame size without a terminal.
 	oneshotW, oneshotH = 120, 40
-	// watchDelay: наблюдатель стартует после первого кадра (kqueue держит дескриптор на файл).
+	// watchDelay: the watcher starts after the first frame (kqueue holds a descriptor per file).
 	watchDelay = 50 * time.Millisecond
-	// settleDelay склеивает пачку событий файлов в одно перечитывание.
+	// settleDelay merges a batch of file events into one reread.
 	settleDelay = 150 * time.Millisecond
 )
 
-// Run открывает TUI на альтернативном экране; паника уходит ошибкой в Log.
+// Run opens the TUI on the alternate screen; a panic goes out as an error to Log.
 func Run(ctx context.Context, d Deps) error {
 	if d.Store == nil {
 		return errors.New("tui: store required")
@@ -64,8 +64,8 @@ func Run(ctx context.Context, d Deps) error {
 	return err
 }
 
-// Model - состояние TUI: доска, карточка, строка ввода. Горутины очереди и наблюдателя
-// останавливает ctx, переданный в New.
+// Model - the TUI state: the board, the card, the input line. The queue and watcher goroutines
+// are stopped by the ctx passed to New.
 type Model struct {
 	d    Deps
 	log  *slog.Logger
@@ -84,27 +84,27 @@ type Model struct {
 	selID    string
 
 	card    cardState
-	showing bool // карточка открыта
-	help    bool // открыт экран справки
+	showing bool // the card is open
+	help    bool // the help screen is open
 	input   *prompt
-	acts    cardActs // действия карточки: выбор поля
-	grab    *grab    // захват карточки на доске; nil вне захвата
+	acts    cardActs // card actions: field choice
+	grab    *grab    // a card grab on the board; nil outside a grab
 
-	notes map[string]gitx.Note // последние заметки задач для пульса; nil, пока git не ответил
-	now   func() time.Time     // часы модели: мета, пульс, двойной клик
+	notes map[string]gitx.Note // the latest task notes for the pulse; nil until git answers
+	now   func() time.Time     // the model clock: meta, pulse, double click
 
-	press     *press // нажатие мыши на карточке; nil вне перетаскивания
-	lastClick click  // последний клик по карточке, для двойного
-	winCol    int    // колонка, которой принадлежит board.RowTop
+	press     *press // a mouse press on a card; nil outside a drag
+	lastClick click  // the last click on a card, for the double click
+	winCol    int    // the column that board.RowTop belongs to
 
 	status  string
 	isErr   bool
 	w, h    int
-	pending bool // перечитывание уже ждёт окна склейки
+	pending bool // a reread is already waiting for the merge window
 }
 
-// New строит модель и читает доску сразу: первый кадр не ждёт git и истории.
-// Очередь записи работает, пока жив ctx.
+// New builds the model and reads the board at once: the first frame does not wait for git and history.
+// The write queue runs while ctx is alive.
 func New(ctx context.Context, d Deps) *Model {
 	m := &Model{
 		d:       d,
@@ -125,7 +125,7 @@ func New(ctx context.Context, d Deps) *Model {
 	return m
 }
 
-// Init откладывает запуск наблюдателя до первого кадра.
+// Init defers the watcher start until the first frame.
 func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		tea.Tick(watchDelay, func(time.Time) tea.Msg { return watchStart{} }),
@@ -133,7 +133,7 @@ func (m *Model) Init() tea.Cmd {
 	)
 }
 
-// Update разбирает сообщение; панику пишет в лог и отдаёт Bubble Tea, он вернёт терминал.
+// Update handles a message; a panic is logged and handed to Bubble Tea, which restores the terminal.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.logPanic()
 	switch msg := msg.(type) {
@@ -154,7 +154,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View рисует кадр: карточку или доску, поверх строки состояния - строку ввода.
+// View draws the frame: the card or the board, with the input line over the status line.
 func (m *Model) View() tea.View {
 	defer m.logPanic()
 	var frame string
@@ -182,12 +182,12 @@ func (m *Model) logPanic() {
 	}
 }
 
-// setStatus ставит строку состояния; err - оранжевая.
+// setStatus sets the status line; err - orange.
 func (m *Model) setStatus(text string, isErr bool) {
 	m.status, m.isErr = text, isErr
 }
 
-// statusText - строка состояния; пустая заменяется счётчиком пропущенных файлов.
+// statusText - the status line; an empty one is replaced by the count of skipped files.
 func (m *Model) statusText() (string, bool) {
 	if m.status == "" && m.skipped > 0 {
 		noun := "files"
@@ -199,7 +199,7 @@ func (m *Model) statusText() (string, bool) {
 	return m.status, m.isErr
 }
 
-// guard выполняет cmd с recover: паника горутины уходит в лог и в строку состояния.
+// guard runs cmd with recover: a goroutine panic goes to the log and to the status line.
 func (m *Model) guard(fn func() tea.Msg) tea.Cmd {
 	return func() (msg tea.Msg) {
 		defer func() {
@@ -212,5 +212,5 @@ func (m *Model) guard(fn func() tea.Msg) tea.Cmd {
 	}
 }
 
-// failed - ошибка фоновой команды без привязки к записи.
+// failed - a background command error not tied to a write.
 type failed struct{ err error }

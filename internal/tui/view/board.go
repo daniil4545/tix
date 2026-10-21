@@ -10,12 +10,12 @@ import (
 const (
 	colWidth   = 24
 	colGap     = 2
-	cardLines  = 5   // ID и проект, название, сводка, мета, пустая
-	boardFrame = 7   // шапка, линия, имена колонок, линии колонок, линия, состояние, подсказка
-	plusMark   = "+" // последний знак ячейки имени колонки: кнопка новой задачи
+	cardLines  = 5   // ID and project, title, summary, meta, empty
+	boardFrame = 7   // header, line, column names, column lines, line, state, hint
+	plusMark   = "+" // the last character of a column name cell: the new task button
 )
 
-// hintItem - пара подсказки: клавиша и слово. Кнопка - любая пара, кроме arrows.
+// hintItem - a hint pair: a key and a word. A button is any pair except arrows.
 type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
@@ -23,13 +23,13 @@ var boardHints = []hintItem{
 	{"e", "edit"}, {"c", "comment"}, {"o", "order"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
-// hintSpan - место пары в строке подсказки: знаки [x0, x1).
+// hintSpan - the place of a pair in the hint line: characters [x0, x1).
 type hintSpan struct {
 	key    string
 	x0, x1 int
 }
 
-// boardHint и hintSpans строятся один раз из boardHints: рисование и попадание мыши берут одну раскладку.
+// boardHint and hintSpans are built once from boardHints: drawing and mouse hit testing share one layout.
 var boardHint, hintSpans = layoutHints(boardHints)
 
 func layoutHints(items []hintItem) (string, []hintSpan) {
@@ -50,7 +50,7 @@ func layoutHints(items []hintItem) (string, []hintSpan) {
 	return sb.String(), spans
 }
 
-// RenderBoard рисует доску: колонки по 24 знака, окно колонок за курсором.
+// RenderBoard draws the board: columns of 24 characters, the column window follows the cursor.
 func RenderBoard(b Board) string {
 	first, last := columnWindow(len(b.Cols), b.Col, b.W, b.FirstCol)
 	shown := last - first
@@ -94,7 +94,7 @@ func RenderBoard(b Board) string {
 	return strings.Join(lines, "\n")
 }
 
-// boardBodyHeight - высота тела колонок при высоте кадра h; h <= 0: не ограничена (0).
+// boardBodyHeight - the column body height for frame height h; h <= 0: not limited (0).
 func boardBodyHeight(h int) int {
 	if h <= 0 {
 		return 0
@@ -102,8 +102,8 @@ func boardBodyHeight(h int) int {
 	return max(h-boardFrame, 0)
 }
 
-// columnWindow выбирает показанные колонки [first, last). Окно липкое: hint - прежняя первая
-// колонка, она остаётся, пока курсор в окне; вышел за него - страница, на которой стоит курсор.
+// columnWindow picks the shown columns [first, last). The window is sticky: hint - the previous first
+// column, it stays while the cursor is in the window; if the cursor left it - the page the cursor is on.
 func columnWindow(count, cursor, w, hint int) (first, last int) {
 	if count == 0 {
 		return 0, 0
@@ -120,9 +120,9 @@ func columnWindow(count, cursor, w, hint int) (first, last int) {
 	return first, first + visible
 }
 
-// FitWindow возвращает окна доски, подогнанные под курсор: первую показанную колонку и верхнюю
-// карточку выбранной колонки. Модель хранит их в Board.FirstCol и Board.RowTop после каждого
-// сдвига курсора: рисование и попадание мыши берут одно состояние, клик окна не двигает.
+// FitWindow returns the board windows fitted to the cursor: the first shown column and the top
+// card of the selected column. The model stores them in Board.FirstCol and Board.RowTop after each
+// cursor move: drawing and mouse hit testing share one state, a click does not move windows.
 func FitWindow(b Board) (firstCol, rowTop int) {
 	if len(b.Cols) == 0 {
 		return 0, 0
@@ -173,9 +173,9 @@ func columnNames(b Board, first, last int) string {
 	return strings.Join(names, strings.Repeat(" ", colGap))
 }
 
-// rowWindow - карточки колонки index, попавшие в окно по высоте: индексы [offset, end).
-// У выбранной колонки окно липкое: идёт от RowTop и сдвигается, только когда курсор выходит
-// за него; у прочих стоит сверху. bodyHeight <= 0: все.
+// rowWindow - the cards of column index that fall into the window by height: indexes [offset, end).
+// The selected column window is sticky: it starts at RowTop and shifts only when the cursor leaves
+// it; the others stay at the top. bodyHeight <= 0: all.
 func rowWindow(b Board, index, bodyHeight int) (offset, end int) {
 	count := len(b.Cols[index].Rows)
 	if bodyHeight <= 0 {
@@ -195,7 +195,7 @@ func rowWindow(b Board, index, bodyHeight int) (offset, end int) {
 	return offset, min(offset+capacity, count)
 }
 
-// columnCells рисует строки одной колонки в окне rowWindow.
+// columnCells draws the lines of one column in the rowWindow window.
 func columnCells(b Board, index, bodyHeight int) []string {
 	rows := b.Cols[index].Rows
 	selected := index == b.Col
@@ -250,7 +250,7 @@ func rowCells(row Row, selected bool) []string {
 	return []string{first, fit(title, colWidth), third.Render(fit(summary, colWidth)), dimStyle.Render(fit(meta, colWidth)), blank}
 }
 
-// pulseLine выбирает третью строку карточки и её стиль: вопрос, заметка, сводка.
+// pulseLine picks the third card line and its style: ask, note, summary.
 func pulseLine(row Row) (string, lipgloss.Style) {
 	switch ask := strings.TrimSpace(row.Ask); {
 	case ask != "":

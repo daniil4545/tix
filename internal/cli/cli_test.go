@@ -15,14 +15,14 @@ import (
 	"github.com/daniil4545/tix/internal/cli"
 )
 
-// Тексты интерфейса и формата: при смене языка правятся здесь.
+// UI and format texts: edit them here when the language changes.
 const (
 	msgNoTasks      = "no tasks"
 	personalProject = "personal"
 	commentsHeading = "## Comments"
 )
 
-// anyInput: план З2, раздел 5, не задаёт код для этих входов - допустимы 1 и 6.
+// anyInput: the exit code table does not set a code for these inputs - 1 and 6 are both acceptable.
 const anyInput = -1
 
 var gitBin string
@@ -56,10 +56,10 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// guard превращает панику заглушки в провал одного теста.
+// guard turns a stub panic into the failure of one test.
 func guard(t *testing.T) {
 	if r := recover(); r != nil {
-		t.Fatalf("паника: %v", r)
+		t.Fatalf("panic: %v", r)
 	}
 }
 
@@ -68,7 +68,7 @@ type box struct {
 	home string
 	cwd  string
 	root string
-	// extra - переменные окружения сверх базовых (личность агента и прочее).
+	// extra - environment variables beyond the base ones (agent identity and so on).
 	extra map[string]string
 }
 
@@ -115,7 +115,7 @@ func (b *box) ok(stdin string, args ...string) res {
 	b.t.Helper()
 	r := b.tix(stdin, args...)
 	if r.code != 0 {
-		b.t.Fatalf("tix %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
+		b.t.Fatalf("tix %v: code %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
 	}
 	return r
 }
@@ -140,12 +140,12 @@ func (b *box) taskFile(id string) string {
 		}
 	}
 	if len(m) != 1 {
-		b.t.Fatalf("файл %s: найдено %d (%v)", id, len(m), m)
+		b.t.Fatalf("file %s: found %d (%v)", id, len(m), m)
 	}
 	return m[0]
 }
 
-// snapshot - файлы базы без .git, лога и лока, плюс HEAD, если репозиторий есть.
+// snapshot - the store files without .git, the log and the lock, plus HEAD if a repository exists.
 func (b *box) snapshot() string {
 	var sb strings.Builder
 	_ = filepath.Walk(b.home, func(p string, info os.FileInfo, err error) error {
@@ -179,17 +179,17 @@ func TestCLI_EmptyBase_ListOneLine_NewCreatesHome(t *testing.T) {
 	b := newBox(t)
 	r := b.tix("", "list")
 	if r.code != 0 || r.out != msgNoTasks+"\n" || r.err != "" {
-		t.Fatalf("list в пустой базе: код %d, stdout %q, stderr %q, ждали %q", r.code, r.out, r.err, msgNoTasks)
+		t.Fatalf("list in an empty store: code %d, stdout %q, stderr %q, want %q", r.code, r.out, r.err, msgNoTasks)
 	}
 	if _, err := os.Stat(filepath.Join(b.home, ".git")); err == nil {
-		t.Error("list создал репозиторий: чтение не должно писать")
+		t.Error("list created a repository: a read must not write")
 	}
-	r = b.tix("", "new", "Первая")
+	r = b.tix("", "new", "First")
 	if r.code != 0 || r.out != "ok T-1 idea\n" {
-		t.Fatalf("new: код %d, stdout %q, ждали `ok T-1 idea`; stderr %q", r.code, r.out, r.err)
+		t.Fatalf("new: code %d, stdout %q, want `ok T-1 idea`; stderr %q", r.code, r.out, r.err)
 	}
 	if _, err := os.Stat(filepath.Join(b.home, ".git")); err != nil {
-		t.Errorf("new не создал репозиторий в ~/tasks: %v", err)
+		t.Errorf("new did not create a repository in ~/tasks: %v", err)
 	}
 }
 
@@ -205,20 +205,20 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 
 	lines := strings.Split(strings.TrimSpace(b.ok("", "list").out), "\n")
 	if len(lines) != 4 {
-		t.Fatalf("list: %d строк, ждали 4: %q", len(lines), lines)
+		t.Fatalf("list: %d lines, want 4: %q", len(lines), lines)
 	}
 	re := regexp.MustCompile(`^(\w+) (T-\d+) (.+?)( \|.*)?$`)
 	var order []string
 	for _, l := range lines {
 		m := re.FindStringSubmatch(l)
 		if m == nil {
-			t.Fatalf("строка list %q не по формату `<колонка> T-N <название> | <сводка>`", l)
+			t.Fatalf("list line %q does not match the format `<column> T-N <title> | <summary>`", l)
 		}
 		order = append(order, m[1]+" "+m[2])
 	}
 	want := "idea T-2,idea T-3,idea T-4,todo T-1"
 	if got := strings.Join(order, ","); got != want {
-		t.Errorf("порядок list: %s, ждали по колонкам и rank: %s", got, want)
+		t.Errorf("list order: %s, want by columns and rank: %s", got, want)
 	}
 	if got := strings.TrimSpace(b.ok("", "list", "--status", "todo").out); !strings.HasPrefix(got, "todo T-1 Alpha") || strings.Contains(got, "\n") {
 		t.Errorf("list --status todo: %q", got)
@@ -229,19 +229,19 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 
 	var js []map[string]any
 	if err := json.Unmarshal([]byte(b.ok("", "list", "--json").out), &js); err != nil {
-		t.Fatalf("list --json не JSON: %v", err)
+		t.Fatalf("list --json not JSON: %v", err)
 	}
 	if len(js) != 4 {
-		t.Fatalf("list --json: %d задач, ждали 4", len(js))
+		t.Fatalf("list --json: %d tasks, want 4", len(js))
 	}
 	for _, k := range []string{"body", "comments"} {
 		if _, has := js[0][k]; has {
-			t.Errorf("list --json содержит %q: по плану Task без body и comments", k)
+			t.Errorf("list --json contains %q: Task is without body and comments", k)
 		}
 	}
 	for _, k := range []string{"id", "title", "status", "project", "rank", "rev", "path"} {
 		if _, has := js[0][k]; !has {
-			t.Errorf("list --json без поля %q: %v", k, js[0])
+			t.Errorf("list --json without field %q: %v", k, js[0])
 		}
 	}
 }
@@ -250,28 +250,28 @@ func TestCLI_Show_RevThenFileAsIs_JSON(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	b.ok("", "comment", "T-1", "коммент")
+	b.ok("", "comment", "T-1", "a comment")
 	file, _ := os.ReadFile(b.taskFile("T-1"))
 
 	r := b.ok("", "show", "T-1")
 	first, rest, _ := strings.Cut(r.out, "\n")
 	blob := strings.TrimSpace(b.git("hash-object", b.taskFile("T-1")))
 	if first != "rev "+blob {
-		t.Errorf("первая строка show %q, ждали `rev %s` (git blob id файла)", first, blob)
+		t.Errorf("first line of show %q, want `rev %s` (git blob id of the file)", first, blob)
 	}
 	if rest != string(file) {
-		t.Errorf("show печатает файл не как есть:\n%q\nфайл:\n%q", rest, file)
+		t.Errorf("show does not print the file as is:\n%q\nfile:\n%q", rest, file)
 	}
 
 	var s map[string]any
 	if err := json.Unmarshal([]byte(b.ok("", "show", "T-1", "--json").out), &s); err != nil {
-		t.Fatalf("show --json не JSON: %v", err)
+		t.Fatalf("show --json not JSON: %v", err)
 	}
 	if s["id"] != "T-1" || s["title"] != "Alpha" || s["rev"] != blob {
-		t.Errorf("show --json: id=%v title=%v rev=%v, ждали T-1, Alpha, %s", s["id"], s["title"], s["rev"], blob)
+		t.Errorf("show --json: id=%v title=%v rev=%v, want T-1, Alpha, %s", s["id"], s["title"], s["rev"], blob)
 	}
 	if cs, _ := s["comments"].([]any); len(cs) != 1 {
-		t.Errorf("show --json: comments %v, ждали 1", s["comments"])
+		t.Errorf("show --json: comments %v, want 1", s["comments"])
 	}
 }
 
@@ -286,22 +286,22 @@ func TestCLI_WriteReplies_OneLine_VerboseAddsCommitHash(t *testing.T) {
 		args  []string
 		want  string
 	}{
-		{"edit", "тело\n", []string{"edit", "T-1", "--base", rev}, "ok T-1 edit"},
-		{"comment", "", []string{"comment", "T-1", "текст"}, "ok T-1 comment"},
-		{"note", "", []string{"note", "T-1", "шаг"}, "ok T-1 note"},
+		{"edit", "body\n", []string{"edit", "T-1", "--base", rev}, "ok T-1 edit"},
+		{"comment", "", []string{"comment", "T-1", "text"}, "ok T-1 comment"},
+		{"note", "", []string{"note", "T-1", "step"}, "ok T-1 note"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			defer guard(t)
 			plain := b.ok(c.stdin, append(append([]string(nil), c.args...), "--as", "cli:1")...)
 			if c.name == "edit" {
-				// второй edit с тем же телом - без изменений, но тот же ответ
+				// a second edit with the same body - no change, but the same reply
 				if r := b.ok(c.stdin, append(append([]string(nil), c.args...), "--as", "cli:1")...); r.out != plain.out {
-					t.Errorf("повтор edit: %q, ждали %q", r.out, plain.out)
+					t.Errorf("repeated edit: %q, want %q", r.out, plain.out)
 				}
 			}
 			if plain.out != c.want+"\n" || plain.err != "" {
-				t.Errorf("ответ %q (stderr %q), ждали %q", plain.out, plain.err, c.want)
+				t.Errorf("reply %q (stderr %q), want %q", plain.out, plain.err, c.want)
 			}
 			if c.name == "edit" {
 				return
@@ -309,7 +309,7 @@ func TestCLI_WriteReplies_OneLine_VerboseAddsCommitHash(t *testing.T) {
 			v := b.ok(c.stdin, append(append([]string(nil), c.args...), "-v")...)
 			head := strings.TrimSpace(b.git("rev-parse", "HEAD"))
 			if !strings.HasPrefix(v.out, c.want+" ") || !strings.Contains(v.out, head[:7]) || strings.Count(v.out, "\n") != 1 {
-				t.Errorf("-v: %q, ждали `%s <хеш коммита %s>` одной строкой", v.out, c.want, head[:7])
+				t.Errorf("-v: %q, want `%s <commit hash %s>` on one line", v.out, c.want, head[:7])
 			}
 		})
 	}
@@ -322,12 +322,12 @@ func TestCLI_Repeat_CommentDuplicates(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	b.ok("", "comment", "T-1", "дубль")
-	b.ok("", "comment", "T-1", "дубль")
+	b.ok("", "comment", "T-1", "dup")
+	b.ok("", "comment", "T-1", "dup")
 	var s struct{ Comments []any }
 	_ = json.Unmarshal([]byte(b.ok("", "show", "T-1", "--json").out), &s)
 	if len(s.Comments) != 2 {
-		t.Errorf("повторный comment: %d комментариев, ждали 2", len(s.Comments))
+		t.Errorf("repeated comment: %d comments, want 2", len(s.Comments))
 	}
 }
 
@@ -341,9 +341,9 @@ func TestCLI_Project_FromCwdGitFolder(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	b.ok("", "new", "Личная") // вне git: проект личное
-	if r := b.runIn(sub, "", "new", "Внутри"); r.code != 0 {
-		t.Fatalf("new в проекте: %+v", r)
+	b.ok("", "new", "Personal") // outside git: project personal
+	if r := b.runIn(sub, "", "new", "Inside"); r.code != 0 {
+		t.Fatalf("new in a project: %+v", r)
 	}
 	proj1 := func(id string) string {
 		var s struct{ Project string }
@@ -351,19 +351,19 @@ func TestCLI_Project_FromCwdGitFolder(t *testing.T) {
 		return s.Project
 	}
 	if p := proj1("T-1"); p != personalProject {
-		t.Errorf("new вне git: проект %q, ждали личное", p)
+		t.Errorf("new outside git: project %q, want personal", p)
 	}
 	if p := proj1("T-2"); p != "myproj" {
-		t.Errorf("new в папке myproj/pkg/deep: проект %q, ждали myproj", p)
+		t.Errorf("new in folder myproj/pkg/deep: project %q, want myproj", p)
 	}
 	if got := b.runIn(sub, "", "list").out; !strings.Contains(got, "T-2") || strings.Contains(got, "T-1") {
-		t.Errorf("list из проекта должен показать только его задачи: %q", got)
+		t.Errorf("list from a project must show only its tasks: %q", got)
 	}
 	if got := b.tix("", "list").out; !strings.Contains(got, "T-2") || !strings.Contains(got, "T-1") {
-		t.Errorf("list вне проекта показывает все задачи: %q", got)
+		t.Errorf("list outside a project shows all tasks: %q", got)
 	}
 	if got := b.runIn(sub, "", "list", "--project", personalProject).out; !strings.Contains(got, "T-1") || strings.Contains(got, "T-2") {
-		t.Errorf("--project перекрывает проект cwd: %q", got)
+		t.Errorf("--project overrides the cwd project: %q", got)
 	}
 }
 
@@ -372,22 +372,22 @@ func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
 	rev := strings.TrimPrefix(strings.SplitN(b.ok("", "show", "T-1").out, "\n", 2)[0], "rev ")
-	// Коды выхода по разделу 5 плана З2: 4 нет задачи, 6 ввод (флаг, id), 1 прочее.
+	// Exit codes: 4 no task, 6 input (flag, id), 1 other.
 	cases := []struct {
 		name  string
 		stdin string
 		args  []string
 		want  int
 	}{
-		{"show нет задачи", "", []string{"show", "T-99"}, 4},
-		{"comment нет задачи", "", []string{"comment", "T-99", "x"}, 4},
-		{"rm нет задачи", "", []string{"rm", "T-99"}, 4},
-		{"new неизвестная колонка", "", []string{"new", "X", "--to", "nosuch"}, anyInput},
-		{"edit с заголовком комментариев", "текст\n" + commentsHeading + "\nподдельный\n", []string{"edit", "T-1", "--base", rev}, anyInput},
-		{"edit пустой stdin", "", []string{"edit", "T-1", "--base", rev}, anyInput},
-		{"as с чертой", "", []string{"comment", "T-1", "x", "--as", "a|b"}, 6},
-		{"as со стрелкой", "", []string{"comment", "T-1", "x", "--as", "a-->b"}, 6},
-		{"as с переводом строки", "", []string{"comment", "T-1", "x", "--as", "a\nb"}, 6},
+		{"show no task", "", []string{"show", "T-99"}, 4},
+		{"comment no task", "", []string{"comment", "T-99", "x"}, 4},
+		{"rm no task", "", []string{"rm", "T-99"}, 4},
+		{"new unknown column", "", []string{"new", "X", "--to", "nosuch"}, anyInput},
+		{"edit with comments heading", "text\n" + commentsHeading + "\nforged\n", []string{"edit", "T-1", "--base", rev}, anyInput},
+		{"edit empty stdin", "", []string{"edit", "T-1", "--base", rev}, anyInput},
+		{"as with pipe", "", []string{"comment", "T-1", "x", "--as", "a|b"}, 6},
+		{"as with arrow", "", []string{"comment", "T-1", "x", "--as", "a-->b"}, 6},
+		{"as with newline", "", []string{"comment", "T-1", "x", "--as", "a\nb"}, 6},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -395,21 +395,21 @@ func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 			before := b.snapshot()
 			r := b.tix(c.stdin, c.args...)
 			if !codeMatches(r.code, c.want) {
-				t.Errorf("код %d, ждали %d (anyInput: 1 или 6); stdout %q stderr %q", r.code, c.want, r.out, r.err)
+				t.Errorf("code %d, want %d (anyInput: 1 or 6); stdout %q stderr %q", r.code, c.want, r.out, r.err)
 			}
 			if r.out != "" {
-				t.Errorf("при ошибке stdout должен быть пуст: %q", r.out)
+				t.Errorf("on error stdout must be empty: %q", r.out)
 			}
 			if !oneErrLine(r.err) {
-				t.Errorf("stderr %q, ждали одну строку `err ...`", r.err)
+				t.Errorf("stderr %q, want one line `err ...`", r.err)
 			}
 			if after := b.snapshot(); after != before {
-				t.Errorf("ошибка изменила базу:\nдо:\n%s\nпосле:\n%s", before, after)
+				t.Errorf("the error changed the store:\nbefore:\n%s\nafter:\n%s", before, after)
 			}
 		})
 	}
 	if r := b.tix("", "show", "T-99"); !strings.HasPrefix(r.err, "err T-99: ") {
-		t.Errorf("show T-99: stderr %q, ждали префикс `err T-99: `", r.err)
+		t.Errorf("show T-99: stderr %q, want prefix `err T-99: `", r.err)
 	}
 }
 
@@ -418,26 +418,26 @@ func TestCLI_BrokenTaskFile_WarnOnListNoOverwriteOnWrite(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
 	broken := filepath.Join(b.home, "T-3-broken.md")
-	data := "---\nid: T-3\ntitle: a: b\n---\nтело\n"
+	data := "---\nid: T-3\ntitle: a: b\n---\nbody\n"
 	if err := os.WriteFile(broken, []byte(data), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	r := b.tix("", "list")
 	if r.code != 0 {
-		t.Errorf("list с битым файлом: код %d, ждали 0", r.code)
+		t.Errorf("list with a broken file: code %d, want 0", r.code)
 	}
 	if !strings.Contains(r.out, "T-1 Alpha") {
-		t.Errorf("list не показал целую задачу: %q", r.out)
+		t.Errorf("list did not show the whole task: %q", r.out)
 	}
 	if !regexp.MustCompile(`T-3-broken\.md:\d+`).MatchString(r.err) {
-		t.Errorf("list: stderr %q, ждали warn с `путь:строка` (T-3-broken.md:N)", r.err)
+		t.Errorf("list: stderr %q, want a warn with `path:line` (T-3-broken.md:N)", r.err)
 	}
 	r = b.tix("", "comment", "T-3", "x")
 	if r.code != 1 || !regexp.MustCompile(`T-3-broken\.md:\d+`).MatchString(r.err) {
-		t.Errorf("comment в битый файл: код %d, stderr %q, ждали err с путём и строкой", r.code, r.err)
+		t.Errorf("comment on a broken file: code %d, stderr %q, want err with path and line", r.code, r.err)
 	}
 	if got, _ := os.ReadFile(broken); string(got) != data {
-		t.Errorf("битый файл изменён:\n%q", got)
+		t.Errorf("broken file changed:\n%q", got)
 	}
 }
 
@@ -454,16 +454,16 @@ func TestCLI_BrokenConfig_ErrPathLine_NothingWritten(t *testing.T) {
 	for _, args := range [][]string{{"new", "Beta"}, {"comment", "T-1", "x"}, {"list"}} {
 		r := b.tix("", args...)
 		if r.code != 1 || !regexp.MustCompile(`config\.toml:\d+`).MatchString(r.err) {
-			t.Errorf("tix %v: код %d, stderr %q, ждали err с `config.toml:N`", args, r.code, r.err)
+			t.Errorf("tix %v: code %d, stderr %q, want err with `config.toml:N`", args, r.code, r.err)
 		}
 	}
 	if after := b.snapshot(); after != before {
-		t.Errorf("битый конфиг: база изменена:\n%s\nпосле:\n%s", before, after)
+		t.Errorf("broken config: store changed:\n%s\nafter:\n%s", before, after)
 	}
 }
 
-// Спека 2.2 и 2.5: new без --to кладёт задачу в колонку роли inbox, какое бы имя и место
-// в конфиге у неё ни было. Краснеет, если колонка ищется по имени или берётся первая.
+// new without --to puts the task into the inbox role column, whatever its name and place
+// in the config. Turns red if the column is looked up by name or the first one is taken.
 func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
@@ -474,6 +474,6 @@ func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	if r := b.ok("", "new", "Beta"); r.out != "ok T-2 ideas\n" {
-		t.Errorf("tix new Beta: stdout %q, ждали %q", r.out, "ok T-2 ideas\n")
+		t.Errorf("tix new Beta: stdout %q, want %q", r.out, "ok T-2 ideas\n")
 	}
 }

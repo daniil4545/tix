@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Установка коннекторов агентов (Claude Code, Codex) для tix.
+# Installs the agent connectors (Claude Code, Codex) for tix.
 #
 #   connect.sh plan|apply|undo [--agent claude|codex|all] [--now ISO] [--force]
 #
-# plan (по умолчанию) печатает, что изменит apply, и ничего не пишет; повторный plan пуст.
-# apply добавляет недостающее и записывает добавленное в манифест; чужое не трогает.
-# Бэкапы <файл>.tix-bak-<время> живут только на время apply; при сбое остаются и называются.
-# Наш файл или скилл уже есть и отличается от источника: warn и пропуск; перезапись только с --force.
-# undo снимает только записи манифеста (файлы скилла по списку) и сам манифест.
-# Манифест: ${TIX_HOME:-$HOME/tasks}/.tix/connect-state.json. Других следов нет.
-# HOME берётся из окружения. Нужны bash, jq; для apply ещё tix.
-# shellcheck disable=SC2016  # $p, $v в программах jq - переменные jq, не shell
+# plan (default) prints what apply would change and writes nothing; a repeated plan is empty.
+# apply adds what is missing and records the additions in the manifest; it leaves foreign entries alone.
+# Backups <file>.tix-bak-<time> live only while apply runs; on failure they stay and are named.
+# Our file or skill already exists and differs from the source: warn and skip; overwrite only with --force.
+# undo removes only the manifest entries (skill files by list) and the manifest itself.
+# Manifest: ${TIX_HOME:-$HOME/tasks}/.tix/connect-state.json. There are no other traces.
+# HOME comes from the environment. Needs bash, jq; apply also needs tix.
+# shellcheck disable=SC2016  # $p, $v in jq programs are jq variables, not shell
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
@@ -42,7 +42,7 @@ usage() {
   exit 2
 }
 
-# ---------- разбор аргументов ----------
+# ---------- argument parsing ----------
 if [ $# -gt 0 ]; then
   case $1 in
     plan|apply|undo) CMD=$1; shift ;;
@@ -63,10 +63,10 @@ while [ $# -gt 0 ]; do
 done
 case $AGENT in claude|codex|all) ;; *) usage ;; esac
 
-[ -n "${HOME:-}" ] && [ -d "$HOME" ] || die "HOME не задан или не каталог"
-command -v jq >/dev/null 2>&1 || die "нет jq в PATH"
+[ -n "${HOME:-}" ] && [ -d "$HOME" ] || die "HOME is not set or not a directory"
+command -v jq >/dev/null 2>&1 || die "jq not found in PATH"
 if [ -n "${CLAUDE_CONFIG_DIR:-}" ] && [ "$CLAUDE_CONFIG_DIR" != "$HOME/.claude" ]; then
-  die "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR отличается от \$HOME/.claude: скрипт пишет в \$HOME/.claude"
+  die "CLAUDE_CONFIG_DIR=$CLAUDE_CONFIG_DIR differs from \$HOME/.claude: the script writes to \$HOME/.claude"
 fi
 
 if [ -z "$NOW" ]; then NOW=$(date -u +%Y%m%dT%H%M%SZ); fi
@@ -79,7 +79,7 @@ CODEX_HOOKS="$HOME/.codex/hooks.json"
 CODEX_RULES="$HOME/.codex/rules/tix.rules"
 CODEX_SKILL="$HOME/.agents/skills/tix"
 
-# Прежняя установка под именем tk (миграция): манифест в .tracker, скиллы и правило с именем tk.
+# Earlier install under the name tk (migration): manifest in .tracker, skills and rule named tk.
 LEGACY_MAN="$(dirname "$(dirname "$MAN")")/.tracker/connect-state.json"
 LEGACY_CLAUDE_SKILL="$HOME/.claude/skills/tk"
 LEGACY_CODEX_RULES="$HOME/.codex/rules/tk.rules"
@@ -88,21 +88,21 @@ LEGACY_CODEX_SKILL="$HOME/.agents/skills/tk"
 on_exit() {
   local rc=$? b
   if [ "$rc" -ne 0 ] && [ -n "$BAKLIST" ]; then
-    printf 'warn: apply не закончен; бэкапы оставлены (undo их не трогает):\n' >&2
+    printf 'warn: apply did not finish; backups kept (undo leaves them alone):\n' >&2
     while IFS= read -r b; do printf '  %s\n' "$b" >&2; done <<<"$BAKLIST"
   fi
 }
 trap on_exit EXIT
 
-# ---------- файлы ----------
+# ---------- files ----------
 
-# Путь без симлинков (в том числе у последнего звена); цель может не существовать.
+# Path without symlinks (the last component included); the target may not exist.
 resolve() {
   local p=$1 t head tail n=0
   case $p in /*) ;; *) p=$PWD/$p ;; esac
   while [ -L "$p" ]; do
     n=$((n + 1))
-    [ "$n" -le 40 ] || die "цикл симлинков: $1"
+    [ "$n" -le 40 ] || die "symlink loop: $1"
     t=$(readlink "$p")
     case $t in /*) p=$t ;; *) p=$(dirname "$p")/$t ;; esac
   done
@@ -119,7 +119,7 @@ resolve() {
 
 fmode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 
-# Каталоги над файлом, которых ещё нет: JSON-массив, самый глубокий первым.
+# Directories above the file that do not exist yet: a JSON array, deepest first.
 missing_dirs() {
   local d out='[]'
   d=$(dirname "$1")
@@ -130,7 +130,7 @@ missing_dirs() {
   printf '%s' "$out"
 }
 
-# Запись stdin в $1 (уже разрешённый путь): временный файл рядом, права цели, rename.
+# Writes stdin to $1 (an already resolved path): temp file next to it, target mode, rename.
 write_atomic() {
   local t=$1 dir tmp mode
   dir=$(dirname "$t")
@@ -143,11 +143,11 @@ write_atomic() {
   fi
   if ! { cat >"$tmp" && chmod "$mode" "$tmp" && mv -f "$tmp" "$t"; }; then
     rm -f "$tmp"
-    die "не удалось записать $t"
+    die "cannot write $t"
   fi
 }
 
-# ---------- манифест ----------
+# ---------- manifest ----------
 
 man_json() {
   if [ -e "$MAN" ]; then cat "$MAN"; else printf '{"version":1,"entries":[]}'; fi
@@ -155,10 +155,10 @@ man_json() {
 man_check() {
   [ -e "$MAN" ] || return 0
   jq -e '.version==1 and (.entries|type=="array")' "$MAN" >/dev/null 2>&1 \
-    || die "манифест повреждён или другой версии: $MAN"
+    || die "manifest is corrupt or has another version: $MAN"
 }
 man_has() { man_json | jq -e --arg k "$1" 'any(.entries[]; .key==$k)' >/dev/null; }
-man_add() { # $1 = JSON записи с полем key; повтор того же key не пишется
+man_add() { # $1 = JSON entry with a key field; a repeated key is not written
   local k real new md
   k=$(jq -r .key <<<"$1")
   if man_has "$k"; then return 0; fi
@@ -175,14 +175,14 @@ man_drop() {
   man_json | jq --arg k "$1" '.entries |= map(select(.key != $k))' | write_atomic "$(resolve "$MAN")"
 }
 
-# Бэкап перед первой правкой файла за запуск; удаляется после успешного apply.
-backup_once() { # $1 = разрешённый путь
+# Backup before the first edit of a file in a run; removed after a successful apply.
+backup_once() { # $1 = resolved path
   local b n=1
   [ -e "$1" ] || return 0
   case $BAKED in *"|$1|"*) return 0 ;; esac
   b="$1.tix-bak-$TAG"
   while [ -e "$b" ]; do n=$((n + 1)); b="$1.tix-bak-$TAG.$n"; done
-  cp -p "$1" "$b" || die "не удалось сделать бэкап $1"
+  cp -p "$1" "$b" || die "cannot back up $1"
   BAKED="$BAKED|$1|"
   BAKLIST="$BAKLIST${BAKLIST:+$'\n'}$b"
 }
@@ -194,29 +194,29 @@ drop_backups() {
   BAKLIST=""
 }
 
-# ---------- JSON-правки ----------
+# ---------- JSON edits ----------
 
-json_load() { # $1 = разрешённый путь; печатает содержимое или {}
+json_load() { # $1 = resolved path; prints the content or {}
   if [ -e "$1" ]; then
-    jq -e 'type=="object"' "$1" >/dev/null 2>&1 || die "битый JSON или не объект: $1"
+    jq -e 'type=="object"' "$1" >/dev/null 2>&1 || die "broken JSON or not an object: $1"
     cat "$1"
   else
     printf '{}'
   fi
 }
 
-# Программы jq: статус цели, добавление, снятие. Параметры: $p путь, $v значение.
+# jq programs: target status, add, remove. Parameters: $p path, $v value.
 ST_ARR='(try (getpath($p)|type) catch "bad") as $t
   | if $t=="null" then "add"
-    elif $t!="array" then "err: \($p|join(".")) не массив"
+    elif $t!="array" then "err: \($p|join(".")) is not an array"
     elif (getpath($p)|index([$v])) != null then "ok"
     else "add" end'
-# Прежние команды хука под именем tk: хук tk ... заменяется хуком tix ... на месте.
+# Earlier hook commands under the name tk: a tk ... hook is replaced in place by a tix ... hook.
 LEGACY='def legacy($w): [$w | sub("^tix "; "tk ")] + (if $w == "tix ctx --hook" then ["tk ctx"] else [] end);'
 ST_HOOK="$LEGACY"'(try (getpath($p)|type) catch "bad") as $t
   | ($v.hooks[0].command) as $want
   | if $t=="null" then "add"
-    elif $t!="array" then "err: \($p|join(".")) не массив"
+    elif $t!="array" then "err: \($p|join(".")) is not an array"
     elif any(getpath($p)[]?; any((.hooks // [])[]?; .command == $want)) then "ok"
     elif any(getpath($p)[]?; any((.hooks // [])[]?; (.command? // "") as $c | any(legacy($want)[]; . == $c))) then "upd"
     else "add" end'
@@ -224,14 +224,14 @@ FROM_HOOK="$LEGACY"'($v.hooks[0].command) as $want
   | [getpath($p)[]? | (.hooks // [])[]? | (.command? // empty) | select(. as $c | any(legacy($want)[]; . == $c))] | .[0] // ""'
 AD_ARR='setpath($p; (getpath($p) // []) + [$v])'
 RM_ARR='if (try (getpath($p)|type) catch "x") == "array" then setpath($p; getpath($p) | map(select(. != $v))) else . end'
-# Снятие хука: группа ровно как в манифесте; команда tk из старого манифеста может стоять уже как tix.
+# Hook removal: the group exactly as in the manifest; a tk command from an old manifest may already stand as tix.
 RENAMED='def renamed($w): [$w] + (if ($w | test("^tk ")) then [$w | sub("^tk "; "tix ")] else [] end)
   + (if $w == "tk ctx" then ["tix ctx --hook"] else [] end);'
 RM_HOOK="$RENAMED"'($v.hooks[0].command) as $want | if (try (getpath($p)|type) catch "x") == "array" then
     setpath($p; getpath($p) | map(select(type == "object" and ((.hooks // []) | length) == 1
       and (.hooks[0].command as $c | any(renamed($want)[]; . == $c)) and ((.hooks[0].command = $want) == $v) | not)))
   else . end'
-# Хук tk меняется на tix (UP_HOOK); снятие возвращает записанную в манифесте команду from (DN_HOOK).
+# A tk hook turns into tix (UP_HOOK); removal restores the command from the manifest, field from (DN_HOOK).
 UP_HOOK="$LEGACY"'($v.hooks[0].command) as $want | setpath($p; getpath($p) | map(if (.hooks | type) == "array"
     then .hooks |= map(if type == "object" and ((.command? // "") as $c | any(legacy($want)[]; . == $c)) then .command = $want else . end) else . end))'
 DN_HOOK='($v.hooks[0].command) as $now | (if $from != "" then $from else ($now | sub("^tix "; "tk ")) end) as $back
@@ -250,10 +250,10 @@ jedit_apply() {
   case $pre in codex-hook*) ag=codex ;; *) ag=claude ;; esac
   real=$(resolve "$file")
   doc=$(json_load "$real")
-  status=$(jq -r --argjson p "$p" --argjson v "$v" "$st" <<<"$doc") || die "не разобрать $real"
+  status=$(jq -r --argjson p "$p" --argjson v "$v" "$st" <<<"$doc") || die "cannot parse $real"
   case $status in
     ok) return 0 ;;
-    err*) die "${status#err: } ($real); запись не сделана" ;;
+    err*) die "${status#err: } ($real); nothing written" ;;
     upd)
       from=$(jq -r --argjson p "$p" --argjson v "$v" "$FROM_HOOK" <<<"$doc")
       pre=${pre}-up; ad=$UP_HOOK; op=hookup; label="$ag: $(jq -r 'join(".")' <<<"$p"): $from -> $(jq -r '.hooks[0].command' <<<"$v")" ;;
@@ -270,13 +270,13 @@ jedit_apply() {
     --argjson c "$created" --argjson fc "$fcreated" --argjson md "$(missing_dirs "$real")" --arg from "$from" \
     '{key:$key, agent:$ag, kind:"json", op:$op, file:$file, path:$p, value:$v, created:$c, file_created:$fc, dirs_created:$md}
      + (if $from != "" then {from:$from} else {} end)')
-  new=$(jq --argjson p "$p" --argjson v "$v" "$ad" <<<"$doc") || die "не удалось собрать JSON для $real"
+  new=$(jq --argjson p "$p" --argjson v "$v" "$ad" <<<"$doc") || die "cannot build JSON for $real"
   man_add "$entry"
   backup_once "$real"
   printf '%s\n' "$new" | write_atomic "$real"
 }
 
-# ---------- файлы и каталоги ----------
+# ---------- files and directories ----------
 
 # put_file KEY REAL SRC LABEL AGENT
 put_file() {
@@ -285,12 +285,12 @@ put_file() {
   if [ "$exists" = 1 ]; then
     cmp -s "$src" "$real" && return 0
     if [ "$FORCE" = 0 ]; then
-      [ "$QUIET" = 1 ] || warn "$label: $real отличается от коннектора; пропуск (перезапись: --force)"
+      [ "$QUIET" = 1 ] || warn "$label: $real differs from the connector; skipped (overwrite: --force)"
       return 0
     fi
-    act "$label: перезаписать $real"
+    act "$label: overwrite $real"
   else
-    act "$label: создать $real"
+    act "$label: create $real"
   fi
   [ "$DRY" = 1 ] && return 0
   man_add "$(jq -nc --arg key "$key" --arg ag "$ag" --arg p "$real" --argjson md "$(missing_dirs "$real")" \
@@ -299,81 +299,81 @@ put_file() {
   write_atomic "$real" <"$src"
 }
 
-put_skill() { # $1 = каталог скилла у агента, $2 = агент
+put_skill() { # $1 = the agent's skill directory, $2 = agent
   local src=$SKILL_SRC real key tmp exists=0 files
   real=$(resolve "$1")
   key="dir|$real"
   [ -e "$real" ] && exists=1
   if [ "$exists" = 1 ]; then
-    [ -d "$real" ] || die "$real не каталог; запись не сделана"
+    [ -d "$real" ] || die "$real is not a directory; nothing written"
     diff -r -q "$src" "$real" >/dev/null 2>&1 && return 0
     if [ "$FORCE" = 0 ]; then
-      [ "$QUIET" = 1 ] || warn "skill: $real отличается от скилла коннектора; пропуск (перезапись: --force)"
+      [ "$QUIET" = 1 ] || warn "skill: $real differs from the connector skill; skipped (overwrite: --force)"
       return 0
     fi
-    act "skill: перезаписать $real"
+    act "skill: overwrite $real"
   else
-    act "skill: создать $real"
+    act "skill: create $real"
   fi
   [ "$DRY" = 1 ] && return 0
   files=$(cd "$src" && find . -type f | jq -Rsc 'split("\n") | map(select(length > 0) | ltrimstr("./"))')
   man_add "$(jq -nc --arg key "$key" --arg ag "$2" --arg p "$real" --argjson f "$files" --argjson md "$(missing_dirs "$real")" \
     '{key:$key, agent:$ag, kind:"dir", path:$p, files:$f, dirs_created:$md}')"
   if [ "$exists" = 1 ]; then
-    cp -R "$src/." "$real/" || die "не удалось скопировать скилл в $real"
+    cp -R "$src/." "$real/" || die "cannot copy the skill to $real"
     return 0
   fi
   mkdir -p "$(dirname "$real")"
   tmp=$(mktemp -d "$(dirname "$real")/.tix-tmp.XXXXXX")
-  cp -R "$src/." "$tmp/" || { rm -r "$tmp"; die "не удалось скопировать скилл"; }
+  cp -R "$src/." "$tmp/" || { rm -r "$tmp"; die "cannot copy the skill"; }
   mv "$tmp" "$real"
   chmod 755 "$real"
 }
 
-# ---------- проверка исходников и инструментов ----------
+# ---------- source and tool checks ----------
 
 check_sources() {
-  [ -f "$SKILL_SRC/SKILL.md" ] || die "нет скилла: $SKILL_SRC/SKILL.md"
+  [ -f "$SKILL_SRC/SKILL.md" ] || die "skill missing: $SKILL_SRC/SKILL.md"
   if want claude; then
-    [ -f "$CLAUDE_HOOKS_SRC" ] || die "нет $CLAUDE_HOOKS_SRC"
+    [ -f "$CLAUDE_HOOKS_SRC" ] || die "missing $CLAUDE_HOOKS_SRC"
   fi
   if want codex; then
-    [ -f "$CODEX_HOOKS_SRC" ] || die "нет $CODEX_HOOKS_SRC"
-    [ -f "$CODEX_RULES_SRC" ] || die "нет $CODEX_RULES_SRC"
+    [ -f "$CODEX_HOOKS_SRC" ] || die "missing $CODEX_HOOKS_SRC"
+    [ -f "$CODEX_RULES_SRC" ] || die "missing $CODEX_RULES_SRC"
   fi
 }
 
 check_tools() {
   if [ "$CMD" = apply ]; then
-    command -v tix >/dev/null 2>&1 || die "нет tix в PATH"
+    command -v tix >/dev/null 2>&1 || die "tix not found in PATH"
   else
-    command -v tix >/dev/null 2>&1 || warn "нет tix в PATH: apply не пройдёт"
+    command -v tix >/dev/null 2>&1 || warn "tix not found in PATH: apply will fail"
   fi
 }
 
-# ---------- миграция установки под именем tk ----------
+# ---------- migration of the install under the name tk ----------
 
-# Манифест из .tracker переезжает в .tix. Служебную папку базы переносит сам tix при открытии
-# базы (порядок и гонки - в ядре). plan и запуск без tix только читают старый манифест.
+# The manifest moves from .tracker to .tix. tix itself moves the store service folder when it opens
+# the store (order and races are handled in the core). plan, and a run without tix, only read the old manifest.
 migrate_manifest() {
   local base
   if [ ! -e "$MAN" ] && [ -f "$LEGACY_MAN" ]; then
     if [ "$CMD" = plan ] || ! command -v tix >/dev/null 2>&1; then MAN=$LEGACY_MAN; return 0; fi
     base=$(dirname "$(dirname "$MAN")")
     if [ -e "$base/.tix" ]; then
-      mv -f "$LEGACY_MAN" "$MAN" || die "не удалось перенести манифест в $MAN"
+      mv -f "$LEGACY_MAN" "$MAN" || die "cannot move the manifest to $MAN"
     else
-      TIX_HOME=$base tix list >/dev/null || die "tix не открыл базу $base"
-      [ -f "$MAN" ] || die "tix не перенёс $base/.tracker в $base/.tix"
+      TIX_HOME=$base tix list >/dev/null || die "tix could not open the store $base"
+      [ -f "$MAN" ] || die "tix did not move $base/.tracker to $base/.tix"
     fi
   fi
-  # Пути .tracker в манифесте: после переноса здесь или раньше, хуком tix в новой сессии.
+  # .tracker paths in the manifest: after the move here or earlier, by the tix hook in a new session.
   [ "$CMD" != plan ] && [ -f "$MAN" ] && grep -q '/\.tracker' "$MAN" || return 0
   jq '(.. | strings) |= (sub("/\\.tracker$"; "/.tix") | sub("/\\.tracker/"; "/.tix/"))' "$MAN" | write_atomic "$(resolve "$MAN")"
 }
 
-# Разрешение Bash(tk *), поставленное прежним apply, становится Bash(tix *) на месте: запись
-# манифеста сохраняет created и file_created. Чужой Bash(tk *) не трогается.
+# A Bash(tk *) permission set by the earlier apply becomes Bash(tix *) in place: the manifest
+# entry keeps created and file_created. A foreign Bash(tk *) is left alone.
 migrate_allow() {
   local real old_key new_key new
   real=$(resolve "$SETTINGS")
@@ -384,22 +384,22 @@ migrate_allow() {
   [ "$DRY" = 1 ] && return 0
   new=$(json_load "$real" | jq 'if (.permissions.allow | type) == "array" then .permissions.allow |= (
       if index("Bash(tix *)") != null then map(select(. != "Bash(tk *)"))
-      else map(if . == "Bash(tk *)" then "Bash(tix *)" else . end) end) else . end') || die "не разобрать $real"
+      else map(if . == "Bash(tk *)" then "Bash(tix *)" else . end) end) else . end') || die "cannot parse $real"
   backup_once "$real"
   printf '%s\n' "$new" | write_atomic "$real"
   man_json | jq --arg o "$old_key" --arg n "$new_key" \
     '.entries |= map(if .key == $o then .key = $n | .value = "Bash(tix *)" else . end)' | write_atomic "$(resolve "$MAN")"
 }
 
-# Скилл или правило tk, поставленное прежним apply, снимается по записи манифеста; созданные
-# им каталоги переходят к записи нового файла. Каталог tk без записи манифеста - чужой.
-# drop_legacy KIND(dir|file) СТАРЫЙ_ПУТЬ НОВЫЙ_ПУТЬ
+# A tk skill or rule set by the earlier apply is removed by its manifest entry; the directories
+# it created pass to the entry of the new file. A tk directory without a manifest entry is foreign.
+# drop_legacy KIND(dir|file) OLD_PATH NEW_PATH
 drop_legacy() {
   local kind=$1 old new key e md p
   old=$(resolve "$2"); new=$(resolve "$3")
   key="$kind|$old"
   man_has "$key" || return 0
-  act "$kind: снять прежний $old"
+  act "$kind: remove earlier $old"
   [ "$DRY" = 1 ] && return 0
   e=$(man_json | jq -c --arg k "$key" '.entries[] | select(.key == $k)')
   if [ "$kind" = dir ]; then
@@ -409,7 +409,7 @@ drop_legacy() {
         rm -f -- "$old/$p"
       done < <(jq -r '.files // [] | .[]' <<<"$e")
       find "$old" -depth -type d -empty -exec rmdir {} + 2>/dev/null || true
-      [ ! -d "$old" ] || warn "в $old остались чужие файлы; каталог не удалён"
+      [ ! -d "$old" ] || warn "$old still holds foreign files; directory kept"
     fi
   else
     rm -f -- "$old"
@@ -420,14 +420,14 @@ drop_legacy() {
     '.entries |= map(if .key == $k then .dirs_created = ((.dirs_created // []) + $a) else . end)' | write_atomic "$(resolve "$MAN")"
 }
 
-# ---------- агенты ----------
+# ---------- agents ----------
 
-# put_hooks AGENT SRC FILE: по группе на каждое событие источника. Ключ манифеста SessionStart
-# прежний (claude-hook), у остальных событий с именем события.
+# put_hooks AGENT SRC FILE: one group per source event. The SessionStart manifest key stays
+# the old one (claude-hook); the other events carry the event name.
 put_hooks() {
   local ag=$1 src=$2 file=$3 ev group pre cmd
   while IFS= read -r ev; do
-    group=$(jq -ce --arg e "$ev" '.hooks[$e][0]' "$src") || die "нет группы $ev в $src"
+    group=$(jq -ce --arg e "$ev" '.hooks[$e][0]' "$src") || die "no group $ev in $src"
     cmd=$(jq -r '.hooks[0].command' <<<"$group")
     pre="$ag-hook"
     [ "$ev" = SessionStart ] || pre="$ag-hook-$ev"
@@ -447,7 +447,7 @@ run_claude() {
 
 run_codex() {
   put_hooks codex "$CODEX_HOOKS_SRC" "$CODEX_HOOKS"
-  put_file "file|$(resolve "$CODEX_RULES")" "$(resolve "$CODEX_RULES")" "$CODEX_RULES_SRC" "codex: правило" codex
+  put_file "file|$(resolve "$CODEX_RULES")" "$(resolve "$CODEX_RULES")" "$CODEX_RULES_SRC" "codex: rule" codex
   drop_legacy file "$LEGACY_CODEX_RULES" "$CODEX_RULES"
   put_skill "$CODEX_SKILL" codex
   drop_legacy dir "$LEGACY_CODEX_SKILL" "$CODEX_SKILL"
@@ -460,10 +460,10 @@ run_agents() {
   return 0
 }
 
-# ---------- откат ----------
+# ---------- undo ----------
 
-# Белый список целей undo: манифест - данные, пути из него не доверяем.
-dir_ok() { # каталог внутри HOME или корня задач, без ..
+# Allow list of undo targets: the manifest is data, its paths are not trusted.
+dir_ok() { # directory inside HOME or the task store root, without ..
   local r roots d
   case $1 in /*) ;; *) return 1 ;; esac
   case $1 in */../*|*/..) return 1 ;; esac
@@ -474,7 +474,7 @@ dir_ok() { # каталог внутри HOME или корня задач, бе
   done
   return 1
 }
-target_ok() { # $1 = kind, $2 = путь из манифеста
+target_ok() { # $1 = kind, $2 = path from the manifest
   local r
   case $2 in /*) ;; *) return 1 ;; esac
   case $2 in */../*|*/..) return 1 ;; esac
@@ -487,15 +487,15 @@ target_ok() { # $1 = kind, $2 = путь из манифеста
   esac
 }
 
-rmdirs() { # $1 = JSON-массив каталогов, самый глубокий первым
+rmdirs() { # $1 = JSON array of directories, deepest first
   local d
   while IFS= read -r d; do
     [ -n "$d" ] || continue
-    if dir_ok "$d"; then rmdir "$d" 2>/dev/null || true; else warn "undo: каталог вне белого списка, пропуск: $d"; fi
+    if dir_ok "$d"; then rmdir "$d" 2>/dev/null || true; else warn "undo: directory outside the allow list, skipped: $d"; fi
   done < <(jq -r '.[]' <<<"$1")
 }
 
-undo_json_file() { # $1 file $2 новый JSON ($3 file_created)
+undo_json_file() { # $1 file $2 new JSON ($3 file_created)
   local real=$1 new=$2 fc=$3
   if [ "$fc" = true ] && jq -e '. == {}' >/dev/null <<<"$new"; then
     rm -f "$real"
@@ -504,7 +504,7 @@ undo_json_file() { # $1 file $2 новый JSON ($3 file_created)
   fi
 }
 
-undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
+undo_entry() { # $1 = JSON entry; 0 - removed, 1 - kept
   local e=$1 kind key f p v op c fc md doc new rm_prog
   kind=$(jq -r .kind <<<"$e")
   key=$(jq -r .key <<<"$e")
@@ -515,20 +515,20 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
     *) f="" ;;
   esac
   if ! target_ok "$kind" "$f"; then
-    warn "undo: путь вне белого списка, пропуск: ${f:-<пусто>} (kind=$kind)"
+    warn "undo: path outside the allow list, skipped: ${f:-<empty>} (kind=$kind)"
     return 1
   fi
   case $kind in
     json)
       f=$(jq -r .file <<<"$e"); p=$(jq -c .path <<<"$e"); v=$(jq -c .value <<<"$e")
       jq -e --argjson ok "$HOOK_EVENTS" '(.path | length == 2 and .[0] == "hooks" and (.[1] as $x | $ok | index($x) != null)) or .path == ["permissions","allow"]' <<<"$e" >/dev/null \
-        || { warn "undo: ключ вне белого списка, пропуск: $p в $f"; return 1; }
+        || { warn "undo: key outside the allow list, skipped: $p in $f"; return 1; }
       op=$(jq -r .op <<<"$e"); c=$(jq -c .created <<<"$e"); fc=$(jq -r .file_created <<<"$e")
-      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; hookup) rm_prog=$DN_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
+      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; hookup) rm_prog=$DN_HOOK ;; *) die "manifest: unknown op $op" ;; esac
       if [ -e "$f" ]; then
         doc=$(json_load "$f")
         new=$(jq --argjson p "$p" --argjson v "$v" --argjson c "$c" --arg from "$(jq -r '.from // ""' <<<"$e")" "$rm_prog | $PRUNE" <<<"$doc") \
-          || die "не снять запись из $f"
+          || die "cannot remove the entry from $f"
         act "undo: $f"
         undo_json_file "$f" "$new" "$fc"
       fi
@@ -536,23 +536,23 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
       ;;
     file)
       f=$(jq -r .path <<<"$e")
-      if [ -e "$f" ]; then act "undo: удалить $f"; rm -f "$f"; fi
+      if [ -e "$f" ]; then act "undo: delete $f"; rm -f "$f"; fi
       rmdirs "$md"
       ;;
     dir)
       f=$(jq -r .path <<<"$e")
       if [ -d "$f" ]; then
-        act "undo: удалить файлы скилла в $f"
+        act "undo: delete skill files in $f"
         while IFS= read -r p; do
           case $p in ''|/*|*..*) continue ;; esac
           rm -f -- "$f/$p"
         done < <(jq -r '.files // [] | .[]' <<<"$e")
         find "$f" -depth -type d -empty -exec rmdir {} + 2>/dev/null || true
-        [ ! -d "$f" ] || warn "в $f остались чужие файлы; каталог не удалён"
+        [ ! -d "$f" ] || warn "$f still holds foreign files; directory kept"
       fi
       rmdirs "$md"
       ;;
-    *) die "манифест: неизвестный kind $kind" ;;
+    *) die "manifest: unknown kind $kind" ;;
   esac
   man_drop "$key"
 }
@@ -570,7 +570,7 @@ run_undo() {
     undo_entry "$e" || left=1
   done < <(man_json | jq -c '.entries | reverse | .[]')
   if [ "$(man_json | jq '.entries | length')" = 0 ]; then
-    act "undo: удалить манифест $MAN"
+    act "undo: delete the manifest $MAN"
     real=$(resolve "$MAN")
     md=$(man_json | jq -c '.dirs_created // []')
     rm -f "$real"
@@ -597,7 +597,7 @@ case $CMD in
     DRY=0 QUIET=0
     run_agents
     drop_backups
-    [ "$CODEX_NEW" = 0 ] || act "codex: новые хуки могут потребовать доверия: откройте /hooks в Codex и подтвердите tix inbox --hook"
+    [ "$CODEX_NEW" = 0 ] || act "codex: new hooks may need trust: open /hooks in Codex and confirm tix inbox --hook"
     ;;
   undo)
     DRY=0

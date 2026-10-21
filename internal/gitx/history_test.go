@@ -10,7 +10,7 @@ import (
 
 var hashRe = regexp.MustCompile(`^[0-9a-f]{40,64}$`)
 
-// commitAt делает пустой коммит с заданным временем автора; трейлер Actor ставит Commit.
+// commitAt makes an empty commit with the given author time; the Actor trailer is set by Commit.
 func commitAt(t *testing.T, r gitx.Repo, at, subject, actor string, trailers ...gitx.Trailer) string {
 	t.Helper()
 	t.Setenv("GIT_AUTHOR_DATE", at)
@@ -27,7 +27,7 @@ func TestLog_NoCommits_EmptyNoError(t *testing.T) {
 	r := newRepo(t)
 	got, err := r.Log("T-1")
 	if err != nil || len(got) != 0 {
-		t.Fatalf("Log в пустом репозитории: %v, %v; ждали пусто без ошибки", got, err)
+		t.Fatalf("Log in an empty repository: %v, %v; want empty without an error", got, err)
 	}
 }
 
@@ -46,7 +46,7 @@ func TestLog_OnlyThisTask_NewestFirst_AllFields(t *testing.T) {
 		t.Fatalf("Log: %v", err)
 	}
 	if len(got) != 3 {
-		t.Fatalf("Log(T-1): %d коммитов %+v; ждали 3 (T-12 и T-10 чужие)", len(got), got)
+		t.Fatalf("Log(T-1): %d commits %+v; want 3 (T-12 and T-10 are foreign)", len(got), got)
 	}
 	want := []struct{ subject, actor, at string }{
 		{"T-1: move todo > doing", "", "2026-10-01T10:20:00Z"},
@@ -57,11 +57,11 @@ func TestLog_OnlyThisTask_NewestFirst_AllFields(t *testing.T) {
 		c := got[i]
 		at, _ := time.Parse(time.RFC3339, w.at)
 		if c.Subject != w.subject || c.Actor != w.actor || !c.At.Equal(at) || !hashRe.MatchString(c.Hash) {
-			t.Errorf("Log[%d] = %+v; ждали subject %q actor %q at %s и хеш", i, c, w.subject, w.actor, w.at)
+			t.Errorf("Log[%d] = %+v; want subject %q actor %q at %s and a hash", i, c, w.subject, w.actor, w.at)
 		}
 	}
 	if got[0].Hash != last {
-		t.Errorf("Log[0].Hash = %q, хеш последнего коммита %q", got[0].Hash, last)
+		t.Errorf("Log[0].Hash = %q, hash of the last commit %q", got[0].Hash, last)
 	}
 }
 
@@ -73,10 +73,10 @@ func TestLog_ExternalEditCommitWithSeveralIDs_FoundByEach(t *testing.T) {
 	for _, id := range []string{"T-2", "T-13"} {
 		got, err := r.Log(id)
 		if err != nil || len(got) != 1 || got[0].Hash != h || got[0].Actor != "external" {
-			t.Errorf("Log(%s) = %+v, %v; ждали один внешний коммит %s", id, got, err, h)
+			t.Errorf("Log(%s) = %+v, %v; want one external commit %s", id, got, err, h)
 		}
 	}
 	if got, _ := r.Log("T-3"); len(got) != 0 {
-		t.Errorf("Log(T-3) = %+v; в коммите такого id нет", got)
+		t.Errorf("Log(T-3) = %+v; no such id in the commit", got)
 	}
 }

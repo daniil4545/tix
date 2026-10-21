@@ -1,64 +1,64 @@
 # tix
 
-Память агентов между сессиями и проектами (Claude Code, Codex, OpenCode): задачи - md-файлы в `~/tasks` под git, каждая правка ведёт к сессии агента, которая её сделала. Агенты работают через CLI `tix`, человек - через TUI.
+Memory for agents across sessions and projects (Claude Code, Codex, OpenCode): tasks are md files in `~/tasks` under git, and every edit leads back to the agent session that made it. Agents work through the `tix` CLI, the human works through the TUI.
 
-## Стадия
+## Stage
 
-MVP. Работают ядро записи, семь базовых команд `tix` (`new`, `show`, `edit`, `comment`, `note`, `rm`, `list`) и цикл агента (`ctx`, `take`, `move`, `set`, `check`, `done`, `backup`), идёт приёмка З2. TUI и коннекторы агентов - в З3-З4.
+MVP. The write core, the seven base `tix` commands (`new`, `show`, `edit`, `comment`, `note`, `rm`, `list`) and the agent cycle (`ctx`, `take`, `move`, `set`, `check`, `done`, `backup`) work; S2 acceptance is under way. The TUI and the agent connectors come in S3-S4.
 
-## Быстрый старт
+## Quick start
 
-Требования: Go 1.27.2, `golangci-lint` 2.x, git.
+Requirements: Go 1.27.2, `golangci-lint` 2.x, git.
 
-1. Собрать: `make build` (бинарь `bin/tix`).
-2. Задать базу: `export TIX_HOME=$HOME/tasks` (без переменной берётся `~/tasks`).
-3. Создать задачу: `bin/tix new "первая задача"`.
-4. Проверить: `bin/tix list` печатает `<колонка> T-1 первая задача | <сводка>`.
+1. Build: `make build` (binary `bin/tix`).
+2. Set the store: `export TIX_HOME=$HOME/tasks` (without the variable `~/tasks` is used).
+3. Create a task: `bin/tix new "first task"`.
+4. Check: `bin/tix list` prints `<column> T-1 first task | <summary>`.
 
-Версия: `tix --version` печатает `dev`; сборка с версией - `VERSION=1.2.3 make build`.
+Version: `tix --version` prints `dev`; a build with a version: `VERSION=1.2.3 make build`.
 
-Проверка: `make check`. Скорость: `make bench`.
+Check: `make check`. Speed: `make bench`.
 
-## Переход с имени tk
+## Moving from the name tk
 
-Проект назывался `tk`. Служебная папка базы `.tracker` переименовывается в `.tix` при первом открытии базы, записи `.tracker/` в `.gitignore` базы заменяются. Старые хуки, скилл и правило Codex снимает `scripts/connect.sh apply` и ставит `tix`. Переменные `TRACKER_*` больше не читаются: задайте `TIX_*`. Кэш `tk` не переносится, отметки доставки и фокус создаются заново.
+The project used to be called `tk`. The service folder of the store `.tracker` is renamed to `.tix` the first time the store is opened, and the `.tracker/` entries in the store `.gitignore` are replaced. `scripts/connect.sh apply` removes the old hooks, skill and Codex rule and installs `tix`. The `TRACKER_*` variables are no longer read: set `TIX_*`. The `tk` cache is not carried over; delivery marks and focus are created again.
 
-## Цикл агента
+## Agent cycle
 
-Агент работает по `RULES.md` (создаётся в `~/tasks` при первой записи). Имя агента берётся из `--as`, затем из `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `TIX_ACTOR`.
+The agent works by `RULES.md` (created in `~/tasks` on the first write). The agent name comes from `--as`, then from `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `TIX_ACTOR`.
 
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `tix ctx [--project p] [--json]` | активные, ждущие и готовые задачи проекта; без git |
-| `tix take T-12 [--steal\|--release]` | берёт задачу в работу на 3 часа, перехватывает или отдаёт |
-| `tix move T-12 <колонка> [--first\|--after T-9] [-m текст] [--force]` | переносит задачу; проверки входа в `ready`, `waiting`, `closed` |
-| `tix set T-12 поле=значение...` | меняет `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
-| `tix check T-12 1 2` | отмечает критерии |
-| `tix done T-12 [-m итог] [--force]` | закрывает задачу и снимает захват |
-| `tix backup` | коммитит правки мимо ядра и пушит `HEAD` в `origin` |
+| `tix ctx [--project p] [--json]` | active, waiting and ready tasks of the project; no git |
+| `tix take T-12 [--steal\|--release]` | claims the task for 3 hours, steals the claim or releases it |
+| `tix move T-12 <column> [--first\|--after T-9] [-m text] [--force]` | moves the task; entry checks for `ready`, `waiting`, `closed` |
+| `tix set T-12 field=value...` | changes `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
+| `tix check T-12 1 2` | checks criteria |
+| `tix done T-12 [-m result] [--force]` | closes the task and releases the claim |
+| `tix backup` | commits external edits and pushes `HEAD` to `origin` |
 
-Коды выхода: 0 успех; 2 занято; 3 конфликт; 4 нет задачи; 5 правило; 6 ввод; 1 прочее.
+Exit codes: 0 success; 2 busy; 3 conflict; 4 no task; 5 rule; 6 input; 1 other.
 
-## Конфигурация
+## Configuration
 
-Все переменные необязательны.
+All variables are optional.
 
-| Переменная | Обязательна | Что задаёт |
+| Variable | Required | What it sets |
 |---|---|---|
-| `TIX_HOME` | нет | папка задач, по умолчанию `~/tasks` |
-| `TIX_LOCK_TIMEOUT` | нет | ожидание лока записи, по умолчанию 5 с |
-| `TIX_GIT` | нет | путь к git, минуя поиск и кеш |
+| `TIX_HOME` | no | the task store, `~/tasks` by default |
+| `TIX_LOCK_TIMEOUT` | no | wait for the write lock, 5 s by default |
+| `TIX_GIT` | no | path to git, bypassing the search and the cache |
 
-## Документы
+## Documents
 
-| Вопрос | Где ответ |
+| Question | Where the answer is |
 |---|---|
-| как устроен код и где что менять | `docs/architecture.md` |
-| что строим и почему так решили | решения `docs/specs/decisions.md`, спека `docs/spec.md` |
-| синхронизация с внешними трекерами (после MVP) | `docs/specs/integrations.md` |
-| как это выглядит | макет `docs/mockup/ui.html` |
-| где проект сейчас и что дальше | `docs/state.md`, `docs/backlog.md` |
-| итоги разведки | `docs/research/` |
-| поведение git и Codex | `docs/api/git.md`, `docs/api/codex.md` |
-| спека текущей задачи, временная | `docs/plans/` |
-| правила для агента | `AGENTS.md` |
+| how the code is built and where to change it | `docs/architecture.md` |
+| what we build and why it was decided so | decisions `docs/specs/decisions.md`, spec `docs/spec.md` |
+| sync with external trackers (after the MVP) | `docs/specs/integrations.md` |
+| what it looks like | mockup `docs/mockup/ui.html` |
+| where the project is now and what is next | `docs/state.md`, `docs/backlog.md` |
+| recon results | `docs/research/` |
+| git and Codex behavior | `docs/api/git.md`, `docs/api/codex.md` |
+| spec of the current task, temporary | `docs/plans/` |
+| rules for the agent | `AGENTS.md` |

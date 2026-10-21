@@ -1,6 +1,6 @@
-// Команда tixbench - замер скорости tix.
-// Вызов из make bench: go run ./cmd/tixbench bin/tix (первый аргумент - путь к собранному tix).
-// Код выхода 0, если цели раздела 7 плана выполнены.
+// Command tixbench - measures the speed of tix.
+// Called from make bench: go run ./cmd/tixbench bin/tix (the first argument is the path to the built tix).
+// Exit code 0 if the bench goals are met.
 package main
 
 import (
@@ -23,28 +23,28 @@ import (
 const (
 	runTimeout = 30 * time.Second
 	benchActor = "bench:1"
-	// Задачи, на которых идёт замер: show и comment читают одну, правка мимо ядра - другую.
+	// The tasks measured: show and comment read one, an external edit changes another.
 	targetTask   = 500
 	externalTask = 600
-	// moveTask лежит в колонке todo; move гоняет её между todo и doing, каждый вызов пишет коммит.
+	// moveTask sits in the todo column; move drives it between todo and doing, each call writes a commit.
 	moveTask = 701
-	// takeFirst - первая задача todo; take берёт по одной новой на прогон (каждая пятая).
+	// takeFirst - the first todo task; take takes one new task per run (every fifth).
 	takeFirst   = 6
 	takeStride  = 5
 	columnTodo  = "todo"
 	columnDoing = "doing"
-	// maxRuns держит take между первой todo-задачей и moveTask (701 = 6 + 5*139).
+	// maxRuns keeps take between the first todo task and moveTask (701 = 6 + 5*139).
 	maxRuns = 130
 )
 
-// bench - один замеряемый вызов tix и цель по медиане.
+// bench - one measured tix call and the goal by median.
 type bench struct {
 	name     string
 	targetMS float64
 	args     []string
-	env      []string             // добавка к окружению запуска
-	argsOf   func(n int) []string // аргументы прогона n; вместо args, если задана
-	before   func(n int) error    // правка перед каждым прогоном, не входит в время
+	env      []string             // addition to the run environment
+	argsOf   func(n int) []string // arguments of run n; used instead of args if set
+	before   func(n int) error    // an edit before each run, not counted in the time
 	check    func(n int, out string) error
 }
 
@@ -186,7 +186,7 @@ func expectOK(_ int, out string) error {
 
 func taskID(n int) string { return fmt.Sprintf("T-%d", n) }
 
-// moveTarget чередует колонки: чётный прогон - в doing, нечётный - обратно в todo.
+// moveTarget alternates columns: an even run goes to doing, an odd run goes back to todo.
 func moveTarget(n int) string {
 	if n%2 == 0 {
 		return columnDoing
@@ -194,7 +194,7 @@ func moveTarget(n int) string {
 	return columnTodo
 }
 
-// expectMove требует ответ о настоящем переносе: повтор без изменения коммита не пишет.
+// expectMove requires an answer about a real move: a repeat without a change writes no commit.
 func expectMove(out, id, column string) error {
 	if !strings.HasPrefix(out, "ok "+id+" ") || !strings.Contains(out, "> "+column) {
 		return fmt.Errorf("reply is not a move of %s to %s: %.60q", id, column, out)
@@ -202,7 +202,7 @@ func expectMove(out, id, column string) error {
 	return nil
 }
 
-// measure гонит прогрев, затем runs замеров; возвращает медиану и p95.
+// measure runs a warm-up, then runs measurements; returns the median and p95.
 func measure(tixBin, home string, b bench, runs, warm int) (sample, error) {
 	times := make([]float64, 0, runs)
 	for i := 0; i < warm+runs; i++ {
@@ -246,15 +246,15 @@ func percentile(sorted []float64, q float64) float64 {
 	return sorted[min(max(i, 0), len(sorted)-1)]
 }
 
-// tixCmd готовит запуск tix в базе home; cwd = home, чтобы Detect не сузил list до проекта.
+// tixCmd prepares a tix run in the store home; cwd = home, so Detect does not narrow list to a project.
 func tixCmd(ctx context.Context, tixBin, home string, args []string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, tixBin, args...) //nolint:gosec // tix - аргумент командной строки bench
+	cmd := exec.CommandContext(ctx, tixBin, args...) //nolint:gosec // tix is a command-line argument of bench
 	cmd.Dir = home
 	cmd.Env = append(cleanEnv(), "TIX_HOME="+home, "TIX_ACTOR="+benchActor)
 	return cmd
 }
 
-// cleanEnv убирает переменные сессии агента: личность замера не зависит от окна запуска.
+// cleanEnv removes the agent session variables: the measurement identity does not depend on the window it runs in.
 func cleanEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
@@ -283,9 +283,9 @@ func timeRun(tixBin, home string, args, env []string) (time.Duration, string, er
 	return d, out.String(), nil
 }
 
-// editOutside правит файл в обход ядра (как Obsidian): строка в теле перед комментариями.
+// editOutside edits a file bypassing the core (like Obsidian): a line in the body before the comments.
 func editOutside(path string, n int) error {
-	data, err := os.ReadFile(path) //nolint:gosec // путь внутри временной базы
+	data, err := os.ReadFile(path) //nolint:gosec // the path is inside the temporary store
 	if err != nil {
 		return err
 	}
@@ -296,11 +296,11 @@ func editOutside(path string, n int) error {
 		return fmt.Errorf("%s: no comments section", path)
 	}
 	out := append(append(append([]byte{}, data[:i]...), line...), data[i:]...)
-	return os.WriteFile(path, out, 0o600) //nolint:gosec // путь внутри временной базы
+	return os.WriteFile(path, out, 0o600) //nolint:gosec // the path is inside the temporary store
 }
 
-// seed строит базу: первую задачу создаёт сам tix (папка, git, config, .gitignore),
-// остальные пишутся файлами и уходят одним коммитом; затем история из комментариев.
+// seed builds the store: the first task is created by tix itself (folder, git, config, .gitignore),
+// the rest are written as files and go in one commit; then the history from comments.
 func seed(tixBin, home string, tasks int) error {
 	if _, _, err := timeRun(tixBin, home, []string{"new", "bench seed"}, nil); err != nil {
 		return err
@@ -310,7 +310,7 @@ func seed(tixBin, home string, tasks int) error {
 		return err
 	}
 	repo := gitx.Repo{Dir: home, Bin: bin}
-	rnd := rand.New(rand.NewSource(1)) //nolint:gosec // детерминированные данные замера
+	rnd := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic measurement data
 	contents := make(map[int]string, tasks)
 	paths := make([]string, 0, tasks)
 	for id := 2; id <= tasks; id++ {
@@ -357,7 +357,7 @@ func para(r *rand.Rand, n int) string {
 	return strings.Join(p, " ")
 }
 
-// taskContent строит файл около 4 КБ по разделу 5 спеки: frontmatter, тело, комментарии.
+// taskContent builds a file of about 4 KB per spec section 5: frontmatter, body, comments.
 func taskContent(r *rand.Rand, id int) string {
 	cols := []string{"idea", "todo", "doing", "blocked", "done"}
 	var b strings.Builder

@@ -20,19 +20,19 @@ var update = flag.Bool("update", false, "rewrite golden files in testdata")
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
-// plain убирает цветовые коды: тесты проверяют текст, а не палитру.
+// plain strips color codes: tests check the text, not the palette.
 func plain(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
-// fits проверяет границы экрана: строк не больше h, каждая строка не шире w.
+// fits checks the screen bounds: no more than h lines, each line no wider than w.
 func fits(t *testing.T, name, out string, w, h int) {
 	t.Helper()
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 	if len(lines) > h {
-		t.Errorf("%s: %d строк при высоте %d", name, len(lines), h)
+		t.Errorf("%s: %d lines at height %d", name, len(lines), h)
 	}
 	for i, ln := range lines {
 		if lw := lipgloss.Width(ln); lw > w {
-			t.Errorf("%s: строка %d шириной %d при ширине %d: %q", name, i, lw, w, plain(ln))
+			t.Errorf("%s: line %d of width %d at width %d: %q", name, i, lw, w, plain(ln))
 			return
 		}
 	}
@@ -63,7 +63,7 @@ func TestRenderBoard_AnySize_FitsScreen(t *testing.T) {
 			b := bigBoard(rows)
 			b.W, b.H = sz.w, sz.h
 			b.Status = "status line that is rather long to check truncation of the bottom line as well"
-			fits(t, fmt.Sprintf("доска %dx%d, %d строк в колонке", sz.w, sz.h, rows), view.RenderBoard(b), sz.w, sz.h)
+			fits(t, fmt.Sprintf("board %dx%d, %d rows in a column", sz.w, sz.h, rows), view.RenderBoard(b), sz.w, sz.h)
 		}
 	}
 }
@@ -79,12 +79,12 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	out := plain(view.RenderBoard(b))
 	for _, want := range colNames {
 		if !strings.Contains(out, want) {
-			t.Errorf("доска без колонки %q:\n%s", want, out)
+			t.Errorf("board without column %q:\n%s", want, out)
 		}
 	}
 	for _, want := range []string{"T-7", "alpha", "Fix login", "see notes", "1/3 28.10"} {
 		if !strings.Contains(out, want) {
-			t.Errorf("доска без %q:\n%s", want, out)
+			t.Errorf("board without %q:\n%s", want, out)
 		}
 	}
 }
@@ -97,27 +97,27 @@ func TestRenderBoard_StarOnlyOnRowThatNeedsYou(t *testing.T) {
 	for _, ln := range strings.Split(plain(view.RenderBoard(b)), "\n") {
 		hasStar := strings.Contains(ln, "*")
 		if strings.Contains(ln, "T-2") && !hasStar {
-			t.Errorf("строка T-2 без звёздочки: %q", ln)
+			t.Errorf("line T-2 without a star: %q", ln)
 		}
 		if strings.Contains(ln, "T-1") && hasStar {
-			t.Errorf("строка T-1 со звёздочкой: %q", ln)
+			t.Errorf("line T-1 with a star: %q", ln)
 		}
 	}
 }
 
 func TestRenderBoard_SelectedColumnStaysVisibleWhenWindowIsNarrow(t *testing.T) {
-	// Колонки по 24 знака: в 60 знаков влезают две, окно идёт за курсором.
+	// Columns of 24 characters: two fit in 60 characters, the window follows the cursor.
 	b := bigBoard(3)
 	b.W, b.H = 60, 30
 	for col, name := range colNames {
 		b.Col, b.Row = col, 2
 		out := plain(view.RenderBoard(b))
 		if !strings.Contains(out, name) {
-			t.Errorf("курсор в колонке %q: её нет на экране:\n%s", name, out)
+			t.Errorf("cursor in column %q: it is not on the screen:\n%s", name, out)
 		}
 		id := b.Cols[col].Rows[2].ID + " "
 		if !strings.Contains(out, id) {
-			t.Errorf("курсор на %s: строки нет на экране:\n%s", id, out)
+			t.Errorf("cursor on %s: the line is not on the screen:\n%s", id, out)
 		}
 	}
 }
@@ -128,7 +128,7 @@ func TestRenderBoard_SelectedRowStaysVisibleInLongColumn(t *testing.T) {
 	b.Col, b.Row = 2, 70
 	out := plain(view.RenderBoard(b))
 	if id := b.Cols[2].Rows[70].ID + " "; !strings.Contains(out, id) {
-		t.Errorf("курсор на %s в длинной колонке: строки нет на экране:\n%s", id, out)
+		t.Errorf("cursor on %s in a long column: the line is not on the screen:\n%s", id, out)
 	}
 }
 
@@ -138,16 +138,16 @@ func TestRenderBoard_SelectionAndErrorLookDifferent(t *testing.T) {
 	a, b := base, base
 	b.Row = 1
 	if view.RenderBoard(a) == view.RenderBoard(b) {
-		t.Error("выбор первой и второй строки рисуется одинаково")
+		t.Error("selection of the first and second line is drawn the same")
 	}
 	ok, bad := base, base
 	ok.Status, bad.Status = "write failed", "write failed"
 	bad.IsErr = true
 	if view.RenderBoard(ok) == view.RenderBoard(bad) {
-		t.Error("ошибка в строке состояния выглядит как обычный статус")
+		t.Error("an error in the status line looks like a normal status")
 	}
 	if !strings.Contains(plain(view.RenderBoard(bad)), "write failed") {
-		t.Error("текст строки состояния не показан")
+		t.Error("status line text not shown")
 	}
 }
 
@@ -171,7 +171,7 @@ func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 	for _, want := range []string{"T-12", "Report on calls", "doing", "alpha", "abstract text", "summary text",
 		"details text", "claude", "new", "3 edits", "daniil", "use a dash for empty values"} {
 		if !strings.Contains(out, want) {
-			t.Errorf("карточка без %q:\n%s", want, out)
+			t.Errorf("card without %q:\n%s", want, out)
 		}
 	}
 }
@@ -179,11 +179,11 @@ func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 func TestRenderCard_AskShownOnlyWhenSet(t *testing.T) {
 	c := card()
 	if out := plain(view.RenderCard(c)); strings.Contains(out, "needs you") {
-		t.Errorf("пустое ask показано:\n%s", out)
+		t.Errorf("empty ask shown:\n%s", out)
 	}
 	c.Ask = "pick A or B"
 	if out := plain(view.RenderCard(c)); !strings.Contains(out, "* needs you: pick A or B") {
-		t.Errorf("ask не показано строкой `* needs you: <ask>`:\n%s", out)
+		t.Errorf("ask not shown as the line `* needs you: <ask>`:\n%s", out)
 	}
 }
 
@@ -201,7 +201,7 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 			}
 			for _, cur := range []int{0, n / 2, max(n-1, 0)} {
 				c.Cursor, c.Scroll = cur, cur/2
-				fits(t, fmt.Sprintf("карточка %dx%d, история %d, курсор %d", sz.w, sz.h, n, cur), view.RenderCard(c), sz.w, sz.h)
+				fits(t, fmt.Sprintf("card %dx%d, history %d, cursor %d", sz.w, sz.h, n, cur), view.RenderCard(c), sz.w, sz.h)
 			}
 		}
 	}
@@ -210,17 +210,17 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 func TestRenderInput_PromptAndTailOfLongText(t *testing.T) {
 	short := plain(view.RenderInput("waiting for:", "vendor", 60))
 	if !strings.Contains(short, "waiting for:") || !strings.Contains(short, "vendor") {
-		t.Errorf("строка ввода без подсказки или текста: %q", short)
+		t.Errorf("input line without a prompt or text: %q", short)
 	}
 	long := strings.Repeat("0123456789", 20) + "END"
 	out := view.RenderInput("close reason:", long, 40)
-	fits(t, "строка ввода", out, 40, 1)
+	fits(t, "input line", out, 40, 1)
 	if p := plain(out); !strings.Contains(p, "END") || !strings.Contains(p, "close reason:") {
-		t.Errorf("длинный текст: не видны подсказка и конец ввода: %q", p)
+		t.Errorf("long text: the prompt and the input end are not visible: %q", p)
 	}
 }
 
-// golden сверяет текст кадра с файлом в testdata; -update переписывает файл.
+// golden compares the frame text with a file in testdata; -update rewrites the file.
 func golden(t *testing.T, name, got string) {
 	t.Helper()
 	path := filepath.Join("testdata", name+".golden")
@@ -229,17 +229,17 @@ func golden(t *testing.T, name, got string) {
 		if err := os.MkdirAll("testdata", 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(got), 0o644); err != nil { //nolint:gosec // эталон в репозитории
+		if err := os.WriteFile(path, []byte(got), 0o644); err != nil { //nolint:gosec // golden file in the repository
 			t.Fatal(err)
 		}
 		return
 	}
-	want, err := os.ReadFile(path) //nolint:gosec // путь собран из имени теста
+	want, err := os.ReadFile(path) //nolint:gosec // path built from the test name
 	if err != nil {
-		t.Fatalf("нет эталона %s: запусти `go test ./internal/tui/view -update` и проверь diff глазами", path)
+		t.Fatalf("no golden file %s: run `go test ./internal/tui/view -update` and check the diff by eye", path)
 	}
 	if got != string(want) {
-		t.Errorf("кадр %s разошёлся с эталоном.\nполучили:\n%s\nждали:\n%s", name, got, want)
+		t.Errorf("frame %s differs from the golden file.\ngot:\n%s\nwant:\n%s", name, got, want)
 	}
 }
 

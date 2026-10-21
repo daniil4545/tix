@@ -1,4 +1,4 @@
-// Package task разбирает и печатает файл задачи. Без IO.
+// Package task parses and prints a task file. No IO.
 package task
 
 import (
@@ -15,14 +15,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Comment - один комментарий после заголовка "## Comments".
+// Comment - one comment after the "## Comments" heading.
 type Comment struct {
 	At    time.Time `json:"at"`
 	Actor string    `json:"actor"`
 	Text  string    `json:"text"`
 }
 
-// Task - задача целиком. JSON-имена: поля frontmatter, rev, body, comments.
+// Task - a whole task. JSON names: the frontmatter fields, rev, body, comments.
 type Task struct {
 	ID       string    `json:"id"`
 	Title    string    `json:"title"`
@@ -36,17 +36,17 @@ type Task struct {
 	Rank     float64   `json:"rank"`
 	Created  time.Time `json:"created"`
 	Tags     []string  `json:"tags"`
-	Body     string    `json:"body"` // до "## Comments"
+	Body     string    `json:"body"` // up to "## Comments"
 	Comments []Comment `json:"comments"`
-	Rev      string    `json:"rev"` // blob id из Go, не из файла
+	Rev      string    `json:"rev"` // blob id from Go, not from the file
 	Path     string    `json:"path"`
 
-	// src хранит разобранный файл: чужие поля frontmatter, порядок и текст до
-	// "## Comments" сохраняются при Render. nil у задачи, созданной в коде.
+	// src keeps the parsed file: foreign frontmatter fields, order and the text before
+	// "## Comments" are preserved by Render. nil for a task created in code.
 	src *source
 }
 
-// MarshalJSON пишет created локальным временем как в файле (CreatedLayout), а не RFC 3339.
+// MarshalJSON writes created as local time like in the file (CreatedLayout), not RFC 3339.
 func (t Task) MarshalJSON() ([]byte, error) {
 	type plain Task
 	if t.Tags == nil {
@@ -62,9 +62,9 @@ func (t Task) MarshalJSON() ([]byte, error) {
 }
 
 type source struct {
-	raw      string // frontmatter как в файле, без строк "---"
-	heading  bool   // в файле есть "## Comments"
-	preamble string // текст под заголовком до первого маркера
+	raw      string // frontmatter as in the file, without "---" lines
+	heading  bool   // the file has "## Comments"
+	preamble string // text under the heading before the first marker
 }
 
 const (
@@ -82,7 +82,7 @@ var (
 
 	timeLayouts = []string{CreatedLayout, commentLayout, time.RFC3339, "2006-01-02"}
 
-	// порядок ключей frontmatter новой задачи
+	// frontmatter key order of a new task
 	fieldOrder = []string{"id", "title", "project", "status", "rank", "created",
 		"external", "waiting", "claim", "due", "tags", "ask"}
 	requiredFields = map[string]bool{"id": true, "title": true, "project": true,
@@ -102,7 +102,7 @@ func parseTime(s string) (time.Time, error) {
 	return time.Time{}, errors.New("bad time " + strconv.Quote(s))
 }
 
-// Parse разбирает файл задачи. Ошибка несёт путь и строку.
+// Parse parses a task file. The error carries the path and line.
 func Parse(path string, data []byte) (*Task, error) {
 	text := strings.TrimPrefix(string(data), "\xef\xbb\xbf")
 	fm, rest, restLine, err := splitFrontmatter(path, text)
@@ -128,9 +128,9 @@ func Parse(path string, data []byte) (*Task, error) {
 	return t, t.parseComments(path, after, afterLine+1)
 }
 
-// findHeading ищет строку "## Comments" (после неё допустимы пробелы, табы и \r).
-// Возвращает [начало, конец строки без перевода] или nil. Заменяет regexp
-// (?m)^## Comments[ \t\r]*$: на list из 1000 файлов regexp давал около четверти разбора.
+// findHeading looks for the line "## Comments" (spaces, tabs and \r may follow it).
+// Returns [start, end of line without the break] or nil. Replaces the regexp
+// (?m)^## Comments[ \t\r]*$: on a list of 1000 files the regexp took about a quarter of parsing.
 func findHeading(s string) []int {
 	for from := 0; ; {
 		i := strings.Index(s[from:], commentsHeading)
@@ -153,8 +153,8 @@ func findHeading(s string) []int {
 	}
 }
 
-// splitFrontmatter отделяет текст между строками "---" от остатка файла.
-// restLine - номер строки, с которой начинается остаток.
+// splitFrontmatter separates the text between "---" lines from the rest of the file.
+// restLine - the number of the line where the rest begins.
 func splitFrontmatter(path, text string) (fm, rest string, restLine int, err error) {
 	first, tail, _ := strings.Cut(text, "\n")
 	if strings.TrimRight(first, " \t\r") != "---" {
@@ -208,7 +208,7 @@ func (t *Task) parseFields(path, fm string) error {
 	return nil
 }
 
-// setField кладёт значение узла в поле задачи; чужие ключи пропускает.
+// setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
 	case "id", "title", "project", "status", "external", "waiting", "claim", "due", "ask":
@@ -308,7 +308,7 @@ func nodeTags(n *yaml.Node) ([]string, error) {
 	return tags, nil
 }
 
-// parseComments разбирает текст под заголовком по маркерам; line - строка его начала.
+// parseComments parses the text under the heading by markers; line - the line where it starts.
 func (t *Task) parseComments(path, after string, line int) error {
 	var (
 		cur *Comment
@@ -344,7 +344,7 @@ func (t *Task) parseComments(path, after string, line int) error {
 	return nil
 }
 
-// Render печатает файл задачи: frontmatter, тело, комментарии.
+// Render prints a task file: frontmatter, body, comments.
 func (t *Task) Render() []byte {
 	var b bytes.Buffer
 	b.WriteString("---\n")
@@ -375,7 +375,7 @@ func (t *Task) Render() []byte {
 func (t *Task) renderFrontmatter() string {
 	var doc yaml.Node
 	if t.src != nil && t.src.raw != "" {
-		_ = yaml.Unmarshal([]byte(t.src.raw), &doc) // уже разобран в Parse
+		_ = yaml.Unmarshal([]byte(t.src.raw), &doc) // already parsed in Parse
 	}
 	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		doc = yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode}}}
@@ -400,7 +400,7 @@ func (t *Task) renderFrontmatter() string {
 	return out.String()
 }
 
-// syncField приводит ключ в узле к значению поля; true - узел изменён.
+// syncField brings a key in the node to the field value; true - the node changed.
 func (t *Task) syncField(m *yaml.Node, key string) bool {
 	var val *yaml.Node
 	for i := 0; i+1 < len(m.Content); i += 2 {
@@ -435,7 +435,7 @@ func (t *Task) syncField(m *yaml.Node, key string) bool {
 	return true
 }
 
-// removeKey удаляет пару ключ-значение из узла-карты.
+// removeKey removes a key-value pair from a map node.
 func removeKey(m *yaml.Node, key string) {
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		if m.Content[i].Value == key {
@@ -447,7 +447,7 @@ func removeKey(m *yaml.Node, key string) {
 
 func plainNode(v string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Value: v} }
 
-// fieldNode строит узел значения; nil - пустое необязательное поле.
+// fieldNode builds a value node; nil - an empty optional field.
 func (t *Task) fieldNode(key string) *yaml.Node {
 	switch key {
 	case "rank":
@@ -474,7 +474,7 @@ func (t *Task) fieldNode(key string) *yaml.Node {
 	return stringNode(s)
 }
 
-// stringNode оборачивает строку в кавычки, когда без них YAML прочтёт иначе.
+// stringNode wraps a string in quotes when YAML would otherwise read it differently.
 func stringNode(s string) *yaml.Node {
 	var n yaml.Node
 	if err := n.Encode(s); err != nil {
@@ -504,7 +504,7 @@ func (t *Task) sameField(key string, val *yaml.Node) bool {
 	return val.Kind == yaml.ScalarNode && scalarText(val) == *t.stringField(key)
 }
 
-// SetBody заменяет тело. "## Comments" в теле - ошибка.
+// SetBody replaces the body. "## Comments" in the body is an error.
 func (t *Task) SetBody(body string) error {
 	if findHeading(body) != nil {
 		return errors.New("body must not contain the section " + commentsHeading)
@@ -526,7 +526,7 @@ func (t *Task) hasComments() bool {
 	return len(t.Comments) > 0 || (t.src != nil && (t.src.heading || t.src.preamble != ""))
 }
 
-// AddComment дописывает комментарий с маркером времени и автора.
+// AddComment appends a comment with a time and author marker.
 func (t *Task) AddComment(at time.Time, actor, text string) {
 	if !t.hasComments() && t.Body != "" && !strings.HasSuffix(t.Body, "\n\n") {
 		if strings.HasSuffix(t.Body, "\n") {
@@ -542,7 +542,7 @@ func (t *Task) AddComment(at time.Time, actor, text string) {
 	t.Comments = append(t.Comments, Comment{At: at, Actor: actor, Text: strings.Trim(text, "\r\n")})
 }
 
-// Summary возвращает первую строку сводки для list.
+// Summary returns the first line of the summary for list.
 func (t *Task) Summary() string {
 	in := false
 	for _, ln := range strings.Split(t.Body, "\n") {
@@ -559,7 +559,7 @@ func (t *Task) Summary() string {
 	return ""
 }
 
-// FileName строит имя файла "T-N слаг.md" из id и названия (спека 8, макет).
+// FileName builds the file name "T-N slug.md" from the id and the title (spec 8, mockup).
 func FileName(id, title string) string {
 	return id + " " + slug(title) + ".md"
 }
@@ -572,7 +572,7 @@ var translit = map[rune]string{
 	'я': "ya",
 }
 
-// translitRune даёт ASCII-замену руны; "-" - разделитель.
+// translitRune gives the ASCII replacement of a rune; "-" - the separator.
 func translitRune(r rune) string {
 	if s, ok := translit[r]; ok {
 		return s

@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// lockWait - сколько хук ждёт замок отметок: параллельный хук той же сессии держит его миллисекунды.
+// lockWait - how long a hook waits for the marks lock: a parallel hook of the same session holds it for milliseconds.
 const lockWait = 3 * time.Second
 
-// Marks - отметки доставки: id задачи и число комментариев, уже учтённых агентом.
+// Marks - delivery marks: a task id and the number of comments the agent has already seen.
 type Marks map[string]int
 
-// InboxDir - каталог отметок доставки: данные машины, не базы. TIX_INBOX_DIR перекрывает
-// путь (тесты), иначе os.UserCacheDir()/tix/inbox. Пусто, если каталог кэша неизвестен.
+// InboxDir - the directory of delivery marks: machine data, not the store. TIX_INBOX_DIR overrides
+// the path (tests), otherwise os.UserCacheDir()/tix/inbox. Empty if the cache directory is unknown.
 func InboxDir(getenv func(string) string) string {
 	if dir := getenv("TIX_INBOX_DIR"); dir != "" {
 		return dir
@@ -29,9 +29,9 @@ func InboxDir(getenv func(string) string) string {
 	return filepath.Join(cache, "tix", "inbox")
 }
 
-// HookActor - личность агента в хуке: окружение (Resolve), иначе session_id входа хука
-// с префиксом агента. Codex отличает turn_id во входе: имён переменных CODEX_* для этого мало.
-// Пусто, если личность не найдена или имя не проходит Valid.
+// HookActor - the agent identity in a hook: the environment (Resolve), otherwise the hook input session_id
+// with the agent prefix. Codex is told apart by turn_id in the input: CODEX_* variable names are not enough for that.
+// Empty if no identity is found or the name fails Valid.
 func HookActor(getenv func(string) string, sessionID string, codex bool) string {
 	name, known := Resolve("", getenv)
 	if !known {
@@ -50,10 +50,10 @@ func HookActor(getenv func(string) string, sessionID string, codex bool) string 
 	return name
 }
 
-// ReadMarks читает отметки агента из файла name каталога dir. Нет файла или он нечитаем - ok=false:
-// отметок нет, их ставят заново.
+// ReadMarks reads the agent marks from file name in directory dir. No file or unreadable - ok=false:
+// there are no marks, they are set again.
 func ReadMarks(dir, name string) (marks Marks, ok bool) {
-	data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir из кэша пользователя, name прошёл FocusFile
+	data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir comes from the user cache, name passed FocusFile
 	if err != nil {
 		return Marks{}, false
 	}
@@ -63,7 +63,7 @@ func ReadMarks(dir, name string) (marks Marks, ok bool) {
 	return marks, true
 }
 
-// WriteMarks пишет отметки через временный файл и rename: читатель не видит полузаписанный файл.
+// WriteMarks writes marks through a temporary file and rename: a reader never sees a half-written file.
 func WriteMarks(dir, name string, marks Marks) error {
 	data, err := json.Marshal(marks)
 	if err != nil {
@@ -90,20 +90,20 @@ func WriteMarks(dir, name string, marks Marks) error {
 	return nil
 }
 
-// LockMarks берёт замок отметок агента (flock на .<name>.lock в dir) и отдаёт функцию снятия.
-// Замок держит чтение, расчёт и запись отметок: два параллельных хука сессии не доставят комментарий дважды.
-// Снимается и при смерти процесса.
+// LockMarks takes the agent marks lock (flock on .<name>.lock in dir) and returns the release function.
+// The lock covers reading, computing and writing marks: two parallel session hooks do not deliver a comment twice.
+// It is released when the process dies, too.
 func LockMarks(dir, name string) (unlock func(), err error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("inbox dir: %w", err)
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "."+name+".lock"), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // dir из кэша пользователя, name прошёл FocusFile
+	f, err := os.OpenFile(filepath.Join(dir, "."+name+".lock"), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // dir comes from the user cache, name passed FocusFile
 	if err != nil {
 		return nil, fmt.Errorf("inbox lock: %w", err)
 	}
 	deadline := time.Now().Add(lockWait)
 	for {
-		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // дескриптор файла помещается в int
+		err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // a file descriptor fits in int
 		if err == nil {
 			return func() { _ = f.Close() }, nil
 		}

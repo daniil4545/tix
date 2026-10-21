@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 
 func guard(t *testing.T) {
 	if r := recover(); r != nil {
-		t.Fatalf("паника: %v", r)
+		t.Fatalf("panic: %v", r)
 	}
 }
 
@@ -76,14 +76,14 @@ func put(t *testing.T, r gitx.Repo, name, data string) {
 func TestResolve(t *testing.T) {
 	defer guard(t)
 	if got, err := gitx.Resolve(gitBin); err != nil || got != gitBin {
-		t.Errorf("Resolve(override) = %q, %v; ждали %q", got, err, gitBin)
+		t.Errorf("Resolve(override) = %q, %v; want %q", got, err, gitBin)
 	}
 	got, err := gitx.Resolve("")
 	if err != nil {
 		t.Fatalf("Resolve(\"\"): %v", err)
 	}
 	if out, err := exec.CommandContext(context.Background(), got, "--version").CombinedOutput(); err != nil || !bytes.Contains(out, []byte("git version")) {
-		t.Errorf("найденный %q не git: %v %s", got, err, out)
+		t.Errorf("found %q is not git: %v %s", got, err, out)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestInit_CreatesRepository(t *testing.T) {
 	defer guard(t)
 	r := newRepo(t)
 	if st, err := os.Stat(filepath.Join(r.Dir, ".git")); err != nil || !st.IsDir() {
-		t.Errorf(".git не создан: %v", err)
+		t.Errorf(".git not created: %v", err)
 	}
 }
 
@@ -101,26 +101,26 @@ func TestCommit_OnlyGivenPaths_ActorTrailer(t *testing.T) {
 	put(t, r, "a.md", "a\n")
 	put(t, r, "b.md", "b\n")
 	put(t, r, "c.md", "c\n")
-	raw(t, r, "add", "c.md") // чужая правка уже в индексе
+	raw(t, r, "add", "c.md") // a foreign edit is already in the index
 	hash, err := r.Commit([]string{"a.md"}, "T-1: new", "bob:1")
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
 	if head := strings.TrimSpace(raw(t, r, "rev-parse", "HEAD")); hash != head {
-		t.Errorf("хеш %q, HEAD %q", hash, head)
+		t.Errorf("hash %q, HEAD %q", hash, head)
 	}
 	if files := strings.Fields(raw(t, r, "show", "--name-only", "--format=", "HEAD")); len(files) != 1 || files[0] != "a.md" {
-		t.Errorf("в коммит ушли файлы %v, ждали только a.md", files)
+		t.Errorf("files %v went into the commit, want only a.md", files)
 	}
 	if s := raw(t, r, "log", "-1", "--format=%s"); strings.TrimSpace(s) != "T-1: new" {
-		t.Errorf("тема %q", s)
+		t.Errorf("subject %q", s)
 	}
 	if a := strings.TrimSpace(raw(t, r, "log", "-1", "--format=%(trailers:key=Actor,valueonly)")); a != "bob:1" {
-		t.Errorf("трейлер Actor %q, ждали bob:1", a)
+		t.Errorf("Actor trailer %q, want bob:1", a)
 	}
 	st := raw(t, r, "status", "--porcelain")
 	if !strings.Contains(st, "b.md") || !strings.Contains(st, "c.md") {
-		t.Errorf("b.md и c.md должны остаться вне коммита:\n%s", st)
+		t.Errorf("b.md and c.md must stay out of the commit:\n%s", st)
 	}
 }
 
@@ -135,20 +135,20 @@ func TestCommit_DeletedPathAndEmptyCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := r.Commit([]string{"a.md"}, "T-1: rm", "x"); err != nil {
-		t.Fatalf("коммит удаления: %v", err)
+		t.Fatalf("delete commit: %v", err)
 	}
 	if ls := strings.TrimSpace(raw(t, r, "ls-files")); ls != "" {
-		t.Errorf("a.md остался в индексе: %q", ls)
+		t.Errorf("a.md stayed in the index: %q", ls)
 	}
 	before := strings.TrimSpace(raw(t, r, "rev-list", "--count", "HEAD"))
-	if _, err := r.Commit(nil, "T-1: note шаг", "x"); err != nil {
-		t.Fatalf("пустой коммит: %v", err)
+	if _, err := r.Commit(nil, "T-1: note step", "x"); err != nil {
+		t.Fatalf("empty commit: %v", err)
 	}
 	if after := strings.TrimSpace(raw(t, r, "rev-list", "--count", "HEAD")); after == before {
-		t.Error("пустой список путей не создал пустой коммит")
+		t.Error("an empty path list did not create an empty commit")
 	}
 	if files := strings.TrimSpace(raw(t, r, "show", "--name-only", "--format=", "HEAD")); files != "" {
-		t.Errorf("note-коммит несёт файлы: %q", files)
+		t.Errorf("note commit carries files: %q", files)
 	}
 }
 
@@ -175,7 +175,7 @@ func TestStatus_UntrackedModifiedDeleted_CyrillicPaths(t *testing.T) {
 	want := map[string]string{"tracked.md": "M", "gone.md": "D", "Заметка про идею.md": "??", "dir/nested file.md": "??"}
 	for p, c := range want {
 		if codes[p] != c {
-			t.Errorf("Status[%q] = %q, ждали %q; всё: %v", p, codes[p], c, codes)
+			t.Errorf("Status[%q] = %q, want %q; all: %v", p, codes[p], c, codes)
 		}
 	}
 }
@@ -194,7 +194,7 @@ func TestHashObject_BlobRoundTrip(t *testing.T) {
 	}
 	back, err := r.Blob(id)
 	if err != nil || !bytes.Equal(back, data) {
-		t.Errorf("Blob(%s) = %q, %v; ждали %q (blob записан -w)", id, back, err, data)
+		t.Errorf("Blob(%s) = %q, %v; want %q (blob written with -w)", id, back, err, data)
 	}
 }
 
@@ -202,21 +202,21 @@ func TestMergeFile(t *testing.T) {
 	defer guard(t)
 	r := newRepo(t)
 	base := []byte("a\nb\nc\nd\ne\nf\ng\nh\n")
-	t.Run("разные места - чисто", func(t *testing.T) {
+	t.Run("different places - clean", func(t *testing.T) {
 		defer guard(t)
 		out, conflict, err := r.MergeFile([]byte("A\nb\nc\nd\ne\nf\ng\nh\n"), base, []byte("a\nb\nc\nd\ne\nf\ng\nH\n"))
 		if err != nil || conflict {
-			t.Fatalf("конфликт=%v err=%v, ждали чистое слияние", conflict, err)
+			t.Fatalf("conflict=%v err=%v, want a clean merge", conflict, err)
 		}
 		if string(out) != "A\nb\nc\nd\ne\nf\ng\nH\n" {
-			t.Errorf("результат %q", out)
+			t.Errorf("result %q", out)
 		}
 	})
-	t.Run("те же строки - конфликт", func(t *testing.T) {
+	t.Run("same lines - conflict", func(t *testing.T) {
 		defer guard(t)
 		_, conflict, err := r.MergeFile([]byte("a\nb\nc\nX\ne\nf\ng\nh\n"), base, []byte("a\nb\nc\nY\ne\nf\ng\nh\n"))
 		if err != nil || !conflict {
-			t.Errorf("конфликт=%v err=%v, ждали conflict=true без ошибки", conflict, err)
+			t.Errorf("conflict=%v err=%v, want conflict=true without an error", conflict, err)
 		}
 	})
 }
@@ -224,7 +224,7 @@ func TestMergeFile(t *testing.T) {
 var testLocks = []string{"index.lock", "HEAD.lock", filepath.Join("refs", "heads", "main.lock"),
 	filepath.Join("refs", "heads", "feat", "x.lock")}
 
-// putLocks создаёт пустые lock-файлы; age > 0 состаривает их на это время.
+// putLocks creates empty lock files; age > 0 ages them by that time.
 func putLocks(t *testing.T, r gitx.Repo, locks []string, age time.Duration) {
 	t.Helper()
 	when := time.Now().Add(-age)

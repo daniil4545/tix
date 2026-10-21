@@ -11,7 +11,7 @@ import (
 	"github.com/daniil4545/tix/internal/project"
 )
 
-// rootDir: TIX_HOME, иначе ~/tasks.
+// rootDir: TIX_HOME, else ~/tasks.
 func rootDir(env Env) (string, error) {
 	if dir := env.Getenv("TIX_HOME"); dir != "" {
 		return dir, nil
@@ -26,8 +26,8 @@ func rootDir(env Env) (string, error) {
 	return filepath.Join(home, "tasks"), nil
 }
 
-// OpenStore открывает базу: база, лог (.tix/log, если папка уже есть), корень базы и
-// проект рабочей папки (пусто - вне проекта).
+// OpenStore opens the store: the store, the log (.tix/log, if the folder exists), the store root and
+// the project of the working folder (empty - outside a project).
 func OpenStore(env Env) (*core.Store, *slog.Logger, string, string, error) {
 	root, err := rootDir(env)
 	if err != nil {

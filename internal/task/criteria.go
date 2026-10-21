@@ -10,15 +10,15 @@ const detailsHeading = "## Details"
 
 var reCriterion = regexp.MustCompile(`^(\s*[-*] \[)( |x|X)(\] )(.*)$`)
 
-// Criterion - критерий готовности из раздела "## Details": номер с 1, текст, отметка.
+// Criterion - a readiness criterion from the "## Details" section: number from 1, text, check mark.
 type Criterion struct {
 	N    int
 	Text string
 	Done bool
 }
 
-// criterionLines возвращает строки тела и индексы строк-критериев раздела "## Details".
-// Строки внутри блока кода (``` или ~~~) не критерии и не заголовки.
+// criterionLines returns the body lines and the indexes of criterion lines of the "## Details" section.
+// Lines inside a code block (``` or ~~~) are neither criteria nor headings.
 func (t *Task) criterionLines() (lines []string, at []int) {
 	lines = strings.Split(t.Body, "\n")
 	in := false
@@ -39,7 +39,7 @@ func (t *Task) criterionLines() (lines []string, at []int) {
 	return lines, at
 }
 
-// fenceAfter - открытое ограждение блока кода после строки ln ("" - вне блока).
+// fenceAfter - the code block fence open after line ln ("" - outside a block).
 func fenceAfter(ln, cur string) string {
 	mark := fenceMark(ln)
 	switch {
@@ -51,7 +51,7 @@ func fenceAfter(ln, cur string) string {
 	return cur
 }
 
-// fenceMark - ограждение, которым начинается строка: "```", "~~~" или "".
+// fenceMark - the fence a line starts with: "```", "~~~" or "".
 func fenceMark(ln string) string {
 	ln = strings.TrimLeft(ln, " ")
 	for _, m := range []string{"```", "~~~"} {
@@ -62,10 +62,10 @@ func fenceMark(ln string) string {
 	return ""
 }
 
-// isFenceLine: строка сама ограждение (закрывающая строка блока уже сброшена fenceAfter).
+// isFenceLine: the line is itself a fence (the closing line of a block is already reset by fenceAfter).
 func isFenceLine(ln string) bool { return fenceMark(ln) != "" }
 
-// CriterionRows - индексы строк-критериев в тексте раздела, без блоков кода.
+// CriterionRows - the indexes of criterion lines in the section text, without code blocks.
 func CriterionRows(text string) []int {
 	var at []int
 	fence := ""
@@ -80,7 +80,7 @@ func CriterionRows(text string) []int {
 	return at
 }
 
-// Criteria возвращает критерии раздела "## Details".
+// Criteria returns the criteria of the "## Details" section.
 func (t *Task) Criteria() []Criterion {
 	lines, at := t.criterionLines()
 	out := make([]Criterion, 0, len(at))
@@ -91,11 +91,11 @@ func (t *Task) Criteria() []Criterion {
 	return out
 }
 
-// IsCriterion: строка вида "- [ ] текст" или "- [x] текст".
+// IsCriterion: a line of the form "- [ ] text" or "- [x] text".
 func IsCriterion(line string) bool { return reCriterion.MatchString(strings.TrimRight(line, "\r")) }
 
-// Uncheck снимает отметки критериев с номерами nums. changed=false: все уже сняты.
-// Номер вне 1..n - ошибка, ничего не меняется.
+// Uncheck clears the check marks of the criteria numbered nums. changed=false: all already cleared.
+// A number outside 1..n is an error, nothing changes.
 func (t *Task) Uncheck(nums ...int) (changed bool, err error) {
 	lines, at := t.criterionLines()
 	for _, n := range nums {
@@ -119,8 +119,8 @@ func (t *Task) Uncheck(nums ...int) (changed bool, err error) {
 	return changed, nil
 }
 
-// Check отмечает критерии с номерами nums. changed=false: все уже отмечены.
-// Номер вне 1..n - ошибка, ничего не меняется.
+// Check marks the criteria numbered nums. changed=false: all already marked.
+// A number outside 1..n is an error, nothing changes.
 func (t *Task) Check(nums ...int) (changed bool, err error) {
 	lines, at := t.criterionLines()
 	for _, n := range nums {

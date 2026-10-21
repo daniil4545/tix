@@ -21,13 +21,13 @@ func TestNotes_NewestPerTask_OnlyNoteSubjects(t *testing.T) {
 	}
 	at, _ := time.Parse(time.RFC3339, "2026-10-01T10:10:00Z")
 	if len(got) != 2 {
-		t.Fatalf("Notes = %+v; ждали заметки T-1 и T-2", got)
+		t.Fatalf("Notes = %+v; want notes of T-1 and T-2", got)
 	}
 	if n := got["T-1"]; n.Text != "second | with %s" || !n.At.Equal(at) {
-		t.Errorf("Notes[T-1] = %+v; ждали новейшую 'second | with %%s' в 10:10", n)
+		t.Errorf("Notes[T-1] = %+v; want the newest 'second | with %%s' at 10:10", n)
 	}
 	if n := got["T-2"]; n.Text != "other task" {
-		t.Errorf("Notes[T-2] = %+v; ждали 'other task'", n)
+		t.Errorf("Notes[T-2] = %+v; want 'other task'", n)
 	}
 }
 
@@ -35,6 +35,6 @@ func TestNotes_NoCommits_EmptyNoError(t *testing.T) {
 	defer guard(t)
 	got, err := newRepo(t).Notes()
 	if err != nil || len(got) != 0 {
-		t.Fatalf("Notes в пустом репозитории: %v, %v; ждали пусто без ошибки", got, err)
+		t.Fatalf("Notes in an empty repository: %v, %v; want empty without an error", got, err)
 	}
 }

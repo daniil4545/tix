@@ -7,7 +7,7 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// cardRow ищет строку кадра с подстрокой: номер строки и колонка подстроки.
+// cardRow looks for a frame line with a substring: the line number and the substring column.
 func cardRow(t *testing.T, c view.Card, sub string) (x, y int) {
 	t.Helper()
 	for y, ln := range strings.Split(plain(view.RenderCard(c)), "\n") {
@@ -15,7 +15,7 @@ func cardRow(t *testing.T, c view.Card, sub string) (x, y int) {
 			return i, y
 		}
 	}
-	t.Fatalf("в кадре нет %q", sub)
+	t.Fatalf("%q is not in the frame", sub)
 	return 0, 0
 }
 
@@ -44,21 +44,21 @@ func TestHitCard_RowsAndButtons(t *testing.T) {
 	for _, tc := range cases {
 		x, y := cardRow(t, c, tc.sub)
 		if got := view.HitCard(c, x, y); got != tc.want {
-			t.Errorf("HitCard на %q = %+v, ждали %+v", tc.sub, got, tc.want)
+			t.Errorf("HitCard at %q = %+v, expected %+v", tc.sub, got, tc.want)
 		}
 	}
 }
 
-// Критерий, ушедший за прокрутку, не кликается; обрезанная кнопка тоже.
+// A criterion scrolled out is not clickable; a cut button too.
 func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 	c := critCard()
 	c.H = 12
-	c.Cursor = 5 // запись истории в конце: тело прокручено
+	c.Cursor = 5 // the history entry at the end: the body is scrolled
 	x, y := cardRow(t, c, "c comment")
 	if got := view.HitCard(c, x, y); got.Kind != view.CardAction {
-		t.Fatalf("кнопка c comment: %+v", got)
+		t.Fatalf("button c comment: %+v", got)
 	}
-	c.W = 20 // строка действий обрезана: g session не влезает целиком
+	c.W = 20 // the actions line is cut: g session does not fit whole
 	last := strings.Count(view.RenderCard(c), "\n")
 	clickable := 0
 	for x := 0; x < c.W; x++ {
@@ -66,10 +66,10 @@ func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 			clickable++
 		}
 		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "g" {
-			t.Errorf("обрезанная кнопка g кликается в колонке %d", x)
+			t.Errorf("the cut button g is clickable at column %d", x)
 		}
 	}
 	if clickable == 0 {
-		t.Error("в обрезанной строке не кликается ни одна кнопка: проверка пуста")
+		t.Error("no button is clickable in the cut line: the check is empty")
 	}
 }

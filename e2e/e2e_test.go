@@ -1,6 +1,6 @@
-// Package e2e проверяет бинарь tix как чёрный ящик: процессы, лок, git, kill -9.
-// Сценарии: docs/plans/z1-core.md, раздел 3; docs/spec.md, 2.1 и 7.
-// Допущение по CLI (раздел 5 плана, макет): флаги --as, -v, --json идут после позиционных.
+// Package e2e tests the tix binary as a black box: processes, lock, git, kill -9.
+// Scenarios: docs/spec.md, 2.1 and 7.
+// CLI assumption (mockup): the flags --as, -v, --json come after the positional arguments.
 package e2e
 
 import (
@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// Текст интерфейса: при смене языка правится здесь.
+// Interface text: when the language changes, edit it here.
 const warnCommitFailed = "warn T-1: commit not recorded"
 
 var (
@@ -56,11 +56,11 @@ func runMain(m *testing.M) int {
 
 type box struct {
 	t    *testing.T
-	root string // временный корень теста
+	root string // temporary root of the test
 	home string // TIX_HOME
-	cwd  string // не git-папка
+	cwd  string // not a git folder
 	env  []string
-	// stale - rev, оставшийся позади файла (для сценариев слияния).
+	// stale - a rev left behind the file (for merge scenarios).
 	stale string
 }
 
@@ -85,7 +85,7 @@ func newBox(t *testing.T) *box {
 	return b
 }
 
-// with возвращает окружение с заменой или добавлением переменной.
+// with returns the environment with a variable replaced or added.
 func (b *box) with(kv ...string) []string {
 	out := append([]string(nil), b.env...)
 	for _, p := range kv {
@@ -132,7 +132,7 @@ func (b *box) runEnv(env []string, stdin string, args ...string) res {
 	case <-done:
 	case <-time.After(90 * time.Second):
 		_ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL)
-		b.t.Fatalf("tix %v завис дольше 90 с", args)
+		b.t.Fatalf("tix %v hung for over 90 s", args)
 	}
 	return res{o.String(), e.String(), c.ProcessState.ExitCode()}
 }
@@ -146,7 +146,7 @@ func (b *box) ok(stdin string, args ...string) res {
 	b.t.Helper()
 	r := b.tix(stdin, args...)
 	if r.code != 0 {
-		b.t.Fatalf("tix %v: код %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
+		b.t.Fatalf("tix %v: code %d, stdout %q, stderr %q", args, r.code, r.out, r.err)
 	}
 	return r
 }
@@ -164,7 +164,7 @@ func (b *box) git(args ...string) string {
 
 type commit struct{ Subject, Actor, Message string }
 
-// commits возвращает коммиты от старых к новым.
+// commits returns the commits from old to new.
 func (b *box) commits() []commit {
 	b.t.Helper()
 	raw := b.git("log", "--reverse", "--format=%s%x1f%(trailers:key=Actor,valueonly,unfold)%x1f%B%x1e")
@@ -185,7 +185,7 @@ func (b *box) commits() []commit {
 	return out
 }
 
-// hasSubject ищет строку сообщения: external edit по спеке 2.1 - строки в сообщении, по одной на id или файл.
+// hasSubject looks for a message line: an external edit per spec 2.1 has lines in the message, one per id or file.
 func (b *box) hasSubject(prefix string) (commit, bool) {
 	for _, c := range b.commits() {
 		for _, line := range strings.Split(c.Message, "\n") {
@@ -197,7 +197,7 @@ func (b *box) hasSubject(prefix string) (commit, bool) {
 	return commit{}, false
 }
 
-// taskFile возвращает путь файла T-N: T-N-слаг.md или "T-N слаг.md".
+// taskFile returns the path of file T-N: T-N-slug.md or "T-N slug.md".
 func (b *box) taskFile(id string) string {
 	b.t.Helper()
 	all, _ := filepath.Glob(filepath.Join(b.home, id+"*.md"))
@@ -208,7 +208,7 @@ func (b *box) taskFile(id string) string {
 		}
 	}
 	if len(m) != 1 {
-		b.t.Fatalf("файл %s: найдено %d (%v)", id, len(m), m)
+		b.t.Fatalf("file %s: found %d (%v)", id, len(m), m)
 	}
 	return m[0]
 }
@@ -232,7 +232,7 @@ func (b *box) write(path, data string) {
 	}
 }
 
-// snapshot - содержимое базы без .git и служебных файлов лога и лока.
+// snapshot - the store content without .git and the service log and lock files.
 func (b *box) snapshot() map[string]string {
 	b.t.Helper()
 	snap := map[string]string{}
@@ -258,7 +258,7 @@ func (b *box) snapshot() map[string]string {
 	return snap
 }
 
-// noTmpLeft: временных файлов нет. После kill -9 остаток в .tix/tmp (в .gitignore) допустим: strictTmp=false.
+// noTmpLeft: no temporary files. After kill -9 a leftover in .tix/tmp (in .gitignore) is allowed: strictTmp=false.
 func (b *box) noTmpLeft(strictTmp bool) {
 	b.t.Helper()
 	_ = filepath.Walk(b.home, func(p string, info os.FileInfo, err error) error {
@@ -273,10 +273,10 @@ func (b *box) noTmpLeft(strictTmp bool) {
 			return nil
 		}
 		if !info.IsDir() && (strings.Contains(info.Name(), ".tmp") || strings.HasSuffix(info.Name(), "~")) {
-			b.t.Errorf("остался временный файл: %s", rel)
+			b.t.Errorf("temporary file left: %s", rel)
 		}
 		if !info.IsDir() && strings.HasPrefix(rel, ".tix/tmp/") {
-			b.t.Errorf("остался файл в .tix/tmp: %s", rel)
+			b.t.Errorf("file left in .tix/tmp: %s", rel)
 		}
 		return nil
 	})
@@ -292,7 +292,7 @@ func (b *box) fsck() {
 		b.t.Errorf("git fsck: %v\n%s", err, out)
 	}
 	if regexp.MustCompile(`(?i)error|missing|broken|corrupt`).MatchString(out) {
-		b.t.Errorf("git fsck не чист:\n%s", out)
+		b.t.Errorf("git fsck is not clean:\n%s", out)
 	}
 }
 
@@ -301,7 +301,7 @@ func (b *box) showRev(id string) string {
 	r := b.ok("", "show", id)
 	first := strings.SplitN(r.out, "\n", 2)[0]
 	if !strings.HasPrefix(first, "rev ") {
-		b.t.Fatalf("show %s: первая строка %q, ждали `rev <blob>`", id, first)
+		b.t.Fatalf("show %s: first line %q, want `rev <blob>`", id, first)
 	}
 	return strings.TrimPrefix(first, "rev ")
 }
@@ -319,14 +319,14 @@ func (b *box) showJSON(id string) showJSON {
 	var s showJSON
 	r := b.ok("", "show", id, "--json")
 	if err := json.Unmarshal([]byte(r.out), &s); err != nil {
-		b.t.Fatalf("show --json не JSON: %v\n%s", err, r.out)
+		b.t.Fatalf("show --json is not JSON: %v\n%s", err, r.out)
 	}
 	return s
 }
 
-// fakeGit ставит обёртку git: режим берётся из файла mode рядом: pass; fail и hang - на
-// commit (hang оставляет .git/index.lock, как убитый git); failon:<подкоманда> - отказ
-// с текстом boom-secret на любой подкоманде.
+// fakeGit installs a git wrapper: the mode comes from the file mode next to it: pass; fail and hang - on
+// commit (hang leaves .git/index.lock, like a killed git); failon:<subcommand> - a refusal
+// with the text boom-secret on any subcommand.
 func (b *box) fakeGit() (script, dir string) {
 	b.t.Helper()
 	dir = filepath.Join(b.root, "fakegit")
@@ -343,8 +343,8 @@ func (b *box) fakeGit() (script, dir string) {
 	return script, dir
 }
 
-// ageLocks состаривает lock-файлы git: висящий lock старше порога снимается.
-// Проверяется восстановление, а не ожидание 10 секунд.
+// ageLocks ages the git lock files: a dangling lock older than the threshold is removed.
+// This tests the recovery, not a wait of 10 seconds.
 func (b *box) ageLocks() []string {
 	b.t.Helper()
 	old := time.Now().Add(-time.Minute)
@@ -370,62 +370,62 @@ func waitFile(t *testing.T, path string) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("файл %s не появился за 20 с", path)
+	t.Fatalf("file %s did not appear within 20 s", path)
 }
 
 func TestScenario_Main_CommitPerOperation(t *testing.T) {
 	b := newBox(t)
 	if r := b.ok("", "new", "Alpha", "--as", "test:1"); r.out != "ok T-1 idea\n" {
-		t.Fatalf("new: ответ %q, ждали %q", r.out, "ok T-1 idea\n")
+		t.Fatalf("new: answer %q, want %q", r.out, "ok T-1 idea\n")
 	}
 	rev := b.showRev("T-1")
-	b.ok("Новое тело\n", "edit", "T-1", "--base", rev, "--as", "test:1")
-	b.ok("", "comment", "T-1", "первый", "--as", "test:1")
-	b.ok("", "comment", "T-1", "второй", "--as", "test:1")
-	b.ok("", "note", "T-1", "шаг сделан", "--as", "test:1")
+	b.ok("New body\n", "edit", "T-1", "--base", rev, "--as", "test:1")
+	b.ok("", "comment", "T-1", "first", "--as", "test:1")
+	b.ok("", "comment", "T-1", "second", "--as", "test:1")
+	b.ok("", "note", "T-1", "step done", "--as", "test:1")
 	file := b.taskFile("T-1")
 	b.ok("", "rm", "T-1", "--as", "test:1")
 
 	got := b.commits()
 	want := []string{"T-1: ", "T-1: edit", "T-1: comment", "T-1: comment", "T-1: note", "T-1: rm"}
 	if len(got) != len(want) {
-		t.Fatalf("коммитов %d, ждали %d: %+v", len(got), len(want), got)
+		t.Fatalf("commits %d, want %d: %+v", len(got), len(want), got)
 	}
 	for i, w := range want {
 		if !strings.HasPrefix(got[i].Subject, w) {
-			t.Errorf("коммит %d: тема %q, ждали префикс %q", i, got[i].Subject, w)
+			t.Errorf("commit %d: subject %q, want prefix %q", i, got[i].Subject, w)
 		}
 		if got[i].Actor != "test:1" {
-			t.Errorf("коммит %d: Actor %q, ждали test:1", i, got[i].Actor)
+			t.Errorf("commit %d: Actor %q, want test:1", i, got[i].Actor)
 		}
 	}
 	first := strings.Fields(b.git("log", "--reverse", "--format=%H", "-1", "--max-parents=0"))[0]
 	files := b.git("show", "--name-only", "--format=", first)
 	for _, f := range []string{".gitignore", ".tix/config.toml", ".tix/next_id", filepath.Base(file)} {
 		if !strings.Contains(files, f) {
-			t.Errorf("первый коммит без %s; файлы:\n%s", f, files)
+			t.Errorf("first commit lacks %s; files:\n%s", f, files)
 		}
 	}
 	if note := strings.TrimSpace(b.git("show", "--name-only", "--format=", "HEAD~1")); note != "" {
-		t.Errorf("note должен быть пустым коммитом, файлы: %q", note)
+		t.Errorf("note must be an empty commit, files: %q", note)
 	}
 	if _, err := os.Stat(file); err == nil {
-		t.Error("rm: файл остался")
+		t.Error("rm: the file stayed")
 	}
 	if st := strings.TrimSpace(b.git("status", "--porcelain")); st != "" {
-		t.Errorf("после rm дерево не чистое:\n%s", st)
+		t.Errorf("after rm the tree is not clean:\n%s", st)
 	}
 	ign := b.read(filepath.Join(b.home, ".gitignore"))
 	for _, p := range []string{".tix/lock", ".tix/log", ".tix/tmp", ".obsidian/workspace", ".trash/", "*.swp"} {
 		if !strings.Contains(ign, p) {
-			t.Errorf(".gitignore без %q:\n%s", p, ign)
+			t.Errorf(".gitignore lacks %q:\n%s", p, ign)
 		}
 	}
 }
 
 func TestScenario_TwoAgents_Race5x20(t *testing.T) {
 	if testing.Short() {
-		t.Skip("slow tier: гонка 5x20")
+		t.Skip("slow tier: race 5x20")
 	}
 	b := newBox(t)
 	b.ok("", "new", "Race")
@@ -448,18 +448,18 @@ func TestScenario_TwoAgents_Race5x20(t *testing.T) {
 	}
 	wg.Wait()
 	if len(fails) > 0 {
-		t.Fatalf("отказов %d, первые: %v", len(fails), fails[:min(3, len(fails))])
+		t.Fatalf("failures %d, first: %v", len(fails), fails[:min(3, len(fails))])
 	}
 	s := b.showJSON("T-1")
 	if len(s.Comments) != 100 {
-		t.Fatalf("комментариев %d, ждали 100", len(s.Comments))
+		t.Fatalf("comments %d, want 100", len(s.Comments))
 	}
 	seen := map[string]bool{}
 	for _, c := range s.Comments {
 		seen[strings.TrimSpace(c.Text)] = true
 	}
 	if len(seen) != 100 {
-		t.Errorf("уникальных текстов %d, ждали 100 (потеря или дубль)", len(seen))
+		t.Errorf("unique texts %d, want 100 (loss or duplicate)", len(seen))
 	}
 	n := 0
 	for _, c := range b.commits() {
@@ -468,13 +468,13 @@ func TestScenario_TwoAgents_Race5x20(t *testing.T) {
 		}
 	}
 	if n != 100 {
-		t.Errorf("коммитов comment %d, ждали 100", n)
+		t.Errorf("comment commits %d, want 100", n)
 	}
 	if total := len(b.commits()); total != 101 {
-		t.Errorf("всего коммитов %d, ждали 101 (new + 100)", total)
+		t.Errorf("total commits %d, want 101 (new + 100)", total)
 	}
 	if st := strings.TrimSpace(b.git("status", "--porcelain")); st != "" {
-		t.Errorf("дерево не чистое после гонки:\n%s", st)
+		t.Errorf("tree is not clean after the race:\n%s", st)
 	}
 	b.noTmpLeft(true)
 }
@@ -492,46 +492,46 @@ func TestScenario_EditStaleBase_MergeAndConflict(t *testing.T) {
 		return strings.Join(l, "\n") + "\n"
 	}
 	b.ok(body("l01", "l10"), "edit", "T-1", "--base", b.showRev("T-1"))
-	revA := b.showRev("T-1") // агент 1 прочитал и ушёл думать
+	revA := b.showRev("T-1") // agent 1 read it and went to think
 
-	b.ok(body("A-first", "l10"), "edit", "T-1", "--base", revA) // агент 2 правит начало
-	b.ok("", "comment", "T-1", "между правками")
+	b.ok(body("A-first", "l10"), "edit", "T-1", "--base", revA) // agent 2 edits the start
+	b.ok("", "comment", "T-1", "between edits")
 
-	// Агент 1 правит конец по старой базе: разные места, слияние.
+	// Agent 1 edits the end on the old base: different places, a merge.
 	b.ok(body("l01", "B-last"), "edit", "T-1", "--base", revA)
 	got := b.read(b.taskFile("T-1"))
-	for _, want := range []string{"A-first", "B-last", "между правками"} {
+	for _, want := range []string{"A-first", "B-last", "between edits"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("после слияния нет %q:\n%s", want, got)
+			t.Errorf("after the merge no %q:\n%s", want, got)
 		}
 	}
 	if strings.Contains(got, "l01\n") || strings.Contains(got, "l10\n") {
-		t.Errorf("после слияния остались старые строки:\n%s", got)
+		t.Errorf("after the merge old lines remained:\n%s", got)
 	}
 
-	// Те же строки: конфликт, отказ, файл цел.
+	// The same lines: a conflict, a refusal, the file is intact.
 	before := b.snapshot()
 	r := b.tix(body("C-first", "l10"), "edit", "T-1", "--base", revA)
 	if r.code != 3 {
-		t.Fatalf("конфликт: код %d, ждали 3 (ErrConflict); stdout %q", r.code, r.out)
+		t.Fatalf("conflict: code %d, want 3 (ErrConflict); stdout %q", r.code, r.out)
 	}
 	if !regexp.MustCompile(`^err T-1: .+\n$`).MatchString(r.err) {
-		t.Errorf("конфликт: stderr %q, ждали одну строку `err T-1: ...`", r.err)
+		t.Errorf("conflict: stderr %q, want one line `err T-1: ...`", r.err)
 	}
 	if after := b.snapshot(); fmt.Sprint(after) != fmt.Sprint(before) {
-		t.Errorf("конфликт изменил базу:\nдо %v\nпосле %v", before, after)
+		t.Errorf("conflict changed the store:\nbefore %v\nafter %v", before, after)
 	}
 
-	// База не из git: просьба перечитать.
+	// A store not from git: a request to re-read.
 	r = b.tix(body("X", "Y"), "edit", "T-1", "--base", strings.Repeat("ab", 20))
 	if r.code != 1 || !strings.Contains(r.err, "tix show") {
-		t.Errorf("база не из git: код %d, stderr %q, ждали err с `tix show`", r.code, r.err)
+		t.Errorf("store not from git: code %d, stderr %q, want err with `tix show`", r.code, r.err)
 	}
 }
 
-// Спека 2.1/3: правка тела и комментарий агента - разные части файла, слияние чисто.
-// Первый комментарий добавляет раздел сразу после последней строки тела; правка этой строки
-// по старой базе вплотную к новому разделу (git merge-file даёт конфликт).
+// Spec 2.1/3: a body edit and an agent comment are different parts of the file, the merge is clean.
+// The first comment adds the section right after the last body line; an edit of that line
+// on the old base adjoins the new section (git merge-file gives a conflict).
 func TestScenario_EditLastBodyLine_FirstCommentAndOtherEdit_MergesClean(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
@@ -546,15 +546,15 @@ func TestScenario_EditLastBodyLine_FirstCommentAndOtherEdit_MergesClean(t *testi
 	b.ok(body("l01", "l12"), "edit", "T-1", "--base", b.showRev("T-1"))
 	rev := b.showRev("T-1")
 	b.ok(body("A-first", "l12"), "edit", "T-1", "--base", rev)
-	b.ok("", "comment", "T-1", "агент")
+	b.ok("", "comment", "T-1", "agent")
 	r := b.tix(body("l01", "B-last"), "edit", "T-1", "--base", rev)
 	if r.code != 0 {
-		t.Fatalf("правка последней строки по старой базе после первого комментария: код %d, stderr %q", r.code, r.err)
+		t.Fatalf("edit of the last line on the old base after the first comment: code %d, stderr %q", r.code, r.err)
 	}
 	got := b.read(b.taskFile("T-1"))
-	for _, want := range []string{"A-first", "B-last", "агент"} {
+	for _, want := range []string{"A-first", "B-last", "agent"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("слияние потеряло %q:\n%s", want, got)
+			t.Errorf("the merge lost %q:\n%s", want, got)
 		}
 	}
 }
@@ -562,19 +562,19 @@ func TestScenario_EditLastBodyLine_FirstCommentAndOtherEdit_MergesClean(t *testi
 func TestScenario_Repeat_DuplicateCommentButNoOpEdit(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	b.ok("", "comment", "T-1", "дубль")
-	b.ok("", "comment", "T-1", "дубль")
+	b.ok("", "comment", "T-1", "duplicate")
+	b.ok("", "comment", "T-1", "duplicate")
 	if n := len(b.showJSON("T-1").Comments); n != 2 {
-		t.Errorf("повторный comment: комментариев %d, ждали 2 (дубль)", n)
+		t.Errorf("repeated comment: comments %d, want 2 (duplicate)", n)
 	}
-	b.ok("Тело\n", "edit", "T-1", "--base", b.showRev("T-1"))
+	b.ok("Body\n", "edit", "T-1", "--base", b.showRev("T-1"))
 	head := b.git("rev-parse", "HEAD")
-	r := b.ok("Тело\n", "edit", "T-1", "--base", b.showRev("T-1"))
+	r := b.ok("Body\n", "edit", "T-1", "--base", b.showRev("T-1"))
 	if r.out != "ok T-1 edit\n" {
-		t.Errorf("повторный edit: ответ %q", r.out)
+		t.Errorf("repeated edit: answer %q", r.out)
 	}
 	if b.git("rev-parse", "HEAD") != head {
-		t.Error("edit без изменения тела создал коммит")
+		t.Error("edit without a body change created a commit")
 	}
 }
 
@@ -584,48 +584,48 @@ func TestScenario_Obsidian_ExternalEdit(t *testing.T) {
 	b.ok("", "new", "Beta")
 	f2 := b.taskFile("T-2")
 	b.write(f2, strings.Replace(b.read(f2), "title: Beta", "title: EDITED Beta", 1))
-	b.write(filepath.Join(b.home, "Заметка про идею.md"), "# просто заметка\n")
-	b.write(filepath.Join(b.home, "RULES.md"), "правила\n")
+	b.write(filepath.Join(b.home, "Заметка про идею.md"), "# just a note\n")
+	b.write(filepath.Join(b.home, "RULES.md"), "rules\n")
 	b.write(filepath.Join(b.home, ".obsidian", "workspace.json"), "{}")
 
-	b.ok("", "comment", "T-1", "привет")
+	b.ok("", "comment", "T-1", "hello")
 
 	for _, line := range []string{"T-2: external edit", "external edit: Заметка про идею.md", "external edit: RULES.md"} {
 		c, found := b.hasSubject(line)
 		if !found {
-			t.Errorf("нет строки %q в сообщениях коммитов: %+v", line, b.commits())
+			t.Errorf("no line %q in the commit messages: %+v", line, b.commits())
 		} else if c.Actor != "external" {
-			t.Errorf("коммит со строкой %q: Actor %q, ждали external", line, c.Actor)
+			t.Errorf("commit with line %q: Actor %q, want external", line, c.Actor)
 		}
 	}
 	last := b.commits()
 	if !strings.HasPrefix(last[len(last)-1].Subject, "T-1: comment") {
-		t.Errorf("последний коммит %q, ждали T-1: comment", last[len(last)-1].Subject)
+		t.Errorf("last commit %q, want T-1: comment", last[len(last)-1].Subject)
 	}
 	if files := strings.Split(strings.TrimSpace(b.git("show", "--name-only", "--format=", "HEAD")), "\n"); len(files) != 1 || !strings.HasPrefix(files[0], "T-1") {
-		t.Errorf("в коммит comment ушли чужие файлы: %v", files)
+		t.Errorf("foreign files went into the comment commit: %v", files)
 	}
 	if ls := b.git("ls-files"); strings.Contains(ls, ".obsidian") {
-		t.Errorf(".obsidian/workspace* попал в git:\n%s", ls)
+		t.Errorf(".obsidian/workspace* got into git:\n%s", ls)
 	}
 	if !strings.Contains(b.read(f2), "EDITED Beta") {
-		t.Error("внешняя правка T-2 потеряна")
+		t.Error("the external edit of T-2 is lost")
 	}
 
-	// Возврат удалённого через git checkout - тоже external edit.
+	// Restoring a deleted file through git checkout is also an external edit.
 	f1 := b.taskFile("T-1")
 	b.ok("", "rm", "T-1")
 	b.git("checkout", "HEAD~1", "--", filepath.Base(f1))
-	b.ok("", "note", "T-2", "после возврата")
+	b.ok("", "note", "T-2", "after restore")
 	c, found := b.hasSubject("T-1: external edit")
 	if !found {
-		t.Fatalf("возврат файла не закоммичен как external edit: %+v", b.commits())
+		t.Fatalf("file restore is not committed as an external edit: %+v", b.commits())
 	}
 	if c.Actor != "external" {
-		t.Errorf("Actor %q, ждали external", c.Actor)
+		t.Errorf("Actor %q, want external", c.Actor)
 	}
 	if st := strings.TrimSpace(b.git("status", "--porcelain")); st != "" {
-		t.Errorf("дерево не чистое:\n%s", st)
+		t.Errorf("tree is not clean:\n%s", st)
 	}
 }
 
@@ -635,13 +635,13 @@ func TestScenario_NoteCommentDoNotCarryOtherFiles(t *testing.T) {
 	b.ok("", "new", "Beta")
 	f2 := b.taskFile("T-2")
 	b.write(f2, strings.Replace(b.read(f2), "title: Beta", "title: EDITED Beta", 1))
-	b.git("add", "-A") // чужая правка уже в индексе
-	b.ok("", "note", "T-1", "заметка")
+	b.git("add", "-A") // a foreign edit is already in the index
+	b.ok("", "note", "T-1", "note")
 	if files := strings.TrimSpace(b.git("show", "--name-only", "--format=", "HEAD")); files != "" {
-		t.Errorf("note не пустой коммит, файлы: %q", files)
+		t.Errorf("note is not an empty commit, files: %q", files)
 	}
 	if c, ok := b.hasSubject("T-2: external edit"); !ok || c.Actor != "external" {
-		t.Errorf("правка T-2 не оформлена как external edit: %+v", b.commits())
+		t.Errorf("the edit of T-2 is not recorded as an external edit: %+v", b.commits())
 	}
 }
 
@@ -661,13 +661,13 @@ func TestScenario_LockBusy_ErrOneLine(t *testing.T) {
 	r := b.runEnv(b.with("TIX_LOCK_TIMEOUT=200ms"), "", "comment", "T-1", "busy")
 	elapsed := time.Since(start)
 	if r.code != 2 || !regexp.MustCompile(`^err .+\n$`).MatchString(r.err) {
-		t.Errorf("лок занят: код %d, stderr %q, ждали код 2 (занято) и одну строку err", r.code, r.err)
+		t.Errorf("lock is busy: code %d, stderr %q, want code 2 (busy) and one err line", r.code, r.err)
 	}
 	if elapsed > 10*time.Second {
-		t.Errorf("ожидание %v, ждали около 200 мс", elapsed)
+		t.Errorf("wait %v, want about 200 ms", elapsed)
 	}
 	if fmt.Sprint(b.snapshot()) != fmt.Sprint(before) {
-		t.Error("отказ по локу изменил базу")
+		t.Error("a lock refusal changed the store")
 	}
 	_ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN)
 	b.ok("", "comment", "T-1", "free")
@@ -686,16 +686,16 @@ func TestScenario_StaleGitLocks_Dropped(t *testing.T) {
 	b.ok("", "comment", "T-1", "after lock")
 	for _, p := range locks {
 		if _, err := os.Stat(p); err == nil {
-			t.Errorf("%s не удалён", p)
+			t.Errorf("%s not removed", p)
 		}
 	}
 	log := b.read(filepath.Join(b.home, ".tix", "log"))
 	if !strings.Contains(log, "WARN") || !strings.Contains(log, "drop_index_lock") {
-		t.Errorf("в .tix/log нет WARN op=drop_index_lock:\n%s", log)
+		t.Errorf("no WARN op=drop_index_lock in .tix/log:\n%s", log)
 	}
 }
 
-// Свежий lock - git другого процесса ещё работает: операция его не трогает и не пишет.
+// A fresh lock - git of another process is still working: the operation does not touch it and does not write.
 func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
@@ -704,23 +704,23 @@ func TestScenario_FreshGitLock_BusyNothingWritten(t *testing.T) {
 	before := b.snapshot()
 	r := b.tix("", "comment", "T-1", "busy")
 	if r.code != 2 || r.err != "err T-1: git is busy\n" {
-		t.Errorf("свежий lock: код %d, stderr %q, ждали код 2 и `err T-1: git is busy`", r.code, r.err)
+		t.Errorf("fresh lock: code %d, stderr %q, want code 2 and `err T-1: git is busy`", r.code, r.err)
 	}
 	if _, err := os.Stat(lock); err != nil {
-		t.Errorf("свежий lock удалён: %v", err)
+		t.Errorf("fresh lock removed: %v", err)
 	}
 	if fmt.Sprint(b.snapshot()) != fmt.Sprint(before) {
-		t.Error("отказ git is busy изменил базу")
+		t.Error("the git is busy refusal changed the store")
 	}
-	// Lock состарился: висящий, операция его снимает.
+	// The lock got old: dangling, the operation removes it.
 	b.ageLocks()
 	b.ok("", "comment", "T-1", "after")
 	if _, err := os.Stat(lock); err == nil {
-		t.Error("висящий lock не удалён")
+		t.Error("dangling lock not removed")
 	}
 }
 
-// Текст stderr git не попадает в ответ ни на одном пути; полный текст - в .tix/log.
+// The git stderr text does not reach the answer on any path; the full text is in .tix/log.
 func TestScenario_GitStderr_NotInReply(t *testing.T) {
 	const secret = "boom-secret"
 	body := "l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\n"
@@ -749,21 +749,21 @@ func TestScenario_GitStderr_NotInReply(t *testing.T) {
 				b.ok(body, "new", "Alpha")
 				b.ok(body, "edit", "T-1", "--base", b.showRev("T-1"))
 				b.stale = b.showRev("T-1")
-				b.ok("", "comment", "T-1", "other") // файл ушёл от базы: edit пойдёт через слияние
+				b.ok("", "comment", "T-1", "other") // the file moved away from the base: edit goes through a merge
 				b.ok(strings.Replace(body, "l1", "first", 1), "edit", "T-1", "--base", b.showRev("T-1"))
 			}
 			b.write(filepath.Join(dir, "mode"), c.mode)
 			r := c.run(b, env)
 			if r.code != c.wantCode {
-				t.Errorf("код %d, ждали %d; stdout %q, stderr %q", r.code, c.wantCode, r.out, r.err)
+				t.Errorf("code %d, want %d; stdout %q, stderr %q", r.code, c.wantCode, r.out, r.err)
 			}
 			for _, bad := range []string{secret, "fatal", "exit 128"} {
 				if strings.Contains(r.err, bad) || strings.Contains(r.out, bad) {
-					t.Errorf("в ответе текст git %q: stdout %q, stderr %q", bad, r.out, r.err)
+					t.Errorf("git text %q in the answer: stdout %q, stderr %q", bad, r.out, r.err)
 				}
 			}
 			if log := b.read(filepath.Join(b.home, ".tix", "log")); !strings.Contains(log, secret) {
-				t.Errorf("полного текста git нет в .tix/log:\n%s", log)
+				t.Errorf("the full git text is not in .tix/log:\n%s", log)
 			}
 		})
 	}
@@ -775,30 +775,30 @@ func TestScenario_CommitFails_WarnExitZero(t *testing.T) {
 	script, dir := b.fakeGit()
 	b.write(filepath.Join(dir, "mode"), "fail")
 	env := b.with("TIX_GIT=" + script)
-	r := b.runEnv(env, "", "comment", "T-1", "без коммита")
+	r := b.runEnv(env, "", "comment", "T-1", "no commit")
 	if r.code != 0 || r.out != "ok T-1 comment\n" {
-		t.Errorf("коммит упал: код %d, stdout %q, ждали код 0 и `ok T-1 comment`", r.code, r.out)
+		t.Errorf("commit failed: code %d, stdout %q, want code 0 and `ok T-1 comment`", r.code, r.out)
 	}
 	if !strings.Contains(r.err, warnCommitFailed) {
-		t.Errorf("stderr %q, ждали %q", r.err, warnCommitFailed)
+		t.Errorf("stderr %q, want %q", r.err, warnCommitFailed)
 	}
 	if strings.Contains(r.err, "boom") || strings.Contains(r.err, "fatal") {
-		t.Errorf("в stderr вывод git: %q", r.err)
+		t.Errorf("git output in stderr: %q", r.err)
 	}
-	if !strings.Contains(b.read(b.taskFile("T-1")), "без коммита") {
-		t.Error("правка не попала в файл")
+	if !strings.Contains(b.read(b.taskFile("T-1")), "no commit") {
+		t.Error("the edit did not reach the file")
 	}
 	if log := b.read(filepath.Join(b.home, ".tix", "log")); strings.TrimSpace(log) == "" {
-		t.Error("упавший коммит не записан в .tix/log")
+		t.Error("the failed commit is not recorded in .tix/log")
 	}
-	// Следующая операция коммитит записанное как external edit.
+	// The next operation commits the written change as an external edit.
 	b.write(filepath.Join(dir, "mode"), "pass")
-	b.runEnv(env, "", "note", "T-1", "дальше")
+	b.runEnv(env, "", "note", "T-1", "next")
 	if c, ok := b.hasSubject("T-1: external edit"); !ok || c.Actor != "external" {
-		t.Errorf("записанное не закоммичено как external edit: %+v", b.commits())
+		t.Errorf("the written change is not committed as an external edit: %+v", b.commits())
 	}
 	if st := strings.TrimSpace(b.git("status", "--porcelain")); st != "" {
-		t.Errorf("дерево не чистое:\n%s", st)
+		t.Errorf("tree is not clean:\n%s", st)
 	}
 }
 
@@ -823,35 +823,35 @@ func TestScenario_Kill9AtCommit_NoPartialFiles(t *testing.T) {
 	b.fsck()
 	lock := filepath.Join(b.home, ".git", "index.lock")
 	if _, err := os.Stat(lock); err != nil {
-		t.Fatalf("убитый git не оставил index.lock: %v", err)
+		t.Fatalf("the killed git left no index.lock: %v", err)
 	}
 	if !strings.Contains(b.read(b.taskFile("T-1")), "zzz") {
-		t.Error("записанная правка пропала")
+		t.Error("the written edit disappeared")
 	}
 	if r := b.ok("", "list"); r.err != "" {
-		t.Errorf("list после kill: stderr %q, файл полузаписан?", r.err)
+		t.Errorf("list after kill: stderr %q, is the file half-written?", r.err)
 	}
 	b.write(filepath.Join(dir, "mode"), "pass")
-	// Пока lock свежий, git мог быть живым: отказ без записи.
-	if r := b.tix("", "note", "T-1", "рано"); r.code != 2 || !strings.Contains(r.err, "git is busy") {
-		t.Errorf("свежий lock после kill: код %d, stderr %q, ждали git is busy", r.code, r.err)
+	// While the lock is fresh, git may have been alive: a refusal without a write.
+	if r := b.tix("", "note", "T-1", "early"); r.code != 2 || !strings.Contains(r.err, "git is busy") {
+		t.Errorf("fresh lock after kill: code %d, stderr %q, want git is busy", r.code, r.err)
 	}
 	b.ageLocks()
-	r := b.runEnv(b.with("TIX_LOCK_TIMEOUT=5s"), "", "note", "T-1", "после kill")
+	r := b.runEnv(b.with("TIX_LOCK_TIMEOUT=5s"), "", "note", "T-1", "after kill")
 	if r.code != 0 {
-		t.Fatalf("после kill -9 операция не прошла (лок не снят?): код %d, %q", r.code, r.err)
+		t.Fatalf("after kill -9 the operation failed (lock not released?): code %d, %q", r.code, r.err)
 	}
 	if c, ok := b.hasSubject("T-1: external edit"); !ok || c.Actor != "external" {
-		t.Errorf("правка не ушла как external edit: %+v", b.commits())
+		t.Errorf("the edit did not go as an external edit: %+v", b.commits())
 	}
 	if st := strings.TrimSpace(b.git("status", "--porcelain")); st != "" {
-		t.Errorf("дерево не чистое:\n%s", st)
+		t.Errorf("tree is not clean:\n%s", st)
 	}
 }
 
 func TestScenario_Kill9Random_RepoStaysConsistent(t *testing.T) {
 	if testing.Short() {
-		t.Skip("slow tier: kill -9 в случайные моменты")
+		t.Skip("slow tier: kill -9 at random moments")
 	}
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
@@ -862,21 +862,21 @@ func TestScenario_Kill9Random_RepoStaysConsistent(t *testing.T) {
 		if err := c.Start(); err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(time.Duration(i%12*4) * time.Millisecond) // момент удара: 0-44 мс
+		time.Sleep(time.Duration(i%12*4) * time.Millisecond) // moment of the strike: 0-44 ms
 		_ = syscall.Kill(-c.Process.Pid, syscall.SIGKILL)
 		if err := c.Wait(); err == nil {
 			finished = append(finished, text)
 		}
-		b.ageLocks() // убитый git оставил lock: считаем его висящим
+		b.ageLocks() // the killed git left a lock: treat it as dangling
 	}
 	b.noTmpLeft(false)
 	b.fsck()
 	if r := b.ok("", "list"); r.err != "" {
-		t.Errorf("list: stderr %q, файл задачи полузаписан", r.err)
+		t.Errorf("list: stderr %q, the task file is half-written", r.err)
 	}
-	fin := b.ok("", "note", "T-1", "финал")
+	fin := b.ok("", "note", "T-1", "final")
 	if st := b.git("status", "--porcelain"); st != "" {
-		t.Errorf("после финальной операции дерево не чистое:\n%s\nstderr note: %q\ndiff:\n%s\nlog:\n%s", st, fin.err, b.git("diff", "HEAD"), b.read(filepath.Join(b.home, ".tix", "log")))
+		t.Errorf("after the final operation the tree is not clean:\n%s\nstderr note: %q\ndiff:\n%s\nlog:\n%s", st, fin.err, b.git("diff", "HEAD"), b.read(filepath.Join(b.home, ".tix", "log")))
 	}
 	have := map[string]bool{}
 	for _, c := range b.showJSON("T-1").Comments {
@@ -884,7 +884,7 @@ func TestScenario_Kill9Random_RepoStaysConsistent(t *testing.T) {
 	}
 	for _, f := range finished {
 		if !have[f] {
-			t.Errorf("команда %s завершилась с кодом 0, но комментария нет", f)
+			t.Errorf("command %s exited with code 0, but there is no comment", f)
 		}
 	}
 }

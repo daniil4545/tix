@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	inboxLimit   = 8000 // знаков текста доставки; лимит Claude Code - 10 000
-	inboxReserve = 80   // запас под последнюю строку "... more"
-	inboxMinCut  = 40   // короче этого остатка комментарий не обрезается, а уходит в more
+	inboxLimit   = 8000 // chars of delivery text; the Claude Code limit is 10 000
+	inboxReserve = 80   // reserve for the last line "... more"
+	inboxMinCut  = 40   // below this remainder a comment is not cut but goes to more
 	humanActor   = "human"
 	inboxHeader  = "New comments on your tasks (from tix):"
 
@@ -26,7 +26,7 @@ const (
 	eventStop     = "Stop"
 )
 
-// hookInput - поля входа хука, нужные доставке.
+// hookInput - the hook input fields that delivery needs.
 type hookInput struct {
 	SessionID string `json:"session_id"`
 	Event     string `json:"hook_event_name"`
@@ -34,8 +34,8 @@ type hookInput struct {
 	TurnID    string `json:"turn_id"`
 }
 
-// readHookInput читает один JSON-объект со stdin (до hookStdinLimit) в срок hookReadTimeout.
-// Срок вышел или ввод не JSON - ok=false.
+// readHookInput reads one JSON object from stdin (up to hookStdinLimit) within hookReadTimeout.
+// Timeout or non-JSON input - ok=false.
 func readHookInput(r io.Reader) (in hookInput, ok bool) {
 	done := make(chan hookInput, 1)
 	go func() {
@@ -54,7 +54,7 @@ func readHookInput(r io.Reader) (in hookInput, ok bool) {
 	}
 }
 
-// newComment - комментарий, ещё не доставленный агенту.
+// newComment - a comment not yet delivered to the agent.
 type newComment struct {
 	id string
 	c  task.Comment
@@ -71,7 +71,7 @@ func (a *app) cmdInbox(args []string) error {
 	if !p.set["hook"] {
 		return inputf("inbox works only as a hook: tix inbox --hook")
 	}
-	// Хук не ломает работу агента: любой сбой - пустой вывод и код 0, причина в .tix/log.
+	// The hook does not break the agent's work: any failure is empty output and code 0, the reason goes to .tix/log.
 	defer func() {
 		if r := recover(); r != nil {
 			a.log.Warn("inbox hook panic", "op", "inbox", "err", r)
@@ -81,14 +81,14 @@ func (a *app) cmdInbox(args []string) error {
 	return nil
 }
 
-// deliverInbox печатает новые комментарии по задачам, которые держит агент хука (спека mvp-inbox, 3).
+// deliverInbox prints new comments on the tasks the hook agent holds.
 func (a *app) deliverInbox() {
 	if a.env.Stdin == nil {
 		return
 	}
 	in, ok := readHookInput(a.env.Stdin)
 	if !ok {
-		// Лога ещё нет: база не открыта. Причина (обрыв, мусор, больше потолка) уходит в .tix/log.
+		// No log yet: the store is not open. The reason (cut-off, garbage, over the ceiling) goes to .tix/log.
 		if a.open() == nil {
 			a.log.Warn("inbox: hook input not read", "op", "inbox", "limit", hookStdinLimit)
 		}
@@ -113,7 +113,7 @@ func (a *app) deliverInbox() {
 		a.log.Warn("inbox: no actor or marks dir", "op", "inbox", "session", in.SessionID)
 		return
 	}
-	// Пустая база: читать нечего.
+	// Empty store: nothing to read.
 	if _, statErr := os.Stat(a.root); statErr != nil {
 		return
 	}
@@ -130,8 +130,8 @@ func (a *app) deliverInbox() {
 	marks, _ := actor.ReadMarks(dir, file)
 	before := maps.Clone(marks)
 	fresh, changed := collectNew(tasks, who, marks)
-	// Stop будит агента только словом человека: комментарии агентов ждут PostToolUse или UserPromptSubmit,
-	// иначе два агента гоняют друг друга по кругу.
+	// Stop wakes the agent only with a human word: agent comments wait for PostToolUse or UserPromptSubmit,
+	// otherwise two agents drive each other in circles.
 	if in.Event == eventStop && !hasHuman(fresh) {
 		for _, nc := range fresh {
 			marks[nc.id] = before[nc.id]
@@ -142,7 +142,7 @@ func (a *app) deliverInbox() {
 	if !changed {
 		return
 	}
-	// Отметка сдвигается до печати: доставка не чаще одного раза, Stop не зацикливается.
+	// The mark moves before printing: delivery happens at most once, Stop does not loop.
 	if err := actor.WriteMarks(dir, file, marks); err != nil {
 		a.log.Warn("inbox: marks not written", "op", "inbox", "actor", who, "err", err)
 		return
@@ -153,9 +153,9 @@ func (a *app) deliverInbox() {
 	a.printInbox(in.Event, inboxText(fresh))
 }
 
-// collectNew сверяет задачи, которые держит who, с отметками: двигает marks и отдаёт чужие
-// комментарии с номером больше отметки. changed - marks изменились. Задача без отметки получает
-// текущее число и ничего не доставляет; отметка больше текущего числа сбрасывается на него.
+// collectNew compares the tasks that who holds with the marks: moves marks and returns others'
+// comments numbered above the mark. changed - marks changed. A task without a mark gets the
+// current count and delivers nothing; a mark above the current count resets to it.
 func collectNew(tasks []*task.Task, who string, marks actor.Marks) (fresh []newComment, changed bool) {
 	for _, t := range tasks {
 		if claim, ok := t.ClaimInfo(); !ok || claim.Actor != who {
@@ -190,8 +190,8 @@ func taskNumber(id string) int {
 	return n
 }
 
-// inboxText собирает текст доставки до inboxLimit знаков. Длинный комментарий обрезается;
-// что не влезло, называет последняя строка "... more: tix show <id>".
+// inboxText builds the delivery text up to inboxLimit chars. A long comment is cut;
+// what did not fit is named by the last line "... more: tix show <id>".
 func inboxText(fresh []newComment) string {
 	var b strings.Builder
 	b.WriteString(inboxHeader)
@@ -221,7 +221,7 @@ func inboxText(fresh []newComment) string {
 	return b.String()
 }
 
-// missing дописывает в left id задач из rest, которых там ещё нет.
+// missing appends to left the task ids from rest that are not there yet.
 func missing(left []string, rest []newComment) []string {
 	for _, nc := range rest {
 		if !slices.Contains(left, nc.id) {
@@ -233,8 +233,8 @@ func missing(left []string, rest []newComment) []string {
 
 func runeLen(s string) int { return len([]rune(s)) }
 
-// printInbox печатает ответ хука в формате события: Stop возвращает агента в работу
-// через decision=block, остальные события добавляют текст в контекст.
+// printInbox prints the hook reply in the event format: Stop returns the agent to work
+// through decision=block, other events add text to the context.
 func (a *app) printInbox(event, text string) {
 	var out any
 	if event == eventStop {

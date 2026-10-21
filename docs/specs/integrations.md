@@ -1,52 +1,52 @@
-# Спека: синхронизация с внешними трекерами (после MVP)
+# Spec: sync with external trackers (after the MVP)
 
-Статус: draft
-Родитель: `docs/spec.md` (решения Р14, Р29-Р32). Макет: вкладка «интеграции» `docs/mockup/ui.html`.
+Status: draft
+Parent: `docs/spec.md` (decisions D14, D29-D32). Mockup: the "integrations" tab of `docs/mockup/ui.html`.
 
-## 1. Цель и границы
+## 1. Goal and boundaries
 
-- Цель: перенос задачи у нас меняет статус в Kaiten или GitHub; перенос там меняет статус у нас.
-- Делаем: статус в обе стороны; итог при `done` комментарием наружу (Р31).
-- Не делаем: синхронизацию полей, тела, комментариев и заметок; создание задач снаружи.
-- В MVP поле `external` - только ссылка (Р32).
+- Goal: moving a task on our side changes its status in Kaiten or GitHub; moving it there changes the status here.
+- We do: status in both directions; the result at `done` as a comment outward (D31).
+- We do not do: sync of fields, body, comments and notes; creating tasks from outside.
+- In the MVP the field `external` is only a link (D32).
 
-## 2. Как работает (предложение)
+## 2. How it works (proposal)
 
 ```mermaid
 flowchart LR
-  mv["Перенос у нас"] --> c["Коммит, status"]
+  mv["Move on our side"] --> c["Commit, status"]
   c --> q{"status = external_state?"}
-  q -->|"нет"| a["Адаптер в фоне"]
+  q -->|"no"| a["Adapter in background"]
   a -->|"ok"| s["external_state = status"]
-  a -->|"ошибка"| e["Пометка !, повтор"]
-  q -->|"да"| z(["Готово"])
+  a -->|"error"| e["Mark !, retry"]
+  q -->|"yes"| z(["Done"])
 ```
 
-1. Человек или агент переносит задачу; ядро меняет `status`, коммит.
-2. `external_state` хранит статус, известный внешнему трекеру. Расходится со `status` - задача ждёт
-   отправки; отдельной очереди нет.
-3. Адаптер в фоне: `kaiten card move <id> --column <колонка>` или
-   `gh project item-edit --url <issue> --field Status --value <статус>`; `done` у GitHub закрывает
-   issue, выход из `done` открывает.
-4. Ok - `external_state` догоняет `status`. Ошибка - пометка `!` на карточке, повтор по `s` и при
-   запуске TUI.
-5. Входящие изменения: по `s` в TUI, `tk pull` (Р61), старт TUI. Задача у нас не менялась - переносим и
-   пишем в историю. Изменилась с обеих сторон - побеждает внешний трекер (Р30), наш перенос
-   остаётся в git. 404 - пометка, задачу не трогаем.
-6. При `done` итог `-m` уходит комментарием один раз (метка в тексте комментария).
+1. The human or the agent moves a task; the core changes `status`, commit.
+2. `external_state` stores the status known to the external tracker. If it differs from `status`, the task waits
+   to be sent; there is no separate queue.
+3. The adapter in the background: `kaiten card move <id> --column <column>` or
+   `gh project item-edit --url <issue> --field Status --value <status>`; for GitHub `done` closes the
+   issue, leaving `done` reopens it.
+4. Ok - `external_state` catches up with `status`. Error - the mark `!` on the card, a retry on `s` and at
+   TUI start.
+5. Incoming changes: on `s` in the TUI, `tix pull` (D61), TUI start. The task did not change on our side - we move it and
+   write to history. It changed on both sides - the external tracker wins (D30), our move
+   stays in git. 404 - a mark, we do not touch the task.
+6. At `done` the result `-m` goes out as a comment once (a marker in the comment text).
 
-Адаптер - исполняемый файл `tracker-ext-<имя>` в `~/tasks/.tracker/ext/` или в PATH, как
-`git-remote-<имя>`. JSON в stdin и stdout; операции `get`, `set_state`, `comment`, `list`. Первые
-адаптеры - скрипты поверх установленных `kaiten` и `gh`.
+The adapter is an executable `tix-ext-<name>` in `~/tasks/.tix/ext/` or in PATH, like
+`git-remote-<name>`. JSON on stdin and stdout; operations `get`, `set_state`, `comment`, `list`. The first
+adapters are scripts on top of the installed `kaiten` and `gh`.
 
-Соответствие колонок в `config.toml`:
+Column mapping in `config.toml`:
 
 ```
 [adapters.kaiten.columns]
-todo = "Очередь"
-doing = "В работе"
-blocked = "В работе"
-done = "Готово"
+todo = "Queue"
+doing = "In progress"
+blocked = "In progress"
+done = "Done"
 
 [adapters.gh]
 done = "close"
@@ -54,25 +54,25 @@ project = "owner/3"
 status = { todo = "Todo", doing = "In Progress", done = "Done" }
 ```
 
-## 3. Критичные правила
+## 3. Critical rules
 
-- Соответствие колонок может быть неоднозначным: `doing` и `blocked` обе идут в «В работе».
-  Входящий статус, который соответствует текущей колонке задачи, её не меняет; иначе задача
-  переходит в первую колонку из соответствия (предложение).
-- Ошибка сети не меняет `status`; повтор `set_state` безопасен.
-- Изменения снаружи не трогают поля, тело и комментарии.
-- Удаление снаружи не удаляет задачу.
+- The column mapping can be ambiguous: `doing` and `blocked` both go to "In progress".
+  An incoming status that matches the current column of the task does not change it; otherwise the task
+  moves to the first column of the mapping (proposal).
+- A network error does not change `status`; a repeated `set_state` is safe.
+- Changes from outside do not touch fields, body and comments.
+- Deletion from outside does not delete the task.
 
-## 4. Внешние факты
+## 4. External facts
 
-| Система | Факт | Источник, дата |
+| System | Fact | Source, date |
 |---|---|---|
-| Kaiten | `kaiten card move <id> --column`, `card comment`, `--json`; CLI v0.6.1 | `--help`, 20.10.2026 |
-| GitHub | `gh project item-edit --url --field --value` по именам; `gh` 2.102 залогинен | `--help`, 20.10.2026 |
-| Kaiten | REST, Bearer, 50 запросов в секунду | developers.kaiten.ru |
-| GitHub | 5000 запросов в час | docs.github.com |
+| Kaiten | `kaiten card move <id> --column`, `card comment`, `--json`; CLI v0.6.1 | `--help`, 2026-10-20 |
+| GitHub | `gh project item-edit --url --field --value` by names; `gh` 2.102 logged in | `--help`, 2026-10-20 |
+| Kaiten | REST, Bearer, 50 requests per second | developers.kaiten.ru |
+| GitHub | 5000 requests per hour | docs.github.com |
 
-## 5. Открытые вопросы
+## 5. Open questions
 
-- Как часто опрашивать внешние трекеры без действия пользователя: никогда, при старте TUI, по таймеру.
-- Задача с `external` удалена у нас: что делать с внешней.
+- How often to poll external trackers without a user action: never, at TUI start, on a timer.
+- A task with `external` was deleted on our side: what to do with the external one.

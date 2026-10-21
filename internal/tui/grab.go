@@ -9,19 +9,19 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// grab - захват карточки: она переезжает по экрану, файлы не трогаются до отпускания.
-// col и idx - показанное место: индекс колонки доски и место в её списке без самой карточки.
-// baseCol и baseAbove - прежнее место (колонка и задача над ней), rebuild считает их заново.
+// grab - picking up a card: it moves around the screen, files stay untouched until release.
+// col and idx - the shown place: the board column index and the place in its list without the card itself.
+// baseCol and baseAbove - the previous place (column and the task above it), rebuild recomputes them.
 type grab struct {
 	id        string
 	col, idx  int
-	status    string     // статус задачи в начале захвата
-	held      *task.Task // захваченная задача, обновляется при каждой сборке доски
+	status    string     // task status at the start of the grab
+	held      *task.Task // the grabbed task, refreshed on every board build
 	baseCol   string
 	baseAbove string
 }
 
-// startGrab берёт выбранную карточку.
+// startGrab takes the selected card.
 func (m *Model) startGrab() {
 	t := m.selected()
 	if t == nil {
@@ -41,7 +41,7 @@ func (m *Model) grabStatus() {
 	m.setStatus("moving "+m.grab.id+": arrows move, space drop, esc cancel", false)
 }
 
-// grabKey разбирает клавишу при захвате; прочие клавиши игнорируются.
+// grabKey handles a key during a grab; other keys are ignored.
 func (m *Model) grabKey(k string) tea.Cmd {
 	switch k {
 	case "ctrl+c":
@@ -73,7 +73,7 @@ func (m *Model) grabKey(k string) tea.Cmd {
 	return nil
 }
 
-// grabColumn переносит показанную карточку в соседнюю колонку на то же место или в конец.
+// grabColumn moves the shown card to the neighbor column, to the same place or to the end.
 func (m *Model) grabColumn(dir int) {
 	g := m.grab
 	next := g.col + dir
@@ -84,7 +84,7 @@ func (m *Model) grabColumn(dir int) {
 	m.rebuild()
 }
 
-// grabRow меняет место карточки в колонке; в порядке по сроку место не выбирается.
+// grabRow changes the card place in a column; in due order the place is not chosen.
 func (m *Model) grabRow(dir int) {
 	g := m.grab
 	if m.board.ByDue {
@@ -94,7 +94,7 @@ func (m *Model) grabRow(dir int) {
 	m.rebuild()
 }
 
-// drop отпускает карточку: один Move в показанную колонку на показанное место.
+// drop releases the card: one Move to the shown column at the shown place.
 func (m *Model) drop() tea.Cmd {
 	g := m.grab
 	col, row := m.board.Col, m.board.Row
@@ -119,8 +119,8 @@ func (m *Model) drop() tea.Cmd {
 	return m.moveTo(t, target, core.MoveOpts{Place: core.Place{First: row == 0, After: above}})
 }
 
-// place вынимает захваченную задачу из её колонки (запоминает, кто был над ней) и вставляет
-// в показанную колонку target; в порядке по сроку - по сроку. ts уже отсортирован.
+// place takes the grabbed task out of its column (remembers who was above it) and inserts it
+// into the shown column target; in due order - by due date. ts is already sorted.
 func (g *grab) place(name string, ts []*task.Task, target string, byDue bool) []*task.Task {
 	if name == g.baseCol {
 		i := slices.IndexFunc(ts, func(t *task.Task) bool { return t.ID == g.id })

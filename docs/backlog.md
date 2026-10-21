@@ -1,99 +1,99 @@
-# Бэклог MVP
+# MVP backlog
 
-Статус: утверждён пользователем 20.10.2026. Источник - `docs/spec.md` (agreed 20.10.2026).
-Путь всех задач - тяжёлый (новая функция): план `docs/plans/<задача>.md`, `spec-reviewer`,
-`code-reviewer` тщательный, проверка рисков.
+Status: approved by the user on 2026-10-20. Source - `docs/spec.md` (agreed 2026-10-20).
+The path of all tasks is heavy (a new feature): task plan `docs/plans/<task>.md`, `spec-reviewer`,
+thorough `code-reviewer`, risk check.
 
 ```mermaid
 flowchart LR
-  t1["З1 Ядро и базовый CLI"] --> t2["З2 Цикл агента"]
-  t2 --> t3["З3 Коннекторы агентов"]
-  t2 --> t4["З4 TUI"]
-  t3 --> t5["З5 Публикация"]
+  t1["S1 Core and basic CLI"] --> t2["S2 Agent cycle"]
+  t2 --> t3["S3 Agent connectors"]
+  t2 --> t4["S4 TUI"]
+  t3 --> t5["S5 Publication"]
   t4 --> t5
 ```
 
-После З2 задачи З3 и З4 идут параллельно: у них разные файлы.
+After S2 the tasks S3 and S4 run in parallel: they have different files.
 
-## З1. Ядро записи и базовый CLI
+## S1. Write core and basic CLI
 
-- Спека: 2, 2.1, 2.2 (`new`, `list`, `show`, `edit`, `comment`, `note`, `rm`), 2.5 (конфиг), 5, 7, 8, 9.
-- Результат: `tk new`, `list`, `show`, `edit`, `comment`, `note`, `rm` пишут в `~/tasks` через лок,
-  слияние и коммит на правку. Правка Obsidian уходит коммитом external edit. Первая запись создаёт
-  `~/tasks`. Созданы `README.md`, `AGENTS.md`, `Makefile` (`check`, `bench`).
-- Этап 0 (до кода): замер запуска и разбора 1000 файлов, цели раздела 7 уточняются; живая проверка
-  записи Codex в `.git` вне рабочей папки и переменной `CODEX_THREAD_ID`.
-- Не входит: `ctx`, `take`, `move`, `set`, `check`, `done`, `backup`, TUI, коннекторы.
-- Проверка: `make check` - сценарии раздела 3 для этих команд (два агента, `edit` по старой базе,
-  Obsidian, лок занят, висящий `index.lock`, `kill -9`, сломанный файл, пустой `~/tasks`, коммит
-  упал), гонка 5x20 `comment`; `make bench`.
-- Зависимости: нет.
+- Spec: 2, 2.1, 2.2 (`new`, `list`, `show`, `edit`, `comment`, `note`, `rm`), 2.5 (config), 5, 7, 8, 9.
+- Result: `tix new`, `list`, `show`, `edit`, `comment`, `note`, `rm` write to `~/tasks` through the lock,
+  merge and a commit per edit. An Obsidian edit goes out as an external edit commit. The first write creates
+  `~/tasks`. Created: `README.md`, `AGENTS.md`, `Makefile` (`check`, `bench`).
+- Stage 0 (before code): measure the start and parsing of 1000 files, refine the targets of section 7; a live check of
+  Codex writing to `.git` outside the working folder and of the variable `CODEX_THREAD_ID`.
+- Out of scope: `ctx`, `take`, `move`, `set`, `check`, `done`, `backup`, TUI, connectors.
+- Check: `make check` - the scenarios of section 3 for these commands (two agents, `edit` on an old base,
+  Obsidian, lock busy, dangling `index.lock`, `kill -9`, broken file, empty `~/tasks`, commit
+  failed), race 5x20 `comment`; `make bench`.
+- Dependencies: none.
 
-## З2. Рабочий цикл агента
+## S2. Agent cycle
 
-- Спека: 2.2 (`ctx`, `take`, `move`, `set`, `check`, `done`, `backup`), 2.4 (личность), 2.5
-  (проверки переноса), 5 (`claim`), 11; Р36-Р41, Р48 (короткий id), Р51, Р52, Р54 (коды выхода), Р55, Р58 (трейлер `Code:`);
-  трейлеры через `commit --trailer`, своя сборка мусора: счётчик, `git gc` в фоне, `commit-graph
-  --changed-paths` (`docs/api/git.md`, разделы 5, 9).
-- Результат: агент проходит happy path раздела 3 одними командами `tk`. Захват, перехват, порядок
-  в колонке, проверки `waiting` и закрытия работают. `backup` пушит в remote. Созданы `RULES.md`,
-  шаблон тикета, `docs/architecture.md`.
-- Не входит: TUI, установка скилла и хуков в агенты, фоновый бэкап.
-- Проверка: `make check` - сценарии happy path, чужой захват, `set status=`, закрытие с
-  неотмеченными, повтор, remote недоступен (локальный bare-репозиторий); `make bench` для `ctx`.
-- Зависимости: З1.
+- Spec: 2.2 (`ctx`, `take`, `move`, `set`, `check`, `done`, `backup`), 2.4 (identity), 2.5
+  (move checks), 5 (`claim`), 11; D36-D41, D48 (short id), D51, D52, D54 (exit codes), D55, D58 (trailer `Code:`);
+  trailers through `commit --trailer`, own garbage collection: a counter, `git gc` in the background, `commit-graph
+  --changed-paths` (`docs/api/git.md`, sections 5, 9).
+- Result: the agent passes the happy path of section 3 with `tix` commands alone. Claim, takeover, order
+  in the column, the checks of `waiting` and of closing work. `backup` pushes to the remote. Created: `RULES.md`,
+  task template, `docs/architecture.md`.
+- Out of scope: TUI, installing the skill and hooks into agents, background backup.
+- Check: `make check` - the scenarios happy path, foreign claim, `set status=`, closing with
+  unchecked criteria, repeat, remote unavailable (a local bare repository); `make bench` for `ctx`.
+- Dependencies: S1.
 
-## З3. Коннекторы агентов
+## S3. Agent connectors
 
-- Спека: 2.4, 7 (`make e2e-agents`), Р7, Р8, Р17, Р49 (плагин Claude Code), Р54 (хук PreCompact).
-- Результат: скилл `tk`, хук старта `tk ctx` и разрешение `tk` стоят в Claude Code, Codex и
-  OpenCode. Домашняя сессия в `~/tasks` записывает идею в `inbox`.
-- Не входит: команда `setup`, ассистент по расписанию.
-- Проверка: `make e2e-agents` - коммиты take, note, done с `Actor:` каждого агента. Тратит лимиты
-  подписок: запуск с согласия пользователя.
-- Риск: пишет в настройки агентов пользователя (`~/.claude`, `~/.codex`, OpenCode) - нужны
-  `test-designer` и проверка рисков.
-- Зависимости: З2.
+- Spec: 2.4, 7 (`make e2e-agents`), D7, D8, D17, D49 (Claude Code plugin), D54 (hook PreCompact).
+- Result: the skill `tix`, the start hook `tix ctx` and the permission for `tix` are in place in Claude Code, Codex and
+  OpenCode. The home session in `~/tasks` writes an idea into `inbox`.
+- Out of scope: the command `setup`, the scheduled assistant.
+- Check: `make e2e-agents` - commits take, note, done with the `Actor:` of each agent. It spends subscription
+  limits: a run with the user's consent.
+- Risk: writes to the user's agent settings (`~/.claude`, `~/.codex`, OpenCode) - needs
+  `test-designer` and a risk check.
+- Dependencies: S2.
 
-## З4. TUI
+## S4. TUI
 
-- Спека: 2.3, 7 (TUI), Р9, Р26, Р27, Р34, Р38, Р45, Р60 (свёртка истории), макет `docs/mockup/ui.html`;
-  даты изменения `git last-modified` (запасной путь mtime), история раздела `git log -L` (`docs/api/git.md`, раздел 9).
-- Результат: `tk` без аргументов открывает доску и карточку с историей. Работают клавиши, перенос
-  со строкой ввода, порядок, фильтр по проекту, `$EDITOR` с повтором при конфликте, жёлтая
-  звёздочка, живое обновление.
-- Не входит: тема `cards`, ответ агенту из карточки, правка полей (Р45).
-- Проверка: `teatest` и заглушка `EDITOR`; `make bench` - открытие до 100 мс. Вид TUI и
-  одновременная правка в Obsidian - пользователь глазами, один раз.
-- Зависимости: З2.
+- Spec: 2.3, 7 (TUI), D9, D26, D27, D34, D38, D45, D60 (history folding), mockup `docs/mockup/ui.html`;
+  modification dates `git last-modified` (fallback mtime), section history `git log -L` (`docs/api/git.md`, section 9).
+- Result: `tix` without arguments opens the board and the card with history. Working: keys, move
+  with an input line, order, filter by project, `$EDITOR` with a retry on conflict, yellow
+  star, live refresh.
+- Out of scope: theme `cards`, reply to the agent from the card, field editing (D45).
+- Check: `teatest` and a stub `EDITOR`; `make bench` - open within 100 ms. The look of the TUI and
+  a simultaneous edit in Obsidian - the user, by eye, once.
+- Dependencies: S2.
 
-## З5. Публичный репозиторий
+## S5. Public repository
 
-- Спека: Р46, Р47, Р50 (установка, completions), Р53 (macOS и Linux), Р54 (примеры в README), Р56 (позиция в README); порядок и состав - `~/.claude/templates/github/design.md`.
-- Результат: публичный репозиторий снимком рабочего. README на английском с демо VHS, сравнение
-  с аналогами из `docs/research/landscape.md` и `docs/research/competitors.md`, LICENSE MIT, CHANGELOG, CI на macOS и Linux, релиз `v0.1.0`
-  с бинарями darwin и linux (amd64, arm64) и SHA256SUMS, описание и topics.
-- Не входит: сайт, логотип, перевод README.
-- Проверка: чек-лист раздела 9 дизайн-документа, итог в отчёте.
-- Нужно от пользователя: имя репозитория, вход `gh auth login`.
-- Зависимости: З3, З4.
+- Spec: D46, D47, D50 (install, completions), D53 (macOS and Linux), D54 (examples in the README), D56 (position in the README); order and content - `~/.claude/templates/github/design.md`.
+- Result: a public repository as a snapshot of the working one. English README with a VHS demo, comparison
+  with the analogs from `docs/research/landscape.md` and `docs/research/competitors.md`, LICENSE MIT, CHANGELOG, CI on macOS and Linux, release `v0.1.0`
+  with darwin and linux binaries (amd64, arm64) and SHA256SUMS, description and topics.
+- Out of scope: website, logo, README translation.
+- Check: the checklist of section 9 of the design document, the result in the report.
+- Needed from the user: the repository name, login `gh auth login`.
+- Dependencies: S3, S4.
 
-## После MVP
+## After the MVP
 
-- `tk sync` на две машины (Р57, Р61): `merge-tree --write-tree`, `merge=union` для комментариев, `bundle`.
-- `tk pull` и клавиша `s`: статус из внешних трекеров (Р61, `docs/specs/integrations.md`).
+- `tix sync` for two machines (D57, D61): `merge-tree --write-tree`, `merge=union` for comments, `bundle`.
+- `tix pull` and the key `s`: status from external trackers (D61, `docs/specs/integrations.md`).
 
-## Покрытие спеки
+## Spec coverage
 
-| Раздел | Задачи |
+| Section | Tasks |
 |---|---|
-| 1 таблица MVP | З1-З4 |
-| 2.1 ядро, 8 модель состояния | З1 |
-| 2.2 CLI | З1, З2 |
-| 2.3 TUI | З4 |
-| 2.4 коннекторы | З1 (этап 0), З2 (личность), З3 |
-| 2.5 колонки | З1 (конфиг), З2 (проверки) |
-| 3 сценарии | З1, З2, З4 |
-| 7 приёмка | З1 (`check`, `bench`), З3 (`e2e-agents`), З4 (`teatest`) |
-| 11 образцы текстов | З2 |
-| Р46 язык, Р47 публикация | З1-З4 (строки), З5 |
+| 1 MVP table | S1-S4 |
+| 2.1 core, 8 state model | S1 |
+| 2.2 CLI | S1, S2 |
+| 2.3 TUI | S4 |
+| 2.4 connectors | S1 (stage 0), S2 (identity), S3 |
+| 2.5 columns | S1 (config), S2 (checks) |
+| 3 scenarios | S1, S2, S4 |
+| 7 acceptance | S1 (`check`, `bench`), S3 (`e2e-agents`), S4 (`teatest`) |
+| 11 text samples | S2 |
+| D46 language, D47 publication | S1-S4 (strings), S5 |

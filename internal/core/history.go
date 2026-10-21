@@ -11,11 +11,11 @@ import (
 	"github.com/daniil4545/tix/internal/project"
 )
 
-// gcEvery - число коммитов между запусками gc (docs/api/git.md, раздел 5: 200-500).
+// gcEvery - the number of commits between gc runs (docs/api/git.md, section 5: 200-500).
 const gcEvery = 300
 
-// codeTrailer возвращает трейлер Code: <проект>@<sha HEAD> для рабочей папки процесса.
-// Папка вне проекта (внутри базы, вне git) или нет HEAD - пустой трейлер, он не пишется.
+// codeTrailer returns the trailer Code: <project>@<HEAD sha> for the process working folder.
+// A folder outside a project (inside the store, outside git) or no HEAD - an empty trailer, it is not written.
 func (s *Store) codeTrailer() gitx.Trailer {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -36,8 +36,8 @@ func (s *Store) codeTrailer() gitx.Trailer {
 	return gitx.Trailer{Key: "Code", Value: name + "@" + sha}
 }
 
-// modelTrailer возвращает трейлер Model: <TIX_MODEL>. Переменная пуста или не проходит
-// проверку - пустой трейлер, он не пишется, запись не отказывает.
+// modelTrailer returns the trailer Model: <TIX_MODEL>. A variable that is empty or fails
+// validation gives an empty trailer, it is not written, the write does not fail.
 func modelTrailer() gitx.Trailer {
 	model := os.Getenv("TIX_MODEL")
 	if !actor.ValidModel(model) {
@@ -46,7 +46,7 @@ func modelTrailer() gitx.Trailer {
 	return gitx.Trailer{Key: "Model", Value: model}
 }
 
-// repoDir поднимается от dir к папке с .git (каталогом или файлом worktree).
+// repoDir climbs from dir to the folder with .git (a directory or a worktree file).
 func repoDir(dir string) string {
 	for {
 		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
@@ -60,16 +60,16 @@ func repoDir(dir string) string {
 	}
 }
 
-// countCommits прибавляет n к счётчику под локом. true: набралось gcEvery, пора запускать gc
-// (после снятия лока). Счётчик живёт в файле лока: он уже в .gitignore, а содержимое
-// лока никто не читает. Не критичен: сбой записи сдвигает gc, поэтому пишется без temp и rename.
+// countCommits adds n to the counter under the lock. true: gcEvery reached, time to run gc
+// (after the lock is released). The counter lives in the lock file: it is already in .gitignore, and nobody
+// reads the lock content. Not critical: a write failure only shifts gc, so it is written without temp and rename.
 func (s *Store) countCommits(n int) bool {
 	if n == 0 {
 		return false
 	}
 	path := filepath.Join(s.root, tixDir, lockFile)
 	cur := 0
-	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // путь строит ядро
+	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // the path is built by the core
 		cur, _ = strconv.Atoi(strings.TrimSpace(string(data)))
 	}
 	total := cur + n

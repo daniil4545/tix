@@ -8,25 +8,25 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// prompt - строка ввода внизу экрана. done получает текст после enter. Пустой текст отдаётся
-// только при allowEmpty, иначе он отменяет ввод. pick не nil - режим выбора: одна клавиша
-// из списка запускает действие, текст не вводится.
+// prompt - the input line at the bottom of the screen. done gets the text after enter. Empty text is passed
+// only with allowEmpty, otherwise it cancels the input. pick not nil - choice mode: one key
+// from the list runs an action, no text is typed.
 type prompt struct {
 	label      string
 	text       []rune
 	allowEmpty bool
 	done       func(text string) tea.Cmd
 	pick       []pickOpt
-	confirm    func() tea.Cmd // не nil - вопрос да/нет: `y` запускает confirm, прочее отменяет
+	confirm    func() tea.Cmd // not nil - a yes/no question: `y` runs confirm, anything else cancels
 }
 
-// pickOpt - пара выбора: клавиша, слово после неё и действие.
+// pickOpt - a choice pair: the key, the word after it and the action.
 type pickOpt struct {
 	key, word string
 	run       func() tea.Cmd
 }
 
-// pickSep разделяет пары в строке выбора.
+// pickSep separates pairs in the choice line.
 const pickSep = "  "
 
 func (p *prompt) String() string {
@@ -36,7 +36,7 @@ func (p *prompt) String() string {
 	return string(p.text)
 }
 
-// pickText - строка пар выбора: `t title  d due`.
+// pickText - the line of choice pairs: `t title  d due`.
 func pickText(opts []pickOpt) string {
 	parts := make([]string, len(opts))
 	for i, o := range opts {
@@ -45,7 +45,7 @@ func pickText(opts []pickOpt) string {
 	return strings.Join(parts, pickSep)
 }
 
-// insert добавляет текст; переводы строк заменяются пробелами. В режиме выбора текст не вводится.
+// insert adds text; line breaks are replaced by spaces. In choice mode no text is typed.
 func (p *prompt) insert(s string) {
 	if p.pick != nil || p.confirm != nil {
 		return
@@ -54,13 +54,13 @@ func (p *prompt) insert(s string) {
 	p.text = append(p.text, []rune(s)...)
 }
 
-// ask открывает строку ввода; пустой текст на enter - отмена.
+// ask opens the input line; empty text on enter is a cancel.
 func (m *Model) ask(label string, done func(text string) tea.Cmd) {
 	m.askWith(label, "", false, done)
 }
 
-// askWith открывает строку ввода с начальным текстом. allowEmpty: пустой enter отдаёт ""
-// (очистить поле), иначе отменяет ввод.
+// askWith opens the input line with an initial text. allowEmpty: an empty enter passes ""
+// (clear the field), otherwise it cancels the input.
 func (m *Model) askWith(label, initial string, allowEmpty bool, done func(string) tea.Cmd) {
 	p := &prompt{label: label, allowEmpty: allowEmpty, done: done}
 	p.insert(initial)
@@ -68,19 +68,19 @@ func (m *Model) askWith(label, initial string, allowEmpty bool, done func(string
 	m.setStatus("", false)
 }
 
-// confirm открывает вопрос да/нет одной клавишей: `y` запускает yes, любая другая клавиша отменяет.
+// confirm opens a yes/no question with one key: `y` runs yes, any other key cancels.
 func (m *Model) confirm(label string, yes func() tea.Cmd) {
 	m.input = &prompt{label: label, confirm: yes}
 	m.setStatus("", false)
 }
 
-// choose открывает строку выбора одной клавишей.
+// choose opens the choice line with one key.
 func (m *Model) choose(label string, opts []pickOpt) {
 	m.input = &prompt{label: label, pick: opts}
 	m.setStatus("", false)
 }
 
-// withInput заменяет последнюю строку кадра (строку действий или подсказку) строкой ввода.
+// withInput replaces the last frame line (the actions line or the hint) with the input line.
 func withInput(frame, line string) string {
 	i := strings.LastIndex(frame, "\n")
 	if i < 0 {
@@ -89,7 +89,7 @@ func withInput(frame, line string) string {
 	return frame[:i+1] + line
 }
 
-// inputKey разбирает клавишу в строке ввода.
+// inputKey handles a key in the input line.
 func (m *Model) inputKey(msg tea.KeyPressMsg) tea.Cmd {
 	p := m.input
 	if p.pick != nil {
@@ -127,7 +127,7 @@ func (m *Model) inputKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-// pickKey: esc отменяет выбор, клавиша из списка запускает действие, прочие клавиши игнорируются.
+// pickKey: esc cancels the choice, a key from the list runs the action, other keys are ignored.
 func (m *Model) pickKey(k string) tea.Cmd {
 	switch k {
 	case "esc", "ctrl+c":
@@ -144,14 +144,14 @@ func (m *Model) pickKey(k string) tea.Cmd {
 	return nil
 }
 
-// inputClick: клик при открытой строке ввода. В режиме выбора пара под курсором равна её
-// клавише; в обычной строке клик ничего не делает.
+// inputClick: a click while the input line is open. In choice mode the pair under the cursor equals its
+// key; in a normal line a click does nothing.
 func (m *Model) inputClick(x, y int) tea.Cmd {
 	p := m.input
 	if p == nil || p.pick == nil || y != m.frameHeight()-1 {
 		return nil
 	}
-	// Строка рисуется как RenderInput: приглашение, пробел, текст (при нехватке места - хвост).
+	// The line is drawn as RenderInput: the prompt, a space, the text (the tail if space is short).
 	text := []rune(p.String())
 	shift := 0
 	if m.w > 0 {
@@ -161,7 +161,7 @@ func (m *Model) inputClick(x, y int) tea.Cmd {
 	pos := 0
 	for _, o := range p.pick {
 		width := len([]rune(o.key + " " + o.word))
-		// Обрезанная слева пара не кликается.
+		// A pair cut off on the left is not clickable.
 		if pos >= shift && x >= origin+pos && x < origin+pos+width {
 			return m.pickKey(o.key)
 		}
@@ -170,7 +170,7 @@ func (m *Model) inputClick(x, y int) tea.Cmd {
 	return nil
 }
 
-// frameHeight - число строк кадра, который сейчас рисует View.
+// frameHeight - the number of frame lines that View draws now.
 func (m *Model) frameHeight() int {
 	frame := ""
 	if m.showing {

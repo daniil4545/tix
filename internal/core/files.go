@@ -2,7 +2,7 @@ package core
 
 import (
 	"bytes"
-	"crypto/sha1" //nolint:gosec // git blob id, не защита
+	"crypto/sha1" //nolint:gosec // git blob id, not protection
 	"errors"
 	"fmt"
 	"os"
@@ -17,28 +17,28 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// taskRef - файл задачи в корне базы.
+// taskRef - a task file in the store root.
 type taskRef struct {
 	id   string
 	num  int
 	path string
 }
 
-// blobID считает git blob id (sha1 от "blob <длина>\0" и содержимого).
+// blobID computes the git blob id (sha1 of "blob <length>\0" and the content).
 func blobID(data []byte) string {
-	h := sha1.New() //nolint:gosec // git blob id, не защита
+	h := sha1.New() //nolint:gosec // git blob id, not protection
 	_, _ = fmt.Fprintf(h, "blob %d\x00", len(data))
 	_, _ = h.Write(data)
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-// IDNum - номер задачи из id вида T-12.
+// IDNum - the task number from an id like T-12.
 func IDNum(id string) int {
 	n, _ := strconv.Atoi(strings.TrimPrefix(id, "T-"))
 	return n
 }
 
-// taskFiles перечисляет T-*.md в корне, по возрастанию номера. Нет папки - пусто.
+// taskFiles lists T-*.md in the root, in ascending number order. No folder - empty.
 func (s *Store) taskFiles() ([]taskRef, error) {
 	entries, err := os.ReadDir(s.root)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *Store) taskFiles() ([]taskRef, error) {
 	return refs, nil
 }
 
-// findPath ищет файл задачи по id.
+// findPath looks for a task file by id.
 func (s *Store) findPath(id string) (string, error) {
 	if !idRe.MatchString(id) {
 		return "", ErrNotFound
@@ -77,14 +77,14 @@ func (s *Store) findPath(id string) (string, error) {
 	return "", ErrNotFound
 }
 
-// nextNum: max(next_id, максимальный номер файла + 1). Битый next_id - ошибка, файл цел.
+// nextNum: max(next_id, max file number + 1). A broken next_id is an error, the file stays intact.
 func (s *Store) nextNum(refs []taskRef) (int, error) {
 	num := 1
 	if n := len(refs); n > 0 {
 		num = refs[n-1].num + 1
 	}
 	path := filepath.Join(s.root, tixDir, nextIDFile)
-	data, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
+	data, err := os.ReadFile(path) //nolint:gosec // the path is built by the core
 	switch {
 	case err == nil:
 		n, perr := strconv.Atoi(strings.TrimSpace(string(data)))
@@ -98,10 +98,10 @@ func (s *Store) nextNum(refs []taskRef) (int, error) {
 	return num, nil
 }
 
-// listWorkers - число горутин разбора в List (замер этапа 0: 4 горутины 11 мс, последовательно 24 мс).
+// listWorkers - the number of parse goroutines in List (stage 0 measurement: 4 goroutines 11 ms, sequential 24 ms).
 const listWorkers = 4
 
-// List читает все задачи без git. Битые файлы - в списке ошибок.
+// List reads all tasks without git. Broken files go into the error list.
 func (s *Store) List() ([]*task.Task, []error) {
 	refs, err := s.taskFiles()
 	if err != nil {
@@ -109,8 +109,8 @@ func (s *Store) List() ([]*task.Task, []error) {
 	}
 	tasks := make([]*task.Task, len(refs))
 	errs := make([]error, len(refs))
-	// Файлы делятся на непрерывные куски по одному на горутину: поштучная раздача
-	// через канал на 1000 файлов съедает выигрыш пробуждениями потоков.
+	// Files are split into contiguous chunks, one per goroutine: per-item distribution
+	// through a channel over 1000 files eats the gain with thread wakeups.
 	workers := min(listWorkers, runtime.NumCPU(), max(len(refs), 1))
 	chunk := (len(refs) + workers - 1) / workers
 	var wg sync.WaitGroup
@@ -137,7 +137,7 @@ func (s *Store) List() ([]*task.Task, []error) {
 }
 
 func readTask(path string) (*task.Task, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
+	data, err := os.ReadFile(path) //nolint:gosec // the path is built by the core
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
@@ -148,11 +148,11 @@ func readTask(path string) (*task.Task, error) {
 	if t.Rev == "" {
 		t.Rev = blobID(data)
 	}
-	t.Path = path // абсолютный: корень приведён в Open
+	t.Path = path // absolute: the root is normalized in Open
 	return t, nil
 }
 
-// stage пишет данные во временный файл .tix/tmp и сбрасывает на диск.
+// stage writes data to the temp file .tix/tmp and flushes to disk.
 func (s *Store) stage(data []byte, mode os.FileMode) (string, error) {
 	f, err := os.CreateTemp(filepath.Join(s.root, tixDir, tmpDir), tmpPrefix+"*.tmp")
 	if err != nil {
@@ -180,20 +180,20 @@ func (s *Store) stage(data []byte, mode os.FileMode) (string, error) {
 	return name, nil
 }
 
-// publish делает rename temp на место; повтор при временной ошибке.
+// publish renames temp into place; repeats on a temporary error.
 func publish(tmp, dst string) error {
 	var err error
 	for i := range maxAttempts {
-		if err = os.Rename(tmp, dst); err == nil { //nolint:gosec // пути строит ядро
+		if err = os.Rename(tmp, dst); err == nil { //nolint:gosec // paths are built by the core
 			return nil
 		}
 		time.Sleep(time.Duration(i+1) * 5 * time.Millisecond)
 	}
-	_ = os.Remove(tmp) //nolint:gosec // путь строит ядро
+	_ = os.Remove(tmp) //nolint:gosec // the path is built by the core
 	return fmt.Errorf("rename to %s: %w", dst, err)
 }
 
-// writeNew пишет файл, которого ещё нет (или не читается задачей): temp и rename.
+// writeNew writes a file that does not exist yet (or is not readable as a task): temp and rename.
 func (s *Store) writeNew(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
@@ -209,8 +209,8 @@ func (s *Store) writeNew(path string, data []byte) error {
 	return publish(tmp, path)
 }
 
-// replace заменяет файл, если он ещё равен прочитанному (шаг 4 из 2.1). false - файл
-// изменился с чтения, нужен повтор.
+// replace replaces the file if it still equals what was read (step 4 of 2.1). false - the file
+// changed since the read, a repeat is needed.
 func (s *Store) replace(path string, old, data []byte) (bool, error) {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -223,9 +223,9 @@ func (s *Store) replace(path string, old, data []byte) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	cur, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
+	cur, err := os.ReadFile(path) //nolint:gosec // the path is built by the core
 	if err != nil || !bytes.Equal(cur, old) {
-		_ = os.Remove(tmp) //nolint:gosec // путь строит ядро
+		_ = os.Remove(tmp) //nolint:gosec // the path is built by the core
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return false, fmt.Errorf("read %s: %w", path, err)
 		}

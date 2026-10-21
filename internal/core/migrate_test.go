@@ -7,14 +7,14 @@ import (
 	"testing"
 )
 
-// Миграция: база прежней версии (.tracker, записи в .gitignore) после первого Open получает
-// .tix, задачи и журнал на месте, .gitignore обновлён, следующая запись коммитит правки.
+// Migration: a store of the former version (.tracker, entries in .gitignore) gets .tix after the first Open,
+// tasks and the journal stay in place, .gitignore is updated, the next write commits the edits.
 func TestOpen_LegacyTrackerDir_MigratedToTix(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.open(0)
 	r := mustCreate(t, s, "Legacy")
-	// Состояние прежней версии: служебная папка и .gitignore со старым именем.
+	// State of the former version: the service folder and .gitignore with the old name.
 	if err := os.Rename(filepath.Join(e.root, ".tix"), filepath.Join(e.root, ".tracker")); err != nil {
 		t.Fatal(err)
 	}
@@ -32,36 +32,36 @@ func TestOpen_LegacyTrackerDir_MigratedToTix(t *testing.T) {
 
 	s = e.open(0)
 	if _, err := os.Stat(filepath.Join(e.root, ".tix", "config.toml")); err != nil {
-		t.Errorf("после Open нет .tix/config.toml: %v", err)
+		t.Errorf("no .tix/config.toml after Open: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(e.root, ".tracker")); !os.IsNotExist(err) {
-		t.Errorf(".tracker остался после миграции: %v", err)
+		t.Errorf(".tracker remained after migration: %v", err)
 	}
 	got, err := os.ReadFile(ign)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(string(got), ".tracker") || !strings.Contains(string(got), ".tix/lock\n") {
-		t.Errorf(".gitignore после миграции:\n%s", got)
+		t.Errorf(".gitignore after migration:\n%s", got)
 	}
 	if _, _, err := s.Get(r.ID); err != nil {
-		t.Errorf("задача %s после миграции: %v", r.ID, err)
+		t.Errorf("task %s after migration: %v", r.ID, err)
 	}
 	if e.count() != before {
-		t.Errorf("Open создал коммит: было %d, стало %d", before, e.count())
+		t.Errorf("Open created a commit: was %d, now %d", before, e.count())
 	}
 	if _, err := s.Comment(r.ID, "after", "tester"); err != nil {
 		t.Fatalf("Comment: %v", err)
 	}
 	if out := e.git("status", "--porcelain"); out != "" {
-		t.Errorf("правки миграции не закоммичены:\n%s", out)
+		t.Errorf("migration edits not committed:\n%s", out)
 	}
 	if e.count() <= before {
-		t.Errorf("запись после миграции не создала коммит")
+		t.Errorf("a write after migration did not create a commit")
 	}
 }
 
-// Если .tix уже есть, а .tracker остался, Open ничего не трогает: данные не затираются.
+// If .tix exists and .tracker remained, Open touches nothing: data is not overwritten.
 func TestOpen_BothDirs_LegacyUntouched(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -73,12 +73,12 @@ func TestOpen_BothDirs_LegacyUntouched(t *testing.T) {
 	}
 	e.open(0)
 	if _, err := os.Stat(legacy); err != nil {
-		t.Errorf(".tracker удалён при наличии .tix: %v", err)
+		t.Errorf(".tracker removed while .tix exists: %v", err)
 	}
 }
 
-// legacyBase готовит базу прежней версии: служебная папка .tracker с журналом, .gitignore
-// с текстом ign (nil - файла нет), всё закоммичено.
+// legacyBase prepares a store of the former version: the service folder .tracker with a journal, .gitignore
+// with text ign (nil - no file), everything committed.
 func legacyBase(t *testing.T, e *env, ign *string) {
 	t.Helper()
 	mustCreate(t, e.open(0), "Legacy")
@@ -100,8 +100,8 @@ func legacyBase(t *testing.T, e *env, ign *string) {
 	e.git("commit", "-q", "-m", "legacy layout")
 }
 
-// Любой вариант .gitignore прежней версии: после миграции служебные файлы .tix не
-// попадают в git, журнал на месте, повторный Open .gitignore не меняет.
+// Any variant of the former-version .gitignore: after migration the .tix service files do not
+// get into git, the journal stays, a repeated Open does not change .gitignore.
 func TestOpen_LegacyGitignoreVariants_TixFilesIgnored(t *testing.T) {
 	str := func(s string) *string { return &s }
 	cases := []struct {
@@ -125,27 +125,27 @@ func TestOpen_LegacyGitignoreVariants_TixFilesIgnored(t *testing.T) {
 			first, _ := os.ReadFile(ign)
 			e.open(0)
 			if again, _ := os.ReadFile(ign); string(again) != string(first) {
-				t.Errorf("повторный Open изменил .gitignore:\n%s\nстало:\n%s", first, again)
+				t.Errorf("repeated Open changed .gitignore:\n%s\nnow:\n%s", first, again)
 			}
 			if got, err := os.ReadFile(filepath.Join(e.root, ".tix", "log")); err != nil || !strings.HasPrefix(string(got), "old log\n") {
-				t.Errorf("журнал после миграции: %q, %v", got, err)
+				t.Errorf("journal after migration: %q, %v", got, err)
 			}
 			r := mustCreate(t, s, "After")
 			if _, err := s.Comment(r.ID, "one", "tester"); err != nil {
 				t.Fatalf("Comment: %v", err)
 			}
 			if out := e.git("ls-files", ".tix/lock", ".tix/log", ".tix/tmp"); out != "" {
-				t.Errorf("служебные файлы .tix в git:\n%s\n.gitignore:\n%s", out, first)
+				t.Errorf(".tix service files in git:\n%s\n.gitignore:\n%s", out, first)
 			}
 			if out := e.git("status", "--porcelain"); out != "" {
-				t.Errorf("после записи грязно:\n%s", out)
+				t.Errorf("dirty after the write:\n%s", out)
 			}
 		})
 	}
 }
 
-// Обе папки (старый бинарь пересоздал .tracker): .tracker не трогается, а .gitignore
-// получает недостающие строки .tix.
+// Both folders (an old binary recreated .tracker): .tracker is not touched, and .gitignore
+// gets the missing .tix lines.
 func TestOpen_BothDirs_GitignoreGetsTixLines(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -163,6 +163,6 @@ func TestOpen_BothDirs_GitignoreGetsTixLines(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(string(got), ".tracker/lock\n") || !strings.Contains(string(got), ".tix/lock\n") {
-		t.Errorf(".gitignore при двух папках:\n%s", got)
+		t.Errorf(".gitignore with two folders:\n%s", got)
 	}
 }

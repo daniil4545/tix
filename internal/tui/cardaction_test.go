@@ -1,7 +1,7 @@
 package tui
 
-// Действия карточки и переход в сессию: docs/plans/mvp-actions.md, разделы 4 и 4a.
-// Модель ведётся напрямую через Update, без терминала.
+// Card actions and the jump into a session.
+// The model is driven directly through Update, without a terminal.
 
 import (
 	"os"
@@ -20,12 +20,12 @@ var cardANSI = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
 func caEnter(m *Model) { feed(m, tea.KeyPressMsg{Code: tea.KeyEnter}) }
 
-// frameLines - текст экрана без escape-кодов по строкам.
+// frameLines - the screen text without escape codes, by lines.
 func caLines(m *Model) []string {
 	return strings.Split(cardANSI.ReplaceAllString(m.View().Content, ""), "\n")
 }
 
-// xyOf ищет подстроку на экране: клетка её первого знака.
+// xyOf looks for a substring on the screen: the cell of its first character.
 func caXY(t *testing.T, m *Model, sub string) (x, y int) {
 	t.Helper()
 	for y, ln := range caLines(m) {
@@ -33,7 +33,7 @@ func caXY(t *testing.T, m *Model, sub string) (x, y int) {
 			return len([]rune(ln[:i])), y
 		}
 	}
-	t.Fatalf("на экране нет %q:\n%s", sub, strings.Join(caLines(m), "\n"))
+	t.Fatalf("%q is not on the screen:\n%s", sub, strings.Join(caLines(m), "\n"))
 	return 0, 0
 }
 
@@ -59,13 +59,13 @@ func TestAnswer_WritesCommentThenClearsAsk(t *testing.T) {
 	m.selectTask(id)
 	typeKeys(m, "a")
 	if m.input == nil || m.input.label != "answer:" {
-		t.Fatalf("после a строка ввода %+v, ждали answer:", m.input)
+		t.Fatalf("after a the input line is %+v, expected answer:", m.input)
 	}
 	typeKeys(m, "postgres")
 	caEnter(m)
 	ask, _, _, comments := e.caTask(id)
 	if ask != "" || len(comments) != 1 || comments[0] != "Answer: postgres" {
-		t.Errorf("ask=%q comments=%q; ждали пустой ask и один комментарий Answer: postgres", ask, comments)
+		t.Errorf("ask=%q comments=%q; expected an empty ask and one comment Answer: postgres", ask, comments)
 	}
 }
 
@@ -77,17 +77,17 @@ func TestAnswer_AskChangedMeanwhile_QuestionStays(t *testing.T) {
 	m.selectTask(id)
 	typeKeys(m, "a")
 	typeKeys(m, "postgres")
-	e.set(id, "ask", "which version?") // агент успел задать новый вопрос
+	e.set(id, "ask", "which version?") // the agent managed to ask a new question
 	caEnter(m)
 	ask, _, _, comments := e.caTask(id)
 	if ask != "which version?" {
-		t.Errorf("ask = %q, ждали новый вопрос нетронутым", ask)
+		t.Errorf("ask = %q, expected the new question untouched", ask)
 	}
 	if len(comments) != 1 {
-		t.Errorf("комментариев %d, ждали ответ на старый вопрос", len(comments))
+		t.Errorf("comments %d, expected the answer to the old question", len(comments))
 	}
 	if got := caStatus(m); got != id+": new question" {
-		t.Errorf("статус %q, ждали %q", got, id+": new question")
+		t.Errorf("status %q, expected %q", got, id+": new question")
 	}
 }
 
@@ -98,22 +98,22 @@ func TestAnswer_NoQuestionOrEmpty_NothingWritten(t *testing.T) {
 	m.selectTask(id)
 	typeKeys(m, "a")
 	if got := caStatus(m); got != id+": no question" || m.input != nil {
-		t.Errorf("без вопроса: статус %q, input %v", got, m.input)
+		t.Errorf("without a question: status %q, input %v", got, m.input)
 	}
 	e.set(id, "ask", "q?")
 	before := e.commits()
 	caReload(m)
 	typeKeys(m, "a")
-	caEnter(m) // пусто - отмена
+	caEnter(m) // empty - cancel
 	if e.commits() != before {
-		t.Error("пустой ответ оставил коммит")
+		t.Error("an empty answer left a commit")
 	}
 }
 
 func caOpenCard(m *Model) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
-		m.Update(cmd()) // история карточки приходит сообщением
+		m.Update(cmd()) // the card history arrives as a message
 	}
 }
 
@@ -127,28 +127,28 @@ func TestField_SetClearUnchangedRefused(t *testing.T) {
 	typeKeys(m, "fd2026-11-01")
 	caEnter(m)
 	if _, due, _, _ := e.caTask(id); due != "2026-11-01" {
-		t.Fatalf("due = %q, ждали 2026-11-01", due)
+		t.Fatalf("due = %q, expected 2026-11-01", due)
 	}
 
 	caReload(m)
 	n := e.commits()
-	typeKeys(m, "fd") // начальное значение в строке - текущее
+	typeKeys(m, "fd") // the initial value in the line is the current one
 	caEnter(m)
 	if e.commits() != n {
-		t.Error("то же значение записано повторно")
+		t.Error("the same value was written again")
 	}
 
 	typeKeys(m, "fd")
 	feed(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	caEnter(m)
 	if _, due, _, _ := e.caTask(id); due != "" {
-		t.Errorf("пустое значение не очистило срок: %q", due)
+		t.Errorf("an empty value did not clear the due: %q", due)
 	}
 
 	typeKeys(m, "fdnot-a-date")
 	caEnter(m)
 	if got := caStatus(m); !strings.Contains(got, "due") {
-		t.Errorf("отказ ядра не виден: статус %q", got)
+		t.Errorf("core refusal not visible: status %q", got)
 	}
 }
 
@@ -161,7 +161,7 @@ func TestField_SummaryWithSeveralLines_RefusesToEditInline(t *testing.T) {
 	caOpenCard(m)
 	typeKeys(m, "fs")
 	if got := caStatus(m); got != id+": summary has several lines, use e" || m.input != nil {
-		t.Errorf("статус %q, input %v", got, m.input)
+		t.Errorf("status %q, input %v", got, m.input)
 	}
 }
 
@@ -176,38 +176,38 @@ func TestCardClick_AskRowFieldsRowAndButtons(t *testing.T) {
 	x, y := caXY(t, m, "* needs you:")
 	leftClick(m, x, y)
 	if m.input == nil || m.input.label != "answer:" {
-		t.Fatalf("клик по вопросу: input %+v", m.input)
+		t.Fatalf("click on the ask: input %+v", m.input)
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	leftClick(m, 0, 1) // строка полей: сразу под заголовком
+	leftClick(m, 0, 1) // fields line: right under the header
 	if m.input == nil || m.input.pick == nil {
-		t.Fatalf("клик по строке полей: input %+v", m.input)
+		t.Fatalf("click on the fields line: input %+v", m.input)
 	}
-	// Клик по паре выбора равен её клавише.
+	// A click on a choice pair equals its key.
 	x, y = caXY(t, m, "d due")
 	leftClick(m, x, y)
 	if m.input == nil || m.input.label != "due:" {
-		t.Fatalf("клик по d due: input %+v", m.input)
+		t.Fatalf("click on d due: input %+v", m.input)
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	x, y = caXY(t, m, "c comment")
 	leftClick(m, x, y)
 	if m.input == nil || m.input.label != "comment:" {
-		t.Fatalf("клик по c comment: input %+v", m.input)
+		t.Fatalf("click on c comment: input %+v", m.input)
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	x, y = caXY(t, m, "set ask")
-	leftClick(m, x, y) // тело карточки без кнопки
+	leftClick(m, x, y) // card body without a button
 	if m.input != nil {
-		t.Errorf("клик по пустому месту открыл строку ввода %+v", m.input)
+		t.Errorf("click on an empty place opened the input line %+v", m.input)
 	}
 	x, y = caXY(t, m, "esc back")
 	leftClick(m, x, y)
 	if m.showing {
-		t.Error("клик по esc back не закрыл карточку")
+		t.Error("click on esc back did not close the card")
 	}
 }
 
@@ -223,7 +223,7 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 
 	typeKeys(m, "g")
 	if got := caStatus(m); got != id+": no session to open" || len(opened) != 0 {
-		t.Fatalf("без захвата: статус %q, open %v", got, opened)
+		t.Fatalf("without a claim: status %q, open %v", got, opened)
 	}
 
 	if _, err := e.store.Take(id, core.Take, "claude:abcd1234"); err != nil {
@@ -232,7 +232,7 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 	caReload(m)
 	typeKeys(m, "g")
 	if len(opened) != 0 {
-		t.Fatalf("захват есть, файла фокуса нет, а open вызван: %v", opened)
+		t.Fatalf("claim exists, no focus file, but open was called: %v", opened)
 	}
 
 	dir := t.TempDir()
@@ -246,7 +246,7 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 		}
 		typeKeys(m, "g")
 		if len(opened) != 0 {
-			t.Fatalf("файл %q прошёл проверку, open %v", bad, opened)
+			t.Fatalf("file %q passed the check, open %v", bad, opened)
 		}
 	}
 
@@ -255,17 +255,17 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 	}
 	typeKeys(m, "g")
 	if len(opened) != 1 || opened[0] != good {
-		t.Fatalf("open вызван с %v, ждали [%s]", opened, good)
+		t.Fatalf("open called with %v, expected [%s]", opened, good)
 	}
 	caOpenCard(m)
 	x, y := caXY(t, m, "g session")
 	leftClick(m, x, y)
 	if len(opened) != 2 {
-		t.Errorf("кнопка g session не открыла сессию: %v", opened)
+		t.Errorf("button g session did not open a session: %v", opened)
 	}
 }
 
-// caReload перечитывает базу, как это делает наблюдатель файлов.
+// caReload rereads the store, as the file watcher does.
 func caReload(m *Model) {
 	tasks, errs := m.d.Store.List()
 	m.apply(tasks, len(errs))
@@ -291,29 +291,29 @@ func TestCriteria_SelectedByCursor_EnterChecksAndUnchecks(t *testing.T) {
 	m.selectTask(id)
 	caOpenCard(m)
 	if m.card.nCrit != 2 {
-		t.Fatalf("критериев в выборе %d, ждали 2", m.card.nCrit)
+		t.Fatalf("criteria in the choice %d, expected 2", m.card.nCrit)
 	}
-	// Enter на записи истории не трогает критерии.
+	// Enter on a history entry does not touch the criteria.
 	caEnter(m)
 	if tk, _, _ := e.store.Get(id); tk.Body != body {
-		t.Fatalf("enter на истории изменил тело: %q", tk.Body)
+		t.Fatalf("enter on the history changed the body: %q", tk.Body)
 	}
 
-	m.card.step(-100) // первый критерий
+	m.card.step(-100) // first criterion
 	caEnter(m)
 	tk, _, _ := e.store.Get(id)
 	if c := tk.Criteria(); !c[0].Done || !c[1].Done {
-		t.Fatalf("после отметки: %+v", c)
+		t.Fatalf("after the check: %+v", c)
 	}
 	caReload(m)
-	m.card.step(1) // второй критерий, он отмечен
+	m.card.step(1) // second criterion, it is checked
 	caEnter(m)
 	tk, _, _ = e.store.Get(id)
 	if c := tk.Criteria(); !c[0].Done || c[1].Done {
-		t.Fatalf("после снятия: %+v", c)
+		t.Fatalf("after the uncheck: %+v", c)
 	}
 	if want := "## Details\nplain line\n- [x] one\n- [ ] two\n"; tk.Body != want {
-		t.Errorf("тело после снятия = %q, ждали %q (прочее не менялось)", tk.Body, want)
+		t.Errorf("body after the uncheck = %q, expected %q (the rest did not change)", tk.Body, want)
 	}
 }
 
@@ -328,7 +328,7 @@ func TestCriteria_ClickOnRowToggles(t *testing.T) {
 	leftClick(m, x, y)
 	tk, _, _ := e.store.Get(id)
 	if !tk.Criteria()[0].Done {
-		t.Errorf("клик по критерию не отметил его: %q", tk.Body)
+		t.Errorf("click on the criterion did not check it: %q", tk.Body)
 	}
 }
 
@@ -339,12 +339,12 @@ func TestCriteria_ChangedMeanwhile_NotToggled(t *testing.T) {
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
-	e.caBody(id, "## Details\n- [ ] other\n") // модель ещё не перечитала файл
+	e.caBody(id, "## Details\n- [ ] other\n") // the model has not reread the file yet
 	m.card.step(-100)
 	caEnter(m)
 	tk, _, _ := e.store.Get(id)
 	if tk.Criteria()[0].Done {
-		t.Error("отмечен критерий, которого пользователь не видел")
+		t.Error("checked a criterion the user did not see")
 	}
 }
 
@@ -360,15 +360,15 @@ func TestDelete_ConfirmByY_AnyOtherKeyCancels(t *testing.T) {
 	}
 	typeKeys(m, "n")
 	if _, _, err := e.store.Get(id); err != nil || m.input != nil {
-		t.Fatalf("n удалил задачу или оставил строку: err=%v input=%v", err, m.input)
+		t.Fatalf("n deleted the task or left the line: err=%v input=%v", err, m.input)
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyDelete})
 	typeKeys(m, "y")
 	if _, _, err := e.store.Get(id); err == nil {
-		t.Error("y не удалил задачу")
+		t.Error("y did not delete the task")
 	}
 	if m.showing {
-		t.Error("после удаления из карточки осталась карточка")
+		t.Error("the card stayed after deletion from the card")
 	}
 }
 
@@ -381,7 +381,7 @@ func TestDelete_SecondDeleteOrBackspace_Cancels(t *testing.T) {
 		feed(m, tea.KeyPressMsg{Code: tea.KeyDelete})
 		feed(m, second)
 		if _, _, err := e.store.Get(id); err != nil || m.input != nil {
-			t.Errorf("%v при открытом вопросе: err=%v input=%v; ждали отмену без удаления", second, err, m.input)
+			t.Errorf("%v with an open question: err=%v input=%v; expected a cancel without deletion", second, err, m.input)
 		}
 	}
 }
@@ -405,6 +405,6 @@ func TestFocus_G_ExpiredClaim_NoSession(t *testing.T) {
 	m.now = func() time.Time { return time.Now().Add(10000 * time.Hour) }
 	typeKeys(m, "g")
 	if got := caStatus(m); got != id+": no session to open" || len(opened) != 0 {
-		t.Errorf("истёкший захват: статус %q, open %v", got, opened)
+		t.Errorf("expired claim: status %q, open %v", got, opened)
 	}
 }

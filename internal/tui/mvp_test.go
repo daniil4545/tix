@@ -1,9 +1,9 @@
 package tui
 
-// Тесты доводки MVP (docs/plans/mvp-finish.md, разделы 3, 4.A, 4.B, 4.C, 5).
-// Пакет внутренний: часы модели (поле now) недоступны снаружи. Свой мини-стенд с префиксом mv:
-// общий стенд лежит в пакете tui_test. Среда (HOME, git) - TestMain из harness_test.go.
-// Пишутся по спеке, без чтения кода зон A и B.
+// Tests of the MVP finishing work.
+// The package is internal: the model clock (field now) is not reachable from outside. A separate mini-harness with prefix mv:
+// the shared harness lives in package tui_test. The environment (HOME, git) comes from TestMain in harness_test.go.
+// Written from the spec, without reading the code of zones A and B.
 
 import (
 	"context"
@@ -27,7 +27,7 @@ import (
 
 var mvANSI = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
-// раскладка раздела 3
+// layout
 const (
 	mvColStep  = 24 + 2
 	mvFirstRow = 4
@@ -116,8 +116,8 @@ func mvNewEnvGit(t *testing.T, config, gitBin string) *mvEnv {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// очередь записи может дописывать коммит, пока тест уже вышел: ждём, пока git отпустит
-	// лок индекса, и удаляем с повтором до срока
+	// the write queue may still add a commit after the test has exited: wait until git releases
+	// the index lock, and remove with retries until a deadline
 	t.Cleanup(func() {
 		lock := filepath.Join(base, "tasks", ".git", "index.lock")
 		for end := time.Now().Add(15 * time.Second); time.Now().Before(end); time.Sleep(20 * time.Millisecond) {
@@ -128,7 +128,7 @@ func mvNewEnvGit(t *testing.T, config, gitBin string) *mvEnv {
 				return
 			}
 		}
-		t.Errorf("не удалось убрать %s", base)
+		t.Errorf("could not remove %s", base)
 	})
 	root := filepath.Join(base, "tasks")
 	if config != "" {
@@ -182,7 +182,7 @@ func (e *mvEnv) note(id, text string) {
 	}
 }
 
-// setClock подставляет время модели. Вызывать, когда все посланные события обработаны (mouse и settle ждут).
+// setClock sets the model time. Call it when all sent events are handled (mouse and settle wait for that).
 func (e *mvEnv) setClock(t time.Time) { e.clock.Store(t.UnixNano()) }
 
 func (e *mvEnv) start(w, h int) {
@@ -206,7 +206,7 @@ func (e *mvEnv) text() string {
 
 func (e *mvEnv) lines() []string { return strings.Split(e.text(), "\n") }
 
-// yOf - строка экрана с первым вхождением sub; -1, если нет.
+// yOf - the screen line with the first occurrence of sub; -1 if none.
 func (e *mvEnv) yOf(sub string) int {
 	for y, ln := range e.lines() {
 		if strings.Contains(ln, sub) {
@@ -225,12 +225,12 @@ func (e *mvEnv) until(what string, cond func() bool) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	e.t.Fatalf("не дождались: %s\nэкран:\n%s", what, e.text())
+	e.t.Fatalf("did not wait for: %s\nscreen:\n%s", what, e.text())
 }
 
 func (e *mvEnv) screenHas(subs ...string) {
 	e.t.Helper()
-	e.until(fmt.Sprint("на экране ", subs), func() bool {
+	e.until(fmt.Sprint("on screen ", subs), func() bool {
 		s := e.text()
 		for _, sub := range subs {
 			if !strings.Contains(s, sub) {
@@ -241,14 +241,14 @@ func (e *mvEnv) screenHas(subs ...string) {
 	})
 }
 
-// settle ждёт, пока модель обработает всё посланное ранее и экран перерисован после этого.
+// settle waits until the model handles everything sent earlier and the screen is redrawn after that.
 func (e *mvEnv) settle() {
 	e.t.Helper()
 	want := e.pingSent.Add(1)
 	e.tm.Send(mvPing{})
-	e.until("пинг обработан", func() bool { return e.pingSeen.Load() >= want })
+	e.until("ping handled", func() bool { return e.pingSeen.Load() >= want })
 	base := e.viewsAtPing.Load()
-	e.until("кадр после пинга", func() bool { return e.views.Load() > base })
+	e.until("frame after the ping", func() bool { return e.views.Load() > base })
 }
 
 func (e *mvEnv) key(keys ...string) {
@@ -266,18 +266,18 @@ func (e *mvEnv) key(keys ...string) {
 	}
 }
 
-// mouse шлёт событие мыши и ждёт, пока модель его обработает (часы можно менять после возврата).
+// mouse sends a mouse event and waits until the model handles it (the clock can be changed after it returns).
 func (e *mvEnv) mouse(msg tea.MouseMsg) {
 	e.t.Helper()
 	e.mouseSent++
 	e.tm.Send(msg)
 	want := int64(e.mouseSent)
-	e.until("событие мыши обработано", func() bool { return e.mouseSeen.Load() >= want })
+	e.until("mouse event handled", func() bool { return e.mouseSeen.Load() >= want })
 }
 
 func mvM(x, y int, b tea.MouseButton) tea.Mouse { return tea.Mouse{X: x, Y: y, Button: b} }
 
-// click - нажатие и отпускание левой в одной точке.
+// click - a left press and release at one point.
 func (e *mvEnv) click(x, y int) {
 	e.t.Helper()
 	e.mouse(tea.MouseClickMsg(mvM(x, y, tea.MouseLeft)))
@@ -293,7 +293,7 @@ func (e *mvEnv) wheel(x, y int, down bool) {
 	e.mouse(tea.MouseWheelMsg(mvM(x, y, b)))
 }
 
-// drag - нажатие левой в (x1,y1), движение и отпускание в (x2,y2).
+// drag - a left press at (x1,y1), a move and a release at (x2,y2).
 func (e *mvEnv) press(x, y int) { e.t.Helper(); e.mouse(tea.MouseClickMsg(mvM(x, y, tea.MouseLeft))) }
 func (e *mvEnv) release(x, y int) {
 	e.t.Helper()
@@ -321,10 +321,10 @@ func (e *mvEnv) git(args ...string) string {
 
 func (e *mvEnv) commits() string { return e.git("rev-list", "--count", "HEAD") }
 
-// opened: открыта карточка задачи title, доски нет.
+// opened: the card of task title is open, no board.
 func (e *mvEnv) opened(title string, others ...string) {
 	e.t.Helper()
-	e.until("открыта карточка "+title, func() bool {
+	e.until("card open: "+title, func() bool {
 		s := e.text()
 		if !strings.Contains(s, title) {
 			return false
@@ -338,19 +338,19 @@ func (e *mvEnv) opened(title string, others ...string) {
 	})
 }
 
-// onBoard: на экране доска со всеми перечисленными карточками (проверка "карточка не открылась").
+// onBoard: the board is on the screen with all the listed cards (the check "the card did not open").
 func (e *mvEnv) onBoard(titles ...string) {
 	e.t.Helper()
 	e.settle()
 	s := e.text()
 	for _, ti := range append([]string{"enter open"}, titles...) {
 		if !strings.Contains(s, ti) {
-			e.t.Fatalf("ждали доску с %q, экран:\n%s", ti, s)
+			e.t.Fatalf("expected the board with %q, screen:\n%s", ti, s)
 		}
 	}
 }
 
-// selectedIs открывает выбранную карточку клавишей enter и проверяет её, затем возвращается на доску.
+// selectedIs opens the selected card with the enter key and checks it, then returns to the board.
 func (e *mvEnv) selectedIs(title string, others ...string) {
 	e.t.Helper()
 	e.settle()
@@ -360,8 +360,8 @@ func (e *mvEnv) selectedIs(title string, others ...string) {
 	e.screenHas("enter open")
 }
 
-// awaitWatcher ждёт, пока наблюдатель запущен (он стартует после первого кадра): правит заглавие
-// служебной задачи, пока доска не покажет новое. Без этого внешняя правка сразу после start теряется.
+// awaitWatcher waits until the watcher is running (it starts after the first frame): edits the title
+// of a service task until the board shows the new one. Without it an external edit right after start is lost.
 func (e *mvEnv) awaitWatcher(canary string) {
 	e.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -374,14 +374,14 @@ func (e *mvEnv) awaitWatcher(canary string) {
 			}
 		}
 	}
-	e.t.Fatalf("наблюдатель не заметил правку файла\nэкран:\n%s", e.text())
+	e.t.Fatalf("watcher did not notice the file edit\nscreen:\n%s", e.text())
 }
 
 // ---------------------------------------------------------------------------------------------
-// Режим мыши
+// Mouse mode
 // ---------------------------------------------------------------------------------------------
 
-// 4.B: режим мыши - CellMotion на доске и в карточке.
+// Mouse mode - CellMotion on the board and in the card.
 func TestMouse_BoardAndCard_CellMotionMode(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -390,18 +390,18 @@ func TestMouse_BoardAndCard_CellMotionMode(t *testing.T) {
 	m := New(ctx, Deps{Store: e.store, Root: e.root, Actor: "human"})
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	if got := m.View().MouseMode; got != tea.MouseModeCellMotion {
-		t.Errorf("доска: MouseMode=%v, ждали CellMotion", got)
+		t.Errorf("board: MouseMode=%v, expected CellMotion", got)
 	}
 	m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if !m.showing {
-		t.Fatal("enter не открыл карточку")
+		t.Fatal("enter did not open the card")
 	}
 	if got := m.View().MouseMode; got != tea.MouseModeCellMotion {
-		t.Errorf("карточка: MouseMode=%v, ждали CellMotion", got)
+		t.Errorf("card: MouseMode=%v, expected CellMotion", got)
 	}
 }
 
-// 4.C.5: клик выбирает карточку (колонка и строка); любая из пяти строк карточки и оба края колонки - её же.
+// A click selects a card (column and row); any of the five card lines and both column edges - the same card.
 func TestMouse_Click_SelectsCardByGrid(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -414,28 +414,28 @@ func TestMouse_Click_SelectsCardByGrid(t *testing.T) {
 		name, want string
 		x, y       int
 	}{
-		{"другая колонка, строка названия", "Charlie", mvX(1), mvY(0)},
-		{"вторая карточка, пятая (пустая) строка", "Bravo", 3, mvFirstRow + mvCardRows + 4},
-		{"первая карточка, правый край колонки", "Alpha", mvColStep*0 + 23, mvFirstRow},
-		{"левый край второй колонки", "Charlie", mvColStep, mvFirstRow + 2},
+		{"other column, title line", "Charlie", mvX(1), mvY(0)},
+		{"second card, fifth (empty) line", "Bravo", 3, mvFirstRow + mvCardRows + 4},
+		{"first card, right column edge", "Alpha", mvColStep*0 + 23, mvFirstRow},
+		{"left edge of the second column", "Charlie", mvColStep, mvFirstRow + 2},
 	}
 	for _, c := range cases {
 		e.click(c.x, c.y)
 		e.selectedIs(c.want)
 		if t.Failed() {
-			t.Fatalf("случай %q: клик (%d,%d)", c.name, c.x, c.y)
+			t.Fatalf("case %q: click (%d,%d)", c.name, c.x, c.y)
 		}
 	}
 }
 
-// 4.B: клик по пустому месту, промежутку, шапке; правая и средняя кнопки; отпускание без нажатия - ничего.
+// A click on an empty place, a gap, the header; right and middle buttons; a release without a press - nothing.
 func TestMouse_NonActions_KeepSelectionAndCommits(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
-	e.key("j") // выбран Bravo
+	e.key("j") // Bravo selected
 	e.settle()
 	before := e.commits()
 
@@ -443,54 +443,54 @@ func TestMouse_NonActions_KeepSelectionAndCommits(t *testing.T) {
 		name string
 		do   func()
 	}{
-		{"промежуток между колонками", func() { e.click(24, mvY(0)) }},
-		{"промежуток, второй знак", func() { e.click(25, mvY(0)) }},
-		{"шапка", func() { e.click(5, 0) }},
-		{"линия под шапкой", func() { e.click(5, 1) }},
-		{"пусто под карточками", func() { e.click(3, mvY(2)) }},
-		{"пустая колонка", func() { e.click(mvX(4), mvY(0)) }},
-		{"правая кнопка на Alpha", func() {
+		{"gap between columns", func() { e.click(24, mvY(0)) }},
+		{"gap, second character", func() { e.click(25, mvY(0)) }},
+		{"header", func() { e.click(5, 0) }},
+		{"line under the header", func() { e.click(5, 1) }},
+		{"empty under the cards", func() { e.click(3, mvY(2)) }},
+		{"empty column", func() { e.click(mvX(4), mvY(0)) }},
+		{"right button on Alpha", func() {
 			e.mouse(tea.MouseClickMsg(mvM(3, mvY(0), tea.MouseRight)))
 			e.mouse(tea.MouseReleaseMsg(mvM(3, mvY(0), tea.MouseRight)))
 		}},
-		{"средняя кнопка на Alpha", func() {
+		{"middle button on Alpha", func() {
 			e.mouse(tea.MouseClickMsg(mvM(3, mvY(0), tea.MouseMiddle)))
 			e.mouse(tea.MouseReleaseMsg(mvM(3, mvY(0), tea.MouseMiddle)))
 		}},
-		{"отпускание без нажатия на Alpha", func() { e.mouse(tea.MouseReleaseMsg(mvM(3, mvY(0), tea.MouseLeft))) }},
+		{"release without a press on Alpha", func() { e.mouse(tea.MouseReleaseMsg(mvM(3, mvY(0), tea.MouseLeft))) }},
 	}
 	for _, s := range steps {
 		s.do()
 		e.settle()
 		if !strings.Contains(e.text(), "enter open") {
-			t.Fatalf("%s: доска пропала, экран:\n%s", s.name, e.text())
+			t.Fatalf("%s: the board vanished, screen:\n%s", s.name, e.text())
 		}
 	}
 	e.selectedIs("Bravo", "Alpha")
 	if after := e.commits(); after != before {
-		t.Errorf("мышь без действия записала коммиты: %s -> %s", before, after)
+		t.Errorf("mouse without an action wrote commits: %s -> %s", before, after)
 	}
 }
 
-// 4.C.5 и риск 2: двойной клик открывает только ту же карточку и только в пределах 400 мс по часам модели.
+// Risk 2: a double click opens only the same card and only within 400 ms by the model clock.
 func TestMouse_DoubleClick_ClockAndSameCard(t *testing.T) {
 	type click struct {
-		after time.Duration // пауза после предыдущего клика
-		slot  int           // колонка
+		after time.Duration // pause after the previous click
+		slot  int           // column
 		row   int
 	}
 	cases := []struct {
 		name   string
 		clicks []click
-		open   string // "" - карточка не открылась
-		sel    string // выбранная в итоге
+		open   string // "" - the card did not open
+		sel    string // finally selected
 	}{
-		{"те же клики за 100 мс", []click{{0, 0, 0}, {100 * time.Millisecond, 0, 0}}, "Alpha", "Alpha"},
-		{"пауза 500 мс", []click{{0, 0, 0}, {500 * time.Millisecond, 0, 0}}, "", "Alpha"},
-		{"пауза 3 с", []click{{0, 0, 0}, {3 * time.Second, 0, 0}}, "", "Alpha"},
-		{"две разные карточки за 50 мс", []click{{0, 0, 0}, {50 * time.Millisecond, 0, 1}}, "", "Bravo"},
-		{"карточки в разных колонках за 50 мс", []click{{0, 0, 0}, {50 * time.Millisecond, 1, 0}}, "", "Charlie"},
-		{"A, B, A быстро", []click{{0, 0, 0}, {50 * time.Millisecond, 0, 1}, {50 * time.Millisecond, 0, 0}}, "", "Alpha"},
+		{"same clicks within 100 ms", []click{{0, 0, 0}, {100 * time.Millisecond, 0, 0}}, "Alpha", "Alpha"},
+		{"pause 500 ms", []click{{0, 0, 0}, {500 * time.Millisecond, 0, 0}}, "", "Alpha"},
+		{"pause 3 s", []click{{0, 0, 0}, {3 * time.Second, 0, 0}}, "", "Alpha"},
+		{"two different cards within 50 ms", []click{{0, 0, 0}, {50 * time.Millisecond, 0, 1}}, "", "Bravo"},
+		{"cards in different columns within 50 ms", []click{{0, 0, 0}, {50 * time.Millisecond, 1, 0}}, "", "Charlie"},
+		{"A, B, A fast", []click{{0, 0, 0}, {50 * time.Millisecond, 0, 1}, {50 * time.Millisecond, 0, 0}}, "", "Alpha"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -526,7 +526,7 @@ func TestMouse_DoubleClick_ClockAndSameCard(t *testing.T) {
 	}
 }
 
-// 4.C.5 и риск 1: колёсико в прокрученной колонке двигает выбор на одну карточку, а не по позиции указателя.
+// Risk 1: the wheel in a scrolled column moves the selection by one card, not by the pointer position.
 func TestMouse_Wheel_ScrolledColumn_StepsOneCard(t *testing.T) {
 	e := mvNewEnv(t, "")
 	for i := 1; i <= 12; i++ {
@@ -534,7 +534,7 @@ func TestMouse_Wheel_ScrolledColumn_StepsOneCard(t *testing.T) {
 	}
 	e.start(140, 24)
 	e.screenHas("Card01")
-	e.key("j", "j", "j", "j") // Card05: окно колонки прокручено
+	e.key("j", "j", "j", "j") // Card05: the column window is scrolled
 	e.settle()
 	e.selectedIs("Card05")
 
@@ -546,12 +546,12 @@ func TestMouse_Wheel_ScrolledColumn_StepsOneCard(t *testing.T) {
 		e.wheel(3, mvFirstRow+1, s.down)
 		e.selectedIs(s.want)
 		if t.Failed() {
-			t.Fatalf("после колёсика down=%v ждали выбор %s", s.down, s.want)
+			t.Fatalf("after the wheel down=%v expected selection %s", s.down, s.want)
 		}
 	}
 }
 
-// 4.B: колёсико над невыбранной колонкой - сначала выбор колонки, затем шаг.
+// The wheel over a non-selected column - first the column choice, then a step.
 func TestMouse_Wheel_OtherColumn_SelectsColumnThenSteps(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -564,7 +564,7 @@ func TestMouse_Wheel_OtherColumn_SelectsColumnThenSteps(t *testing.T) {
 	e.selectedIs("Beta2", "Alpha", "Beta1", "Beta3")
 }
 
-// 4.B: на экране карточки колёсико вниз и вверх = j и k; клик ничего не делает.
+// On the card screen the wheel down and up = j and k; a click does nothing.
 func TestMouse_CardScreen_WheelScrollsLikeJK_ClickIgnored(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -581,36 +581,36 @@ func TestMouse_CardScreen_WheelScrollsLikeJK_ClickIgnored(t *testing.T) {
 	e.settle()
 	s0 := e.text()
 
-	e.key(strings.Repeat("k", 15)) // история открывается на новейшей записи: k уходит вверх
+	e.key(strings.Repeat("k", 15)) // the history opens on the newest entry: k goes up
 	e.settle()
 	s1 := e.text()
 	if s1 == s0 {
-		t.Fatal("15 нажатий k не сдвинули историю: сценарий не проверяет прокрутку")
+		t.Fatal("15 presses of k did not move the history: the scenario does not check scrolling")
 	}
 	for i := 0; i < 15; i++ {
-		e.wheel(10, 6, true) // вниз = j
+		e.wheel(10, 6, true) // down = j
 	}
 	e.settle()
 	if got := e.text(); got != s0 {
-		t.Errorf("15 раз колёсико вниз не вернуло экран к началу (как 15 j):\n%s\nждали:\n%s", got, s0)
+		t.Errorf("15 wheel-downs did not return the screen to the start (like 15 j):\n%s\nexpected:\n%s", got, s0)
 	}
 	for i := 0; i < 15; i++ {
-		e.wheel(10, 6, false) // вверх = k
+		e.wheel(10, 6, false) // up = k
 	}
 	e.settle()
 	if got := e.text(); got != s1 {
-		t.Errorf("15 раз колёсико вверх не повторило 15 раз k:\n%s\nждали:\n%s", got, s1)
+		t.Errorf("15 wheel-ups did not repeat 15 presses of k:\n%s\nexpected:\n%s", got, s1)
 	}
 	e.click(10, 6)
 	e.settle()
 	if got := e.text(); got != s1 {
-		t.Errorf("клик в карточке изменил экран:\n%s", got)
+		t.Errorf("click in the card changed the screen:\n%s", got)
 	}
 }
 
-// 4.C.5: перетаскивание в waiting спрашивает причину; esc - задача на месте; ввод - задача перенесена.
+// A drag to waiting asks for a reason; esc - the task stays; input - the task is moved.
 func TestMouse_Drag_ToWaiting_AsksReason(t *testing.T) {
-	t.Run("esc оставляет задачу на месте", func(t *testing.T) {
+	t.Run("esc leaves the task in place", func(t *testing.T) {
 		e := mvNewEnv(t, mvCfgWork)
 		e.create("Alpha", "work")
 		e.create("Bravo", "work")
@@ -621,12 +621,12 @@ func TestMouse_Drag_ToWaiting_AsksReason(t *testing.T) {
 		e.release(mvX(1)+2, mvY(0))
 		e.screenHas("waiting for:")
 		e.key("esc")
-		e.until("строка ввода закрыта", func() bool { return !strings.Contains(e.text(), "waiting for:") })
+		e.until("input line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
 		if st, _ := e.status("T-1"); st != "work" || e.commits() != before {
-			t.Errorf("отмена изменила задачу: статус %s, коммитов %s -> %s", st, before, e.commits())
+			t.Errorf("cancel changed the task: status %s, commits %s -> %s", st, before, e.commits())
 		}
 	})
-	t.Run("причина и enter переносят", func(t *testing.T) {
+	t.Run("reason and enter move", func(t *testing.T) {
 		e := mvNewEnv(t, mvCfgWork)
 		e.create("Alpha", "work")
 		e.create("Bravo", "work")
@@ -637,14 +637,14 @@ func TestMouse_Drag_ToWaiting_AsksReason(t *testing.T) {
 		e.screenHas("waiting for:")
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("T-2 в wait с причиной", func() bool { st, w := e.status("T-2"); return st == "wait" && w == "vendor reply" })
+		e.until("T-2 in wait with a reason", func() bool { st, w := e.status("T-2"); return st == "wait" && w == "vendor reply" })
 		if st, _ := e.status("T-1"); st != "work" {
-			t.Errorf("T-1 сдвинута вместе с T-2: %s", st)
+			t.Errorf("T-1 moved together with T-2: %s", st)
 		}
 	})
 }
 
-// 4.C.5: отпускание над той же колонкой или вне колонок - переноса нет; правая кнопка не тащит.
+// A release over the same column or outside columns - no move; the right button does not drag.
 func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 	cases := []struct {
 		name               string
@@ -653,11 +653,11 @@ func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 		releaseX, releaseY int
 		btn                tea.MouseButton
 	}{
-		{"та же колонка, другая карточка", 3, mvY(0), 3, mvY(1), tea.MouseLeft},
-		{"промежуток между колонками", 3, mvY(0), 25, mvY(0), tea.MouseLeft},
-		{"шапка", 3, mvY(0), mvX(1), 0, tea.MouseLeft},
-		{"строка состояния под колонками", 3, mvY(0), mvX(1), 28, tea.MouseLeft},
-		{"правая кнопка в другую колонку", 3, mvY(0), mvX(1), mvY(0), tea.MouseRight},
+		{"same column, other card", 3, mvY(0), 3, mvY(1), tea.MouseLeft},
+		{"gap between columns", 3, mvY(0), 25, mvY(0), tea.MouseLeft},
+		{"header", 3, mvY(0), mvX(1), 0, tea.MouseLeft},
+		{"status line under the columns", 3, mvY(0), mvX(1), 28, tea.MouseLeft},
+		{"right button to another column", 3, mvY(0), mvX(1), mvY(0), tea.MouseRight},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -671,21 +671,21 @@ func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 			e.mouse(tea.MouseReleaseMsg(mvM(c.releaseX, c.releaseY, c.btn)))
 			e.settle()
 			if strings.Contains(e.text(), "waiting for:") || strings.Contains(e.text(), "close reason:") {
-				t.Errorf("появилась строка ввода переноса:\n%s", e.text())
+				t.Errorf("the move input line appeared:\n%s", e.text())
 			}
 			for _, id := range []string{"T-1", "T-2"} {
 				if st, _ := e.status(id); st != "work" {
-					t.Errorf("%s перенесена в %s", id, st)
+					t.Errorf("%s moved to %s", id, st)
 				}
 			}
 			if after := e.commits(); after != before {
-				t.Errorf("коммиты %s -> %s", before, after)
+				t.Errorf("commits %s -> %s", before, after)
 			}
 		})
 	}
 }
 
-// 4.B: задачи уже нет к моменту отпускания - T-N removed, коммитов от нас нет.
+// The task is gone by the time of release - T-N removed, no commits from us.
 func TestMouse_Drag_TaskRemovedMeanwhile_ReportsRemoved(t *testing.T) {
 	e := mvNewEnv(t, mvCfgWork)
 	e.create("Alpha", "work")
@@ -698,19 +698,19 @@ func TestMouse_Drag_TaskRemovedMeanwhile_ReportsRemoved(t *testing.T) {
 	if _, err := e.store.Remove("T-1", "agent"); err != nil {
 		t.Fatal(err)
 	}
-	e.until("Alpha ушла с доски", func() bool { return !strings.Contains(e.text(), "Alpha") })
+	e.until("Alpha left the board", func() bool { return !strings.Contains(e.text(), "Alpha") })
 	after := e.commits()
 	e.release(mvX(1), mvY(0))
 	e.screenHas("T-1 removed")
 	if e.commits() != after {
-		t.Errorf("перенос удалённой задачи записал коммит")
+		t.Errorf("moving a deleted task wrote a commit")
 	}
 	if st, _ := e.status("T-2"); st != "work" {
-		t.Errorf("T-2 перенесена вместо удалённой: %s", st)
+		t.Errorf("T-2 moved instead of the deleted one: %s", st)
 	}
 }
 
-// Риск 1: переносится задача, запомненная при нажатии, а не та, что оказалась на месте к отпусканию.
+// The task remembered at the press is moved, not the one that ended up in that place by the release.
 func TestMouse_Drag_BoardShiftsBetweenPressAndRelease_MovesPressedTask(t *testing.T) {
 	e := mvNewEnv(t, mvCfgWork)
 	e.create("Alpha", "work")
@@ -723,7 +723,7 @@ func TestMouse_Drag_BoardShiftsBetweenPressAndRelease_MovesPressedTask(t *testin
 	if _, err := e.store.Move("T-1", "fin", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
 		t.Fatal(err)
 	}
-	e.until("Bravo поднялась на первое место", func() bool {
+	e.until("Bravo rose to the first place", func() bool {
 		ls := e.lines()
 		return len(ls) > mvY(0) && strings.Contains(ls[mvY(0)], "Bravo")
 	})
@@ -731,15 +731,15 @@ func TestMouse_Drag_BoardShiftsBetweenPressAndRelease_MovesPressedTask(t *testin
 	e.screenHas("waiting for:")
 	e.tm.Type("why")
 	e.key("enter")
-	e.until("T-2 в wait", func() bool { st, _ := e.status("T-2"); return st == "wait" })
+	e.until("T-2 in wait", func() bool { st, _ := e.status("T-2"); return st == "wait" })
 	if st, _ := e.status("T-1"); st != "fin" {
-		t.Errorf("T-1: %s, ждали fin (не должна двигаться)", st)
+		t.Errorf("T-1: %s, expected fin (must not move)", st)
 	}
 }
 
 var mvDefaultCols = []string{"idea", "todo", "doing", "blocked", "done"}
 
-// visibleColumns - имена колонок по умолчанию из шапки (строка 2), в порядке на экране.
+// visibleColumns - the default column names from the header (line 2), in screen order.
 func (e *mvEnv) visibleColumns() []string {
 	hdr := e.lines()[2]
 	var names []string
@@ -753,8 +753,8 @@ func (e *mvEnv) visibleColumns() []string {
 	return names
 }
 
-// 4.C.6 и риск 1: окно колонок сдвинуто (ширина 80, курсор на дальней колонке) - попадание по слоту окна.
-// Окно зависит от курсора, поэтому после каждого действия шапка читается заново: ждём то, что нарисовано.
+// Risk 1: the column window is shifted (width 80, the cursor on the far column) - a hit goes by the window slot.
+// The window depends on the cursor, so the header is reread after each action: wait for what is drawn.
 func TestMouse_ColumnWindowShifted_ClickAndDragUseVisibleSlots(t *testing.T) {
 	ids := map[string]string{}
 	setup := func(t *testing.T) *mvEnv {
@@ -764,16 +764,16 @@ func TestMouse_ColumnWindowShifted_ClickAndDragUseVisibleSlots(t *testing.T) {
 		}
 		e.start(80, 24)
 		e.screenHas("task-idea")
-		e.key("l", "l", "l", "l") // курсор на done
+		e.key("l", "l", "l", "l") // cursor on done
 		e.settle()
-		e.until("колонка done видна", func() bool { return len(e.visibleColumns()) > 0 && strings.Contains(e.lines()[2], "done") })
+		e.until("column done visible", func() bool { return len(e.visibleColumns()) > 0 && strings.Contains(e.lines()[2], "done") })
 		if names := e.visibleColumns(); len(names) < 2 || names[0] == "idea" {
-			t.Fatalf("окно не сдвинулось: видны %v, шапка %q", names, e.lines()[2])
+			t.Fatalf("window did not shift: visible %v, header %q", names, e.lines()[2])
 		}
 		return e
 	}
 
-	t.Run("клик выбирает нарисованную колонку", func(t *testing.T) {
+	t.Run("click selects the drawn column", func(t *testing.T) {
 		e := setup(t)
 		for slot := 0; slot < 3; slot++ {
 			names := e.visibleColumns()
@@ -789,57 +789,57 @@ func TestMouse_ColumnWindowShifted_ClickAndDragUseVisibleSlots(t *testing.T) {
 			e.screenHas("enter open")
 		}
 	})
-	t.Run("перенос из нарисованной колонки в нарисованную", func(t *testing.T) {
+	t.Run("move from the drawn column to the drawn column", func(t *testing.T) {
 		e := setup(t)
 		before := e.visibleColumns()
 		src, dst := before[0], before[1]
 		e.press(mvX(0), mvY(0))
 		e.settle()
-		// окно липкое: нажатие его не двигает, цель - та колонка, что нарисована в слоте 1
+		// the window is sticky: a press does not move it, the target is the column drawn in slot 1
 		if now := e.visibleColumns(); strings.Join(now, " ") != strings.Join(before, " ") {
-			t.Fatalf("нажатие сдвинуло окно колонок: было %v, стало %v", before, now)
+			t.Fatalf("press moved the column window: was %v, now %v", before, now)
 		}
 		e.release(mvX(1), mvY(0))
-		e.screenHas("waiting for:") // dst - blocked, роль waiting: спрашивает причину
+		e.screenHas("waiting for:") // dst - blocked, role waiting: asks for a reason
 		e.tm.Type("why")
 		e.key("enter")
-		e.until(ids[src]+" в "+dst, func() bool { st, _ := e.status(ids[src]); return st == dst })
+		e.until(ids[src]+" in "+dst, func() bool { st, _ := e.status(ids[src]); return st == dst })
 	})
 }
 
-// 4.B: при строке ввода мышь игнорируется, ввод доходит до задачи, у которой он начат.
+// With an input line the mouse is ignored, input reaches the task where it was started.
 func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 	e := mvNewEnv(t, mvCfgWork)
 	e.create("Alpha", "work")
 	e.create("Bravo", "work")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
-	e.key(" ", "l", " ") // Alpha -> wait: строка причины
+	e.key(" ", "l", " ") // Alpha -> wait: reason line
 	e.screenHas("waiting for:")
 	before := e.commits()
-	e.click(3, mvY(1)) // клик по Bravo
-	e.press(3, mvY(1)) // и перетаскивание Bravo в fin
+	e.click(3, mvY(1)) // click on Bravo
+	e.press(3, mvY(1)) // and a drag of Bravo to fin
 	e.release(mvX(2), mvY(0))
 	e.settle()
 	if !strings.Contains(e.text(), "waiting for:") {
-		t.Fatalf("мышь закрыла строку ввода:\n%s", e.text())
+		t.Fatalf("mouse closed the input line:\n%s", e.text())
 	}
 	if e.commits() != before {
-		t.Error("мышь при строке ввода записала коммит")
+		t.Error("mouse with an input line wrote a commit")
 	}
 	e.tm.Type("reason")
 	e.key("enter")
-	e.until("T-1 в wait с причиной", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "reason" })
+	e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "reason" })
 	if st, _ := e.status("T-2"); st != "work" {
-		t.Errorf("T-2 сдвинута мышью при строке ввода: %s", st)
+		t.Errorf("T-2 moved by the mouse with an input line: %s", st)
 	}
 }
 
 // ---------------------------------------------------------------------------------------------
-// Пульс, порядок
+// Pulse, order
 // ---------------------------------------------------------------------------------------------
 
-// 4.C.3: ask важнее заметки; заметка только в колонке active; без заметок - summary.
+// ask outranks a note; a note only in the active column; without notes - summary.
 func TestPulse_AskBeatsNote_NoteOnlyInActive_ElseSummary(t *testing.T) {
 	e := mvNewEnv(t, "")
 	asked := e.create("Asked", "doing")
@@ -859,12 +859,12 @@ func TestPulse_AskBeatsNote_NoteOnlyInActive_ElseSummary(t *testing.T) {
 	s := e.text()
 	for _, bad := range []string{"note-asked", "sum-asked", "sum-noted", "note-parked"} {
 		if strings.Contains(s, bad) {
-			t.Errorf("на доске лишнее %q:\n%s", bad, s)
+			t.Errorf("extra %q on the board:\n%s", bad, s)
 		}
 	}
 }
 
-// 4.A.4: возраст заметки 5m, 3h, 2d по часам модели; у задачи видна самая новая заметка.
+// Note age 5m, 3h, 2d by the model clock; the newest note is visible for a task.
 func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 	cases := []struct {
 		offset time.Duration
@@ -888,20 +888,20 @@ func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 			e.start(140, 30)
 			e.screenHas(c.want + " new-note")
 			if strings.Contains(e.text(), "old-note") {
-				t.Errorf("показана не последняя заметка:\n%s", e.text())
+				t.Errorf("not the last note is shown:\n%s", e.text())
 			}
 		})
 	}
 }
 
-// 4.A.4: tix note - пустой коммит без правки файла; наблюдатель замечает его по .git/logs/HEAD.
+// tix note - an empty commit without a file edit; the watcher notices it by .git/logs/HEAD.
 func TestPulse_NoteWrittenWhileOpen_AppearsWithoutKeypress(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("Noted", "doing")
 	e.summary(id, "sum-noted")
 	e.start(140, 30)
 	e.screenHas("sum-noted")
-	// наблюдатель стартует после первого кадра: заметку повторяем, пока он не включится
+	// the watcher starts after the first frame: repeat the note until it turns on
 	deadline := time.Now().Add(5 * time.Second)
 	for i := 0; time.Now().Before(deadline) && !strings.Contains(e.text(), "fresh-news"); i++ {
 		e.note(id, "fresh-news")
@@ -912,7 +912,7 @@ func TestPulse_NoteWrittenWhileOpen_AppearsWithoutKeypress(t *testing.T) {
 	e.screenHas("fresh-news")
 }
 
-// Риск 3: число вызовов git на перечитывание пульса не растёт с числом задач.
+// Risk 3: the number of git calls per pulse reread does not grow with the number of tasks.
 func TestPulse_GitCalls_DoNotGrowWithTaskCount(t *testing.T) {
 	realGit := mvGit(t)
 	calls := func(tasks int) int {
@@ -920,7 +920,7 @@ func TestPulse_GitCalls_DoNotGrowWithTaskCount(t *testing.T) {
 		logPath := filepath.Join(dir, "calls.log")
 		wrapper := filepath.Join(dir, "git")
 		script := "#!/bin/sh\necho \"$@\" >> \"" + logPath + "\"\nexec " + realGit + " \"$@\"\n"
-		if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil { //nolint:gosec // тестовый скрипт
+		if err := os.WriteFile(wrapper, []byte(script), 0o755); err != nil { //nolint:gosec // test script
 			t.Fatal(err)
 		}
 		e := mvNewEnvGit(t, "", wrapper)
@@ -934,7 +934,7 @@ func TestPulse_GitCalls_DoNotGrowWithTaskCount(t *testing.T) {
 		e.start(140, 40)
 		e.screenHas("note-of-01")
 		e.settle()
-		data, err := os.ReadFile(logPath) //nolint:gosec // путь теста
+		data, err := os.ReadFile(logPath) //nolint:gosec // test path
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -951,11 +951,11 @@ func TestPulse_GitCalls_DoNotGrowWithTaskCount(t *testing.T) {
 	}
 	small, large := calls(3), calls(40)
 	if large > small {
-		t.Errorf("вызовов git log: %d на 3 задачах, %d на 40 - растут с числом задач", small, large)
+		t.Errorf("git log calls: %d on 3 tasks, %d on 40 - grow with the number of tasks", small, large)
 	}
 }
 
-// 4.C.4: o переключает порядок по сроку (затем без срока по rank); J в этом режиме не пишет коммит.
+// o toggles due order (then no-due by rank); J in this mode does not write a commit.
 func TestOrder_O_ByDue_JDoesNotWrite(t *testing.T) {
 	e := mvNewEnv(t, "")
 	a := e.create("task-aaa", "idea")
@@ -988,26 +988,26 @@ func TestOrder_O_ByDue_JDoesNotWrite(t *testing.T) {
 		return out
 	}
 	if got := strings.Join(order(), " "); got != "task-aaa task-bbb task-ccc" {
-		t.Fatalf("порядок по rank: %s", got)
+		t.Fatalf("order by rank: %s", got)
 	}
 	e.key("o")
 	e.screenHas("order: due")
 	e.settle()
 	if got := strings.Join(order(), " "); got != "task-ccc task-aaa task-bbb" {
-		t.Errorf("порядок по сроку: %s, ждали ccc (11-01), aaa (12-01), bbb (без срока)", got)
+		t.Errorf("due order: %s, expected ccc (11-01), aaa (12-01), bbb (no due)", got)
 	}
 	before := e.commits()
 	e.key("J")
 	e.screenHas("order by due: J K off")
 	e.settle()
 	if e.commits() != before {
-		t.Errorf("J в режиме по сроку записал коммит: %s -> %s", before, e.commits())
+		t.Errorf("J in due mode wrote a commit: %s -> %s", before, e.commits())
 	}
 	if got := strings.Join(order(), " "); got != "task-ccc task-aaa task-bbb" {
-		t.Errorf("J изменил порядок в режиме по сроку: %s", got)
+		t.Errorf("J changed the order in due mode: %s", got)
 	}
 	e.key("o")
-	e.until("режим по rank", func() bool {
+	e.until("rank mode", func() bool {
 		return !strings.Contains(e.text(), "order: due") && strings.Join(order(), " ") == "task-aaa task-bbb task-ccc"
 	})
 }

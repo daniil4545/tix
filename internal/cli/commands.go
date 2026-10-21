@@ -13,8 +13,8 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// reply печатает `ok <id> <что>`; -v добавляет хеш коммита.
-// Упавший коммит - предупреждение в stderr, код 0.
+// reply prints `ok <id> <what>`; -v adds the commit hash.
+// A failed commit is a warning on stderr, code 0.
 func (a *app) reply(p *parsed, res core.Result, id, what string) {
 	if res.ID != "" {
 		id = res.ID
@@ -29,7 +29,7 @@ func (a *app) reply(p *parsed, res core.Result, id, what string) {
 	}
 }
 
-// wrap привязывает ошибку ядра к задаче и подсказывает, что делать с конфликтом.
+// wrap ties a core error to a task and hints what to do about a conflict.
 func wrap(id string, err error) error {
 	if errors.Is(err, core.ErrConflict) {
 		err = fmt.Errorf("%w; run tix show %s again", err, id)
@@ -72,7 +72,7 @@ func (a *app) cmdNew(args []string) error {
 	return nil
 }
 
-// column возвращает колонку новой задачи: --to по имени, иначе колонка роли inbox, иначе первая.
+// column returns the column of a new task: --to by name, else the inbox role column, else the first.
 func (a *app) column(p *parsed) (string, error) {
 	cols := a.store.Config().Columns
 	if len(cols) == 0 {
@@ -181,7 +181,7 @@ func (a *app) cmdEdit(args []string) error {
 	return nil
 }
 
-// readBody читает новое тело из stdin; пустое тело - отказ.
+// readBody reads the new body from stdin; an empty body is a refusal.
 func (a *app) readBody() (string, error) {
 	if a.env.Stdin == nil {
 		return "", inputf("task body not passed on stdin")
@@ -222,7 +222,7 @@ func (a *app) cmdShow(args []string) error {
 		}
 		return a.printJSON(t)
 	}
-	// Файл как есть: Obsidian мог записать его не в каноническом виде.
+	// The file as is: Obsidian may have written it in a non-canonical form.
 	a.out("rev %s", rev)
 	_, _ = a.env.Stdout.Write(data)
 	return nil
@@ -237,7 +237,7 @@ func (a *app) printJSON(v any) error {
 	return nil
 }
 
-// listItem - задача в `list --json`: поля Task без body и comments.
+// listItem - a task in `list --json`: Task fields without body and comments.
 type listItem struct {
 	ID       string   `json:"id"`
 	Title    string   `json:"title"`
@@ -267,7 +267,7 @@ func (a *app) cmdList(args []string) error {
 	if err != nil {
 		return err
 	}
-	// Пустая база: читать нечего, папку list не создаёт.
+	// Empty store: nothing to read, list does not create the folder.
 	if _, statErr := os.Stat(root); errors.Is(statErr, os.ErrNotExist) {
 		return a.printTasks(p, nil)
 	}
@@ -285,8 +285,8 @@ func (a *app) cmdList(args []string) error {
 	return a.printTasks(p, a.filter(tasks, proj, p.vals["status"]))
 }
 
-// filter оставляет задачи проекта и колонки (пустое значение - без фильтра)
-// и сортирует: колонки по config.toml, внутри по rank, затем по номеру.
+// filter keeps the tasks of the project and column (an empty value means no filter)
+// and sorts: columns by config.toml, within a column by rank, then by number.
 func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
 	order := map[string]int{}
 	for i, c := range a.store.Config().Columns {

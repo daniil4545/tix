@@ -11,32 +11,32 @@ import (
 )
 
 const (
-	cardWidth   = 100 // ширина, если W не задан
-	cardFrame   = 3   // линия, состояние и строка действий внизу
+	cardWidth   = 100 // width if W is not set
+	cardFrame   = 3   // the line, the state and the actions line at the bottom
 	dateWidth   = 11  // "02.01 15:04"
 	actorWidth  = 16
 	historyHead = "history"
 )
 
-// RenderCard рисует карточку: шапка, тело с историей, состояние, строка действий. Тело
-// прокручивается, шапка и низ стоят.
+// RenderCard draws the card: header, body with history, state, actions line. The body
+// scrolls, the header and the bottom stay.
 func RenderCard(c Card) string {
 	return strings.Join(layoutCard(c).lines, "\n")
 }
 
-// cardLay - кадр карточки и строки, на которые попадает мышь. Рисование и HitCard берут его
-// из одного места, поэтому прокрутка тела не расходится с кликом.
+// cardLay - the card frame and the lines the mouse can hit. Drawing and HitCard take it
+// from one place, so body scroll does not diverge from a click.
 type cardLay struct {
 	lines          []string
 	w              int
-	askFrom, askTo int // строки вопроса агента [askFrom, askTo); -1, если вопроса нет
-	fieldsRow      int // строка полей; -1, если её нет
+	askFrom, askTo int // agent ask lines [askFrom, askTo); -1 if there is no ask
+	fieldsRow      int // the fields line; -1 if there is none
 	actionsRow     int
 	actions        []actionSpan
-	crits          []critSpan // видимые строки критериев
+	crits          []critSpan // visible criterion lines
 }
 
-// critSpan - строки кадра [from, to), занятые критерием с номером index (с нуля).
+// critSpan - frame lines [from, to) taken by the criterion with number index (zero-based).
 type critSpan struct{ from, to, index int }
 
 func layoutCard(c Card) cardLay {
@@ -68,7 +68,7 @@ func layoutCard(c Card) cardLay {
 	return lay
 }
 
-// cardHead собирает шапку и отмечает в cardLay её строки: поля и вопрос агента.
+// cardHead builds the header and marks its lines in cardLay: the fields and the agent ask.
 func cardHead(c Card, w int) ([]string, cardLay) {
 	lay := cardLay{fieldsRow: -1, askFrom: -1, askTo: -1}
 	column := " [" + clean(c.Column) + "]"
@@ -88,8 +88,8 @@ func cardHead(c Card, w int) ([]string, cardLay) {
 	return append(lines, ruleLine(w)), lay
 }
 
-// cardBody собирает строки тела, границы выбранной строки (критерий или запись истории; -1,
-// если её нет) и строки каждого критерия в теле.
+// cardBody builds the body lines, the bounds of the selected line (a criterion or a history entry; -1
+// if there is none) and the lines of each criterion in the body.
 func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits [][2]int) {
 	curStart, curEnd = -1, -1
 	section := func(title, right string) {
@@ -128,7 +128,7 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits [][2]i
 	return lines, curStart, curEnd, crits
 }
 
-// historyLines рисует записи истории; from, to - строки выбранной записи внутри результата (-1, если её нет).
+// historyLines draws the history entries; from, to - the lines of the selected entry inside the result (-1 if there is none).
 func historyLines(c Card, w int) (lines []string, from, to int) {
 	from, to = -1, -1
 	if len(c.History) == 0 {
@@ -145,7 +145,7 @@ func historyLines(c Card, w int) (lines []string, from, to int) {
 	return lines, from, to
 }
 
-// indentLines выводит текст раздела с отступом; dimRest приглушает все строки текста после первой.
+// indentLines prints the section text with an indent; dimRest dims all text lines after the first.
 func indentLines(text string, dimRest bool, w int) []string {
 	var out []string
 	for i, src := range strings.Split(text, "\n") {
@@ -159,8 +159,8 @@ func indentLines(text string, dimRest bool, w int) []string {
 	return out
 }
 
-// detailLines рисует раздел Details; выбранный критерий (Cursor) подсвечен. rel - строки каждого
-// критерия внутри возвращённых строк.
+// detailLines draws the Details section; the selected criterion (Cursor) is highlighted. rel - the lines of each
+// criterion inside the returned lines.
 func detailLines(c Card, w int) (lines []string, rel [][2]int) {
 	critOf := map[int]int{}
 	for k, at := range c.CritAt {
@@ -183,7 +183,7 @@ func detailLines(c Card, w int) (lines []string, rel [][2]int) {
 	return lines, rel
 }
 
-// entryLines рисует запись истории; комментарий - заголовок и текст под ним, прочее - в одну строку с переносом.
+// entryLines draws a history entry; a comment - a heading and the text under it, others - one line with wrapping.
 func entryLines(e history.Entry, selected bool, w int) []string {
 	op, text := clean(e.Op), e.Text
 	if len(e.Folded) > 0 {
@@ -225,7 +225,7 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 	return out
 }
 
-// scrollBody оставляет room строк тела от смещения scroll; смещение подгоняется под выбранную запись.
+// scrollBody keeps room body lines from offset scroll; the offset is fitted to the selected entry.
 func scrollBody(body []string, scroll, curStart, curEnd, room int) ([]string, int) {
 	if room <= 0 {
 		return nil, 0

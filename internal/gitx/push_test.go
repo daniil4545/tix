@@ -41,12 +41,12 @@ func TestRemotes_ListsNames(t *testing.T) {
 	r := newRepo(t)
 	got, err := r.Remotes()
 	if err != nil || len(got) != 0 {
-		t.Fatalf("Remotes в чистом репозитории = %v, %v; ждали пусто", got, err)
+		t.Fatalf("Remotes in a clean repository = %v, %v; want empty", got, err)
 	}
 	raw(t, r, "remote", "add", "origin", newBare(t))
 	got, err = r.Remotes()
 	if err != nil || !reflect.DeepEqual(got, []string{"origin"}) {
-		t.Errorf("Remotes = %v, %v; ждали [origin]", got, err)
+		t.Errorf("Remotes = %v, %v; want [origin]", got, err)
 	}
 }
 
@@ -65,10 +65,10 @@ func TestPush_SendsHEAD_NoForceOnDiverged(t *testing.T) {
 	br := branch(t, r.Dir)
 	local := strings.TrimSpace(raw(t, r, "rev-parse", "HEAD"))
 	if got := bareHead(t, bare, br); got != local {
-		t.Fatalf("после Push ветка %s в bare = %q, ждали HEAD %s", br, got, local)
+		t.Fatalf("after Push branch %s in bare = %q, want HEAD %s", br, got, local)
 	}
 
-	// Чужой коммит в remote: наш Push не fast-forward и не должен перезаписать (без --force).
+	// A foreign commit in the remote: our Push is not a fast-forward and must not overwrite it (no --force).
 	other := newRepo(t)
 	raw(t, other, "remote", "add", "origin", bare)
 	put(t, other, "b.md", "other\n")
@@ -82,10 +82,10 @@ func TestPush_SendsHEAD_NoForceOnDiverged(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := r.Push(context.Background(), "origin"); err == nil {
-		t.Error("Push поверх чужого коммита прошёл: нужен отказ без --force")
+		t.Error("Push over a foreign commit passed: a refusal without --force is needed")
 	}
 	if got := bareHead(t, bare, br); got != theirs {
-		t.Errorf("Push затёр remote: ветка %s = %q, ждали %q", br, got, theirs)
+		t.Errorf("Push overwrote the remote: branch %s = %q, want %q", br, got, theirs)
 	}
 }
 
@@ -103,10 +103,10 @@ func TestPush_UnreachableRemote_ErrorNotHang(t *testing.T) {
 		select {
 		case err := <-done:
 			if err == nil {
-				t.Errorf("Push в %s прошёл", url)
+				t.Errorf("Push to %s passed", url)
 			}
 		case <-time.After(45 * time.Second):
-			t.Fatalf("Push в %s завис: запрос пароля или нет таймаута", url)
+			t.Fatalf("Push to %s hung: a password prompt or no timeout", url)
 		}
 		raw(t, r, "remote", "remove", "bad")
 	}

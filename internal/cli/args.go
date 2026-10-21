@@ -4,17 +4,17 @@ import (
 	"strings"
 )
 
-// flagSpec: имя флага без дефисов, true - флаг берёт значение.
+// flagSpec: flag name without dashes, true - the flag takes a value.
 type flagSpec map[string]bool
 
-// parsed - позиционные аргументы и флаги команды.
+// parsed - positional arguments and flags of a command.
 type parsed struct {
 	pos  []string
 	vals map[string]string
 	set  map[string]bool
 }
 
-// commonFlags есть у каждой команды: -v и --as.
+// commonFlags exist on every command: -v and --as.
 var commonFlags = flagSpec{"v": false, "as": true}
 
 func withCommon(extra flagSpec) flagSpec {
@@ -28,8 +28,8 @@ func withCommon(extra flagSpec) flagSpec {
 	return spec
 }
 
-// parseArgs принимает флаги в любом месте; "--" заканчивает флаги,
-// так текст может начинаться с дефиса.
+// parseArgs accepts flags anywhere; "--" ends the flags,
+// so text may start with a dash.
 func parseArgs(args []string, spec flagSpec) (*parsed, error) {
 	p := &parsed{vals: map[string]string{}, set: map[string]bool{}}
 	for i := 0; i < len(args); i++ {

@@ -1,4 +1,4 @@
-// Package project определяет проект по рабочей папке. Без git.
+// Package project detects the project by the working folder. No git.
 package project
 
 import (
@@ -9,8 +9,8 @@ import (
 	"github.com/daniil4545/tix/internal/config"
 )
 
-// Detect возвращает имя проекта для cwd: имя папки над .git (у worktree - над
-// основной), переименованное картой c.Projects. false: cwd в root или вне git.
+// Detect returns the project name for cwd: the name of the folder above .git (for a worktree - above
+// the main one), renamed by the c.Projects map. false: cwd in root or outside git.
 func Detect(cwd, root string, c *config.Config) (string, bool) {
 	cwd, root = resolve(cwd), resolve(root)
 	if root != "" && within(cwd, root) {
@@ -32,7 +32,7 @@ func Detect(cwd, root string, c *config.Config) (string, bool) {
 	return name, true
 }
 
-// resolve раскрывает симлинки (macOS: /var и /private/var); не вышло - путь как есть.
+// resolve expands symlinks (macOS: /var and /private/var); if that fails - the path as is.
 func resolve(p string) string {
 	if p == "" {
 		return ""
@@ -48,7 +48,7 @@ func within(path, root string) bool {
 	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
 }
 
-// findGitDir поднимается от cwd к папке с .git (каталогом или файлом worktree).
+// findGitDir climbs from cwd to the folder with .git (a directory or a worktree file).
 func findGitDir(cwd string) string {
 	for dir := cwd; ; {
 		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
@@ -62,15 +62,15 @@ func findGitDir(cwd string) string {
 	}
 }
 
-// mainWorktree: если .git - файл linked worktree, возвращает папку основной
-// копии; иначе пустая строка. Путь читается из "gitdir:" и commondir.
+// mainWorktree: if .git is a file of a linked worktree, returns the folder of the main
+// copy; otherwise an empty string. The path is read from "gitdir:" and commondir.
 func mainWorktree(dir string) string {
 	gitPath := filepath.Join(dir, ".git")
 	fi, err := os.Lstat(gitPath)
 	if err != nil || fi.IsDir() {
 		return ""
 	}
-	data, err := os.ReadFile(gitPath) //nolint:gosec // путь .git найден поиском вверх от cwd
+	data, err := os.ReadFile(gitPath) //nolint:gosec // the .git path was found by searching up from cwd
 	if err != nil {
 		return ""
 	}
@@ -79,7 +79,7 @@ func mainWorktree(dir string) string {
 		return ""
 	}
 	gitdir = absFrom(dir, strings.TrimSpace(gitdir))
-	common, err := os.ReadFile(filepath.Join(gitdir, "commondir")) //nolint:gosec // путь из файла .git
+	common, err := os.ReadFile(filepath.Join(gitdir, "commondir")) //nolint:gosec // path from the .git file
 	if err != nil {
 		return ""
 	}

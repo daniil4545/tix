@@ -17,27 +17,27 @@ import (
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
-// TestTUI_OneShot_FirstFrameInPipe: tix без аргументов, stdout не терминал, TIX_TUI_ONESHOT=1:
-// бинарь открывает базу, рисует доску в пайп и выходит с кодом 0.
+// TestTUI_OneShot_FirstFrameInPipe: tix without arguments, stdout is not a terminal, TIX_TUI_ONESHOT=1:
+// the binary opens the store, draws the board into the pipe and exits with code 0.
 func TestTUI_OneShot_FirstFrameInPipe(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Frame task", "--to", "idea")
 	r := b.runEnv(b.with("TIX_TUI_ONESHOT=1"), "")
 	out := ansi.ReplaceAllString(r.out, "")
 	if r.code != 0 || !strings.Contains(out, "idea") || !strings.Contains(out, "Frame task") {
-		t.Fatalf("код %d, stderr %q, кадр:\n%s", r.code, r.err, out)
+		t.Fatalf("code %d, stderr %q, frame:\n%s", r.code, r.err, out)
 	}
 }
 
-// TestTUI_NoTerminal_FallsBackToCLI: без ONESHOT и без терминала tix работает как раньше (cli.Run).
+// TestTUI_NoTerminal_FallsBackToCLI: without ONESHOT and without a terminal tix works as before (cli.Run).
 func TestTUI_NoTerminal_FallsBackToCLI(t *testing.T) {
 	b := newBox(t)
 	r := b.tix("")
 	if strings.Contains(r.out, "\x1b[?1049h") {
-		t.Errorf("альтернативный экран открыт без терминала: %q", r.out)
+		t.Errorf("alternate screen opened without a terminal: %q", r.out)
 	}
 	if r.code == 0 || !strings.Contains(r.err, "command required") {
-		t.Errorf("код %d, stderr %q; ждали ответ cli.Run об отсутствии команды", r.code, r.err)
+		t.Errorf("code %d, stderr %q; want the cli.Run answer about a missing command", r.code, r.err)
 	}
 }
 
@@ -61,7 +61,7 @@ func (p probe) View() tea.View {
 	return v
 }
 
-// TestTUI_LiveUpdate_AgentWritesThroughTix: доска открыта, агент пишет настоящим процессом tix.
+// TestTUI_LiveUpdate_AgentWritesThroughTix: the board is open, the agent writes with a real tix process.
 func TestTUI_LiveUpdate_AgentWritesThroughTix(t *testing.T) {
 	b := newBox(t)
 	t.Setenv("HOME", b.root)
@@ -90,21 +90,21 @@ func TestTUI_LiveUpdate_AgentWritesThroughTix(t *testing.T) {
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
-		t.Fatalf("не дождались: %s\n%s", what, text())
+		t.Fatalf("timed out waiting: %s\n%s", what, text())
 	}
 	has := func(sub string) func(string) bool { return func(s string) bool { return strings.Contains(s, sub) } }
-	until("первый кадр", has("Second"))
+	until("first frame", has("Second"))
 
-	// Выбрана Second; агент добавляет задачу выше неё: выбор остаётся на Second по id.
+	// Second is selected; the agent adds a task above it: the selection stays on Second by id.
 	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
 	b.ok("", "new", "From agent", "--to", "idea")
 	b.ok("", "move", "T-3", "idea", "--first")
-	until("новая задача на доске", has("From agent"))
+	until("new task on the board", has("From agent"))
 	tm.Send(tea.KeyPressMsg{Code: tea.KeyEnter})
-	until("карточка Second", func(s string) bool { return strings.Contains(s, "Second") && !strings.Contains(s, "From agent") })
+	until("Second card", func(s string) bool { return strings.Contains(s, "Second") && !strings.Contains(s, "From agent") })
 
-	// Агент удаляет открытую задачу: возврат на доску и сообщение.
+	// The agent deletes the open task: back to the board and a message.
 	b.ok("", "rm", "T-2")
 	until("T-2 removed", has("T-2 removed"))
-	until("доска без Second", func(s string) bool { return strings.Contains(s, "First") && !strings.Contains(s, "Second") })
+	until("board without Second", func(s string) bool { return strings.Contains(s, "First") && !strings.Contains(s, "Second") })
 }

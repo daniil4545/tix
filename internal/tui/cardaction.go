@@ -11,11 +11,11 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// cardActs - состояние действий карточки. open запускает переход в сессию; nil - команда `open`
-// системы (тесты подставляют свою).
+// cardActs - the state of card actions. open starts the jump into a session; nil - the system
+// `open` command (tests substitute their own).
 type cardActs struct{ open func(url string) error }
 
-// fieldSpec - поле, которое правит `f`: клавиша выбора, имя в ядре и чтение значения.
+// fieldSpec - a field that `f` edits: the choice key, the core name and the value reader.
 type fieldSpec struct {
 	key, word, name string
 	value           func(*task.Task) string
@@ -31,8 +31,8 @@ var cardFields = []fieldSpec{
 	{"x", "external", "external", func(t *task.Task) string { return t.External }},
 }
 
-// startAnswer отвечает на вопрос агента (поле ask): комментарий `Answer: <текст>`, затем ask
-// очищается, если агент не успел задать новый вопрос.
+// startAnswer answers an agent ask (the ask field): comment `Answer: <text>`, then ask
+// is cleared if the agent did not manage to ask a new question.
 func (m *Model) startAnswer() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -52,8 +52,8 @@ func (m *Model) startAnswer() tea.Cmd {
 	return nil
 }
 
-// answer - одна задача очереди: Comment, затем Set ask="" только при том же вопросе.
-// Вызывается из горутины записи.
+// answer - one task of the queue: Comment, then Set ask="" only for the same question.
+// Called from the write goroutine.
 func (m *Model) answer(id, ask, text string) (core.Result, error) {
 	res, err := m.d.Store.Comment(id, "Answer: "+text, m.d.Actor)
 	if err != nil {
@@ -76,7 +76,7 @@ func (m *Model) answer(id, ask, text string) (core.Result, error) {
 	return res, nil
 }
 
-// startField открывает выбор поля одной клавишей; затем строка со значением поля.
+// startField opens the field choice by one key; then a line with the field value.
 func (m *Model) startField() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -91,8 +91,8 @@ func (m *Model) startField() tea.Cmd {
 	return nil
 }
 
-// editField спрашивает новое значение поля и пишет его через Set. Пусто очищает поле, то же
-// значение не пишется, отказ ядра попадает в строку состояния.
+// editField asks for the new field value and writes it through Set. Empty clears the field, the same
+// value is not written, a core refusal goes to the status line.
 func (m *Model) editField(id string, f fieldSpec) tea.Cmd {
 	t := m.byID(id)
 	if t == nil {
@@ -116,8 +116,8 @@ func (m *Model) editField(id string, f fieldSpec) tea.Cmd {
 	return nil
 }
 
-// cardClick разбирает клик по открытой карточке: строка вопроса, строка полей или кнопка
-// строки действий. Остальное место карточки - ничего.
+// cardClick handles a click on the open card: the ask line, the fields line or a button of the
+// actions line. The rest of the card does nothing.
 func (m *Model) cardClick(x, y int) tea.Cmd {
 	hit := view.HitCard(m.cardView(), x, y)
 	switch hit.Kind {
@@ -138,8 +138,8 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 	return nil
 }
 
-// startDelete спрашивает подтверждение одной клавишей: `y` удаляет задачу через очередь записи,
-// любая другая клавиша отменяет. Из карточки возврат на доску идёт сразу после `y`.
+// startDelete asks for confirmation with one key: `y` deletes the task through the write queue,
+// any other key cancels. From a card, the return to the board happens right after `y`.
 func (m *Model) startDelete() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -157,8 +157,8 @@ func (m *Model) startDelete() tea.Cmd {
 	return nil
 }
 
-// cardEnter - enter в карточке: на строке критерия переключает отметку, на записи истории
-// раскрывает серию правок.
+// cardEnter - enter in a card: on a criterion line it toggles the mark, on a history entry
+// it expands the series of edits.
 func (m *Model) cardEnter() tea.Cmd {
 	if m.card.cursor < m.card.nCrit {
 		return m.toggleCriterion(m.card.cursor)
@@ -167,10 +167,10 @@ func (m *Model) cardEnter() tea.Cmd {
 	return nil
 }
 
-// toggleCriterion переключает критерий: не отмечен - Check, отмечен - снять правкой тела (Edit с
-// базой rev). Решение берётся из свежего файла внутри очереди записи: два enter подряд дают
-// отметку и снятие, даже если экран ещё не перечитан. Текст критерия сверяется с тем, что
-// видел пользователь; изменился - отказ.
+// toggleCriterion toggles a criterion: unchecked - Check, checked - uncheck by a body edit (Edit with
+// base rev). The decision is taken from the fresh file inside the write queue: two enters in a row give
+// a mark and an uncheck, even if the screen is not reread yet. The criterion text is compared with what
+// the user saw; changed - refusal.
 func (m *Model) toggleCriterion(idx int) tea.Cmd {
 	t := m.byID(m.card.id)
 	if t == nil {
@@ -203,7 +203,7 @@ func (m *Model) toggleCriterion(idx int) tea.Cmd {
 	})
 }
 
-// cardButton - нажатие кнопки строки действий: то же, что клавиша.
+// cardButton - a press of an actions-line button: same as the key.
 func (m *Model) cardButton(k string) tea.Cmd {
 	switch k {
 	case "a":

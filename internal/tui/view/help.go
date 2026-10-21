@@ -2,7 +2,7 @@ package view
 
 import "strings"
 
-// helpEntry - строка справки: клавиша или жест и действие; пустая клавиша - заголовок раздела.
+// helpEntry - a help line: a key or gesture and the action; an empty key is a section heading.
 type helpEntry struct{ keys, what string }
 
 var helpEntries = []helpEntry{
@@ -36,7 +36,7 @@ var helpEntries = []helpEntry{
 
 const helpKeyWidth = 20
 
-// RenderHelp рисует экран справки: все клавиши и действия мыши. W, H <= 0: размер не ограничен.
+// RenderHelp draws the help screen: all keys and mouse actions. W, H <= 0: the size is not limited.
 func RenderHelp(w, h int) string {
 	lines := []string{accentStyle.Render("tix help") + dimStyle.Render("  esc or ? back")}
 	for _, e := range helpEntries {

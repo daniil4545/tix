@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// stubScript - заглушка EDITOR. Вызов n: пишет seen.n (копия при запуске) и started.n; если есть
-// wait.n - ждёт go.n (не дольше 10 с); затем выполняет script.n с путём копии первым аргументом.
+// stubScript - an EDITOR stub. Call n: writes seen.n (the copy at start) and started.n; if wait.n
+// exists - waits for go.n (not longer than 10 s); then runs script.n with the copy path as the first argument.
 const stubScript = `#!/bin/sh
 d="$TIX_STUB_DIR"; f="$1"
 n=$(( $(cat "$d/count" 2>/dev/null || echo 0) + 1 )); echo $n > "$d/count"
@@ -30,7 +30,7 @@ func newStub(t *testing.T) *stub {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "editor.sh")
-	if err := os.WriteFile(bin, []byte(stubScript), 0o700); err != nil { //nolint:gosec // заглушка теста
+	if err := os.WriteFile(bin, []byte(stubScript), 0o700); err != nil { //nolint:gosec // test stub
 		t.Fatal(err)
 	}
 	t.Setenv("EDITOR", bin)
@@ -40,7 +40,7 @@ func newStub(t *testing.T) *stub {
 
 func (s *stub) file(name string) string { return filepath.Join(s.dir, name) }
 
-// plan задаёт вызов n: gated - ждать go.n; script - команда sh над копией (пусто - выйти без правки).
+// plan sets call n: gated - wait for go.n; script - an sh command over the copy (empty - exit without an edit).
 func (s *stub) plan(n int, gated bool, script string) {
 	s.t.Helper()
 	i := strconv.Itoa(n)
@@ -79,7 +79,7 @@ func copies(e *env) []string {
 
 const base3 = "line1\nline2\nline3\n"
 
-// openEditor: задача T-1 с телом base3, карточка открыта, нажато e.
+// openEditor: task T-1 with body base3, the card is open, e is pressed.
 func openEditor(t *testing.T, st *stub) *env {
 	t.Helper()
 	e := newEnv(t, "")
@@ -90,7 +90,7 @@ func openEditor(t *testing.T, st *stub) *env {
 	e.key("enter")
 	e.screenHas("Alpha", "new")
 	e.key("e")
-	e.until("редактор запущен", func() bool { _, err := os.Stat(st.file("started.1")); return err == nil })
+	e.until("editor started", func() bool { _, err := os.Stat(st.file("started.1")); return err == nil })
 	return e
 }
 
@@ -105,13 +105,13 @@ func TestEditor_ExitWithoutChange_NoCommitCopyRemoved(t *testing.T) {
 	e.key("enter")
 	e.screenHas("new")
 	e.key("e")
-	e.until("редактор вызван", func() bool { return st.calls() == 1 })
-	e.until("копия удалена", func() bool { return len(copies(e)) == 0 })
+	e.until("editor called", func() bool { return st.calls() == 1 })
+	e.until("copy removed", func() bool { return len(copies(e)) == 0 })
 	if got := e.gitOut("rev-list", "--count", "HEAD"); got != n {
-		t.Errorf("выход без правки создал коммит: было %s, стало %s", n, got)
+		t.Errorf("exit without an edit created a commit: was %s, now %s", n, got)
 	}
 	if !strings.Contains(st.seen(1), "line2") {
-		t.Errorf("редактор открыт не на теле задачи: %q", st.seen(1))
+		t.Errorf("editor was not opened on the task body: %q", st.seen(1))
 	}
 }
 
@@ -123,13 +123,13 @@ func TestEditor_ParallelAgentComment_MergesCleanly(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.touch("go.1")
-	e.until("правка и комментарий в файле", func() bool {
+	e.until("edit and comment in the file", func() bool {
 		_, _, body, cs := e.get("T-1")
 		return strings.Contains(body, "USER-LINE") && strings.Contains(strings.Join(cs, "|"), "agent says")
 	})
-	e.until("копия удалена", func() bool { return len(copies(e)) == 0 })
+	e.until("copy removed", func() bool { return len(copies(e)) == 0 })
 	if st.calls() != 1 {
-		t.Errorf("редактор вызван %d раз, ждали 1", st.calls())
+		t.Errorf("editor called %d times, expected 1", st.calls())
 	}
 }
 
@@ -143,17 +143,17 @@ func TestEditor_Conflict_ReopensWithMarkersAndRetrySaves(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.touch("go.1")
-	e.until("второй запуск редактора", func() bool { _, err := os.Stat(st.file("started.2")); return err == nil })
+	e.until("second editor start", func() bool { _, err := os.Stat(st.file("started.2")); return err == nil })
 	for _, want := range []string{"<<<<<<<", "USER", "AGENT"} {
 		if !strings.Contains(st.seen(2), want) {
-			t.Errorf("повторный запуск без %q в копии:\n%s", want, st.seen(2))
+			t.Errorf("repeat start without %q in the copy:\n%s", want, st.seen(2))
 		}
 	}
-	e.until("слияние сохранено", func() bool { _, _, body, _ := e.get("T-1"); return strings.Contains(body, "BOTH") })
+	e.until("merge saved", func() bool { _, _, body, _ := e.get("T-1"); return strings.Contains(body, "BOTH") })
 	if _, _, body, _ := e.get("T-1"); strings.Contains(body, "<<<<<<<") {
-		t.Errorf("маркеры попали в файл:\n%s", body)
+		t.Errorf("markers got into the file:\n%s", body)
 	}
-	e.until("копия удалена", func() bool { return len(copies(e)) == 0 })
+	e.until("copy removed", func() bool { return len(copies(e)) == 0 })
 }
 
 func TestEditor_Conflict_SecondRunUnchanged_CancelsCopyKept(t *testing.T) {
@@ -166,24 +166,24 @@ func TestEditor_Conflict_SecondRunUnchanged_CancelsCopyKept(t *testing.T) {
 	}
 	n := e.gitOut("rev-list", "--count", "HEAD")
 	st.touch("go.1")
-	e.until("второй запуск", func() bool { return st.calls() == 2 })
+	e.until("second start", func() bool { return st.calls() == 2 })
 	e.screenHas("copy kept: ")
 	e.screenHas("edit cancelled")
 	if len(copies(e)) != 1 {
-		t.Errorf("копия с правкой человека не сохранена: %v", copies(e))
+		t.Errorf("copy with the human edit not kept: %v", copies(e))
 	}
 	if _, _, body, _ := e.get("T-1"); strings.Contains(body, "USER") || !strings.Contains(body, "AGENT") {
-		t.Errorf("отмена изменила файл:\n%s", body)
+		t.Errorf("cancel changed the file:\n%s", body)
 	}
 	if got := e.gitOut("rev-list", "--count", "HEAD"); got != n {
-		t.Error("отмена создала коммит")
+		t.Error("cancel created a commit")
 	}
 }
 
 func TestEditor_MarkersLeftInCopy_RefusedCopyKeptPathShown(t *testing.T) {
 	st := newStub(t)
 	st.plan(1, true, `printf 'line1\nUSER\nline3\n' > "$1"`)
-	st.plan(2, false, `printf 'extra\n' >> "$1"`) // правка есть, маркеры остались
+	st.plan(2, false, `printf 'extra\n' >> "$1"`) // there is an edit, markers remain
 	e := openEditor(t, st)
 	_, curRev, _ := e.store.Get("T-1")
 	if _, err := e.store.Edit("T-1", curRev, "line1\nAGENT\nline3\n", "agent"); err != nil {
@@ -191,13 +191,13 @@ func TestEditor_MarkersLeftInCopy_RefusedCopyKeptPathShown(t *testing.T) {
 	}
 	n := e.gitOut("rev-list", "--count", "HEAD")
 	st.touch("go.1")
-	e.until("копия осталась", func() bool { return st.calls() == 2 && len(copies(e)) == 1 })
+	e.until("copy stays", func() bool { return st.calls() == 2 && len(copies(e)) == 1 })
 	e.screenHas("ed-T-1-")
 	if _, _, body, _ := e.get("T-1"); strings.Contains(body, "<<<<<<<") || strings.Contains(body, "extra") {
-		t.Errorf("копия с маркерами записана:\n%s", body)
+		t.Errorf("copy with markers was written:\n%s", body)
 	}
 	if got := e.gitOut("rev-list", "--count", "HEAD"); got != n {
-		t.Error("отказ создал коммит")
+		t.Error("refusal created a commit")
 	}
 }
 
@@ -213,7 +213,7 @@ func TestEditor_StoreLocked_CopyKeptPathShownNothingWritten(t *testing.T) {
 	e.key("enter")
 	e.screenHas("new")
 	e.key("e")
-	e.until("редактор запущен", func() bool { _, err := os.Stat(st.file("started.1")); return err == nil })
+	e.until("editor started", func() bool { _, err := os.Stat(st.file("started.1")); return err == nil })
 	lock, err := os.OpenFile(filepath.Join(e.root, ".tix", "lock"), os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		t.Fatal(err)
@@ -223,9 +223,9 @@ func TestEditor_StoreLocked_CopyKeptPathShownNothingWritten(t *testing.T) {
 		t.Fatal(err)
 	}
 	st.touch("go.1")
-	e.until("копия осталась", func() bool { return len(copies(e)) == 1 })
+	e.until("copy stays", func() bool { return len(copies(e)) == 1 })
 	e.screenHas("ed-T-1-")
 	if _, _, body, _ := e.get("T-1"); strings.Contains(body, "USER") {
-		t.Errorf("запись прошла под занятым локом:\n%s", body)
+		t.Errorf("write passed under a held lock:\n%s", body)
 	}
 }

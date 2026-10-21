@@ -1,79 +1,79 @@
-# Разведка: лёгкий трекер задач в терминале
+# Recon: a light task tracker in the terminal
 
-Дата: 20.10.2026. Источники: README и релизы репозиториев, docs.rs, crates.io, документация
-Obsidian, GitHub и Kaiten. Решений здесь нет: варианты, цена, рекомендация.
+Date: 2026-10-20. Sources: README and releases of repositories, docs.rs, crates.io, the Obsidian
+documentation, GitHub and Kaiten. There are no decisions here: options, cost, recommendation.
 
-## Оглавление
+## Contents
 
-1. Идея и минимальный сценарий
-2. Готовые аналоги
-3. Хранилище и Obsidian
-4. Интерфейс для агента
-5. Внешние трекеры
-6. Стек TUI
-7. Пробелы
+1. Idea and minimal scenario
+2. Ready analogs
+3. Storage and Obsidian
+4. Agent interface
+5. External trackers
+6. TUI stack
+7. Gaps
 
-## 1. Идея и минимальный сценарий
+## 1. Idea and minimal scenario
 
-Одна папка задач для всех проектов и личных идей. Задача - md-файл. Агенты работают через CLI,
-человек через TUI. Папку можно открыть как vault Obsidian.
+One folder of tasks for all projects and personal ideas. A task is an md file. Agents work through the CLI,
+the human through the TUI. The folder can be opened as an Obsidian vault.
 
 ```mermaid
 flowchart LR
-  A[Агент в любой сессии] -->|CLI --json| F[(tasks/*.md)]
-  H[Человек: TUI канбан] --> F
-  O[Obsidian] -.читает и правит.-> F
-  F -.поле external.-> X[GitHub Issues / Kaiten]
+  A[Agent in any session] -->|CLI --json| F[(tasks/*.md)]
+  H[Human: kanban TUI] --> F
+  O[Obsidian] -.reads and edits.-> F
+  F -.field external.-> X[GitHub Issues / Kaiten]
 ```
 
-Сценарий: агент на старте сессии получает контекст проекта одной командой, берёт задачу,
-пишет комментарии и двигает статус. Человек видит доску в TUI и читает историю задачи.
+Scenario: at session start the agent gets the project context with one command, takes a task,
+writes comments and moves the status. The human sees the board in the TUI and reads the history of the task.
 
-## 2. Готовые аналоги
+## 2. Ready analogs
 
-Готового под идею целиком нет. Ни один не даёт одно пространство на все проекты, md-формат и
-связь с внешними трекерами вместе.
+There is no ready tool for the whole idea. None gives one space for all projects, the md format and
+a link to external trackers together.
 
-| Кандидат | Хранилище | Много проектов | TUI | Агенту | Внешние | Зрелость |
+| Candidate | Storage | Many projects | TUI | For the agent | External | Maturity |
 | --- | --- | --- | --- | --- | --- | --- |
-| Backlog.md | md + frontmatter | на репо | канбан, правка в вебе | `--json`, MCP | нет | TS, 7 тыс. зв., v1.54 16.10.2026 |
-| kanban-md | md + frontmatter | на репо | канбан только смотреть | JSON, `pick --claim`, `context`, `skill install` | нет | Go, 225 зв., v0.39 |
-| kandown | md + frontmatter | на репо, `projects` видит все | канбан, запуск агента | `work`, `--json`, MCP | импорт Trello | JS, 13 зв., с 04.2026 |
-| Beads (`bd`) | Dolt, не md | на репо | нет | `ready`, `prime`, `remember`, `--claim` | GitHub, GitLab, Jira | Go, 28 тыс. зв., v1.3.1 |
-| git-bug | git refs | на репо | termui | CLI, GraphQL | GitHub, GitLab, Jira | Go, 10,8 тыс. зв. |
-| Taskwarrior + tui + bugwarrior | своя БД | да | список, без канбана | `export` JSON | pull многих трекеров | зрелый |
-| kanban-tui (Zaloog) | SQLite | да | Textual, полный канбан | MCP, SKILL.md | Jira | Python, 286 зв. |
+| Backlog.md | md + frontmatter | per repo | kanban, editing on the web | `--json`, MCP | no | TS, 7k stars, v1.54 2026-10-16 |
+| kanban-md | md + frontmatter | per repo | kanban view-only | JSON, `pick --claim`, `context`, `skill install` | no | Go, 225 stars, v0.39 |
+| kandown | md + frontmatter | per repo, `projects` sees all | kanban, agent launch | `work`, `--json`, MCP | Trello import | JS, 13 stars, since 2026-04 |
+| Beads (`bd`) | Dolt, not md | per repo | no | `ready`, `prime`, `remember`, `--claim` | GitHub, GitLab, Jira | Go, 28k stars, v1.3.1 |
+| git-bug | git refs | per repo | termui | CLI, GraphQL | GitHub, GitLab, Jira | Go, 10.8k stars |
+| Taskwarrior + tui + bugwarrior | own DB | yes | list, no kanban | `export` JSON | pull of many trackers | mature |
+| kanban-tui (Zaloog) | SQLite | yes | Textual, full kanban | MCP, SKILL.md | Jira | Python, 286 stars |
 
-Что взять:
-- формат kanban-md: файл на задачу, плоский YAML, чужие поля frontmatter сохраняются;
-- из Beads: `ready` (задачи без блокеров), `prime` (контекст на старте сессии), `--claim`
-  (атомарно взять задачу), `setup` для блока в CLAUDE.md;
-- из kandown: `work` - правила, дайджест доски и следующая задача одной командой;
-- из Backlog.md: версия схемы в `--json`, архив с сохранением id.
+What to take:
+- the format of kanban-md: a file per task, flat YAML, foreign frontmatter fields are preserved;
+- from Beads: `ready` (tasks without blockers), `prime` (context at session start), `--claim`
+  (take a task atomically), `setup` for a block in CLAUDE.md;
+- from kandown: `work` - rules, a digest of the board and the next task in one command;
+- from Backlog.md: the schema version in `--json`, an archive that keeps ids.
 
-Лёгкого md-редактора в TUI нет ни у кого. Это место, где свой проект даёт новое.
+Nobody has a light md editor in the TUI. This is the place where our own project brings something new.
 
-## 3. Хранилище и Obsidian
+## 3. Storage and Obsidian
 
-Факты Obsidian (obsidian.md/help/properties, /help/bases):
-- Properties: text, list, number, checkbox, date, datetime, tags. Вложенные объекты UI не
-  показывает. Имена `tags`, `aliases`, `cssclasses` заняты.
-- Bases (core-плагин) группирует заметки по свойству. Вид Kanban по документации есть с 1.14,
-  changelog не сверен. Значит, доску по `status` Obsidian покажет без плагина.
-- Плагин Kanban хранит доску одним файлом: одна точка конфликта для всех агентов. Не подходит.
-- Obsidian сливает внешнюю правку с открытым буфером (changelog 0.11.6). Есть непроверенный
-  отчёт о потере правки в 1.13.1.
+Obsidian facts (obsidian.md/help/properties, /help/bases):
+- Properties: text, list, number, checkbox, date, datetime, tags. Nested objects are not shown by the
+  UI. The names `tags`, `aliases`, `cssclasses` are taken.
+- Bases (a core plugin) groups notes by a property. The Kanban view exists since 1.14 per the documentation,
+  the changelog was not checked. So Obsidian will show a board by `status` without a plugin.
+- The Kanban plugin stores the board in one file: one conflict point for all agents. Not suitable.
+- Obsidian merges an external edit with an open buffer (changelog 0.11.6). There is an unverified
+  report of an edit loss in 1.13.1.
 
-| Вопрос | Варианты | Рекомендация разведки |
+| Question | Options | Recon recommendation |
 | --- | --- | --- |
-| Файлы | файл на задачу / доска одним файлом | файл на задачу |
-| Папки | плоско + поле `project` / подпапка на проект | плоско `tasks/`, закрытые в `_archive/` |
-| Комментарии | раздел `## Comments` в файле / отдельный файл / лог операций | раздел в файле, запись с маркером `<!-- c: ISO \| автор -->`, пишет только CLI |
-| Запись | temp + rename, `flock` на чтение-изменение-запись, создание через `O_EXCL` | всё три |
-| Id | счётчик под локом (`T-12`) / короткий хеш | счётчик; хеш, если появятся копии на нескольких машинах |
-| Git | автокоммит из CLI / снимок по запросу | git есть, CLI не коммитит |
+| Files | a file per task / the board in one file | a file per task |
+| Folders | flat + field `project` / a subfolder per project | flat `tasks/`, closed ones in `_archive/` |
+| Comments | section `## Comments` in the file / a separate file / an operation log | a section in the file, entry with the marker `<!-- c: ISO \| author -->`, written only by the CLI |
+| Write | temp + rename, `flock` on read-modify-write, creation through `O_EXCL` | all three |
+| Id | counter under the lock (`T-12`) / short hash | counter; a hash if copies on several machines appear |
+| Git | autocommit from the CLI / snapshot on request | git exists, the CLI does not commit |
 
-Пример файла `tasks/T-123 fix-login-timeout.md`:
+Example of the file `tasks/T-123 fix-login-timeout.md`:
 
 ```
 ---
@@ -85,76 +85,76 @@ external: gh:acme/web#45
 created: 2026-10-20T12:00:00
 updated: 2026-10-20T14:03:00
 ---
-Сессия рвётся через 5 минут.
+The session drops after 5 minutes.
 
 ## Comments
 <!-- c: 2026-10-20T13:10:00 | agent:claude -->
-Воспроизвёл, причина в TTL токена.
+Reproduced, the cause is the token TTL.
 ```
 
-`flock` advisory: Obsidian и ручная правка его не берут. На iCloud и Dropbox он ненадёжен.
+`flock` is advisory: Obsidian and manual edits do not take it. On iCloud and Dropbox it is unreliable.
 
-## 4. Интерфейс для агента
+## 4. Agent interface
 
-Решено пользователем: CLI. Требования из аналогов:
-- `--json` на каждой команде, со версией схемы;
-- команда старта сессии: правила, дайджест по проекту, следующая задача;
-- `claim`: взять задачу атомарно, чтобы два агента не взяли одну;
-- `install-skill` или блок для CLAUDE.md, чтобы агент знал команды без промпта.
+Decided by the user: CLI. Requirements from the analogs:
+- `--json` on every command, with a schema version;
+- a session start command: rules, a digest for the project, the next task;
+- `claim`: take a task atomically so that two agents do not take the same one;
+- `install-skill` or a block for CLAUDE.md so that the agent knows the commands without a prompt.
 
-Время запуска важно: агент делает много коротких вызовов. Замер на этом маке: бинарь Go 2,4 мс,
-Go с Charm 8,5 мс, Python с Textual 90 мс.
+Start time matters: the agent makes many short calls. Measured on this Mac: a Go binary 2.4 ms,
+Go with Charm 8.5 ms, Python with Textual 90 ms.
 
-## 5. Внешние трекеры
+## 5. External trackers
 
-| Уровень | Что | Цена | Ловушки |
+| Level | What | Cost | Traps |
 | --- | --- | --- | --- |
-| 0 | поле `external: gh:owner/repo#123` или `kaiten:<card>` | кода нет | статус виден только снаружи |
-| 1 | pull по запросу: одна задача или «мои» | команда на трекер | повторный pull затирает локальные правки; удаление снаружи не видно |
-| 2 | push статуса и комментария | ещё команда, запись наружу | дубль комментария при повторе; маппинг статуса в колонку |
-| 3 | двусторонняя синхронизация | недели | на нём ломались все готовые: дубли (bugwarrior #220), закрытие всех задач при сбое сети (#897), rate limit (git-bug #749) |
+| 0 | field `external: gh:owner/repo#123` or `kaiten:<card>` | no code | status is visible only outside |
+| 1 | pull on request: one task or "mine" | a command per tracker | a repeated pull overwrites local edits; deletion outside is not seen |
+| 2 | push of status and comment | one more command, write outward | a duplicate comment on repeat; mapping status to column |
+| 3 | two-way sync | weeks | all ready tools broke on it: duplicates (bugwarrior #220), closing of all tasks on a network failure (#897), rate limit (git-bug #749) |
 
-Доступно сейчас:
-- GitHub: `gh` 2.102 залогинен, scopes `repo` и `project`. `gh issue view/list --json` покрывает
-  чтение. Статус в Projects v2 писать неудобно (три id), проще open/closed и label.
-- Kaiten: REST, Bearer, 50 запросов в секунду. Официальный MCP на 20.10.2026 не вышел. У вас уже
-  стоит `kaiten` CLI v0.6.1 с `--json` и подтверждением записи.
+Available now:
+- GitHub: `gh` 2.102 logged in, scopes `repo` and `project`. `gh issue view/list --json` covers
+  reading. Writing status in Projects v2 is awkward (three ids), open/closed and a label are simpler.
+- Kaiten: REST, Bearer, 50 requests per second. An official MCP had not been released as of 2026-10-20. You already have
+  the `kaiten` CLI v0.6.1 installed with `--json` and a confirmation for writes.
 
-Рекомендация разведки: уровни 0 и 1, затем 2 только для статуса и комментария, уровень 3 не
-строить. Два способа:
-- интеграция как скилл агента: трекер хранит только `external`, агент зовёт `gh` и `kaiten`;
-  кода в трекере нет, авторизация уже есть;
-- команда `ext pull` в трекере: детерминировано, работает из TUI кнопкой; около сотни строк
-  на трекер.
+Recon recommendation: levels 0 and 1, then 2 only for status and comment, do not build level 3.
+Two ways:
+- integration as an agent skill: the tracker stores only `external`, the agent calls `gh` and `kaiten`;
+  no code in the tracker, authorization already exists;
+- a command `ext pull` in the tracker: deterministic, works from the TUI by a button; about a hundred lines
+  per tracker.
 
-Правила для любого способа: pull меняет только внешние поля; 404 даёт пометку, не удаление;
-ошибка сети не меняет статус; маппинг статусов в конфиге.
+Rules for any way: pull changes only external fields; 404 gives a mark, not a deletion;
+a network error does not change status; the mapping of statuses is in the config.
 
-## 6. Стек TUI
+## 6. TUI stack
 
-Решено пользователем: Rust, запасной Go.
+Decided by the user: Rust, fallback Go.
 
-| Пункт | Rust (Ratatui 0.30.2) | Go (Bubble Tea v2.1) |
+| Item | Rust (Ratatui 0.30.2) | Go (Bubble Tea v2.1) |
 | --- | --- | --- |
-| Канбан | свой из Layout и List | свой, Lip Gloss удобнее для колонок |
-| Textarea | tui-textarea заброшен с 10.2024; живой форк tui-textarea-2 0.13.2, один автор | bubbles/textarea из коробки |
-| Рендер md | tui-markdown 0.3 (API нестабилен) или termimad | Glamour v2, зрелый |
-| Внешний `$EDITOR` | вручную: выйти из alternate screen и вернуться; ответы терминала vim могут утечь в события | `tea.ExecProcess`, один вызов |
-| Frontmatter | serde_yaml устарел; serde_yaml_ng или serde-saphyr | yaml.v3 |
-| CLI | clap 4.6 | cobra или flag |
-| Запуск | ожидается 2-4 мс, не замерено | 2,4-8,5 мс, замерено |
+| Kanban | own, from Layout and List | own, Lip Gloss is more convenient for columns |
+| Textarea | tui-textarea abandoned since 2024-10; living fork tui-textarea-2 0.13.2, one author | bubbles/textarea out of the box |
+| Md rendering | tui-markdown 0.3 (API unstable) or termimad | Glamour v2, mature |
+| External `$EDITOR` | by hand: leave the alternate screen and come back; vim terminal replies may leak into events | `tea.ExecProcess`, one call |
+| Frontmatter | serde_yaml is deprecated; serde_yaml_ng or serde-saphyr | yaml.v3 |
+| CLI | clap 4.6 | cobra or flag |
+| Start | 2-4 ms expected, not measured | 2.4-8.5 ms, measured |
 
-Цена Rust (суждение разведчика, не факт): первый рабочий канбан 2-3 недели против 3-5 дней на Go.
-Больше ручного кода: состояние виджетов, работа с внешним редактором, рендер md.
+The cost of Rust (the scout's judgment, not a fact): the first working kanban takes 2-3 weeks against 3-5 days in Go.
+More manual code: widget state, work with the external editor, md rendering.
 
-Порядок, который снижает риск: сначала ядро (CLI и хранилище), потом TUI. Редактор сначала через
-`$EDITOR`. Рендер md и textarea проверить прототипом до выбора.
+The order that lowers risk: the core first (CLI and storage), then the TUI. The editor first through
+`$EDITOR`. Check md rendering and textarea with a prototype before choosing.
 
-## 7. Пробелы
+## 7. Gaps
 
-- Rust не собирали: запуск, размер бинаря и время сборки не замерены.
-- tui-markdown и tui-textarea-2 в деле не проверены.
-- Вид Kanban в Bases: версия 1.14 из документации, changelog не сверен.
-- Поведение Obsidian при одновременной правке и `flock` на облачных дисках не проверены.
-- Эндпоинт комментариев Kaiten и права read-only токена не проверены.
-- Ни один аналог не запускали; оценки по README.
+- Rust was not built: start, binary size and build time are not measured.
+- tui-markdown and tui-textarea-2 were not tried in practice.
+- The Kanban view in Bases: version 1.14 from the documentation, the changelog was not checked.
+- The behavior of Obsidian on a simultaneous edit and `flock` on cloud drives were not checked.
+- The Kaiten comments endpoint and the rights of a read-only token were not checked.
+- No analog was run; the estimates come from the README.
