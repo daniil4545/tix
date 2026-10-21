@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -138,6 +139,29 @@ func (c *Config) ByRole(role string) (Column, bool) {
 		}
 	}
 	return Column{}, false
+}
+
+// Resolve возвращает имя колонки по имени или по роли: имя колонки важнее роли.
+// Нет ни того, ни другого - name как есть, ошибку даст проверка колонки.
+func (c *Config) Resolve(name string) string {
+	if name == "" || slices.ContainsFunc(c.Columns, func(col Column) bool { return col.Name == name }) {
+		return name
+	}
+	if col, ok := c.ByRole(name); ok {
+		return col.Name
+	}
+	return name
+}
+
+// Roles печатает колонки с ролями: "idea=inbox todo=ready ...". Колонки без роли пропущены.
+func (c *Config) Roles() string {
+	parts := make([]string, 0, len(c.Columns))
+	for _, col := range c.Columns {
+		if col.Role != "" {
+			parts = append(parts, col.Name+"="+col.Role)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 // RoleOf возвращает роль колонки. Пусто: колонки нет или у неё нет роли.

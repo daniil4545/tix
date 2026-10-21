@@ -205,3 +205,20 @@ func TestBrief_JSON_LowercaseFields(t *testing.T) {
 		}
 	}
 }
+
+// Третья строка ctx - колонки с ролями: агент видит, какое имя у колонки роли waiting.
+func TestText_ColumnsLine(t *testing.T) {
+	defer guard(t)
+	b := brief.Build(input(mk("T-1", "x", "todo", 1)))
+	want := "- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed"
+	if lines := strings.Split(b.Text(), "\n"); len(lines) < 3 || lines[2] != want {
+		t.Errorf("третья строка ctx, ждали %q:\n%s", want, b.Text())
+	}
+	raw, err := json.Marshal(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"columns":"idea=inbox todo=ready`) {
+		t.Errorf("в JSON нет columns: %s", raw)
+	}
+}

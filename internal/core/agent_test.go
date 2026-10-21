@@ -723,3 +723,46 @@ func TestGC_EveryThreeHundredCommits(t *testing.T) {
 		t.Errorf("после 320 коммитов gc.log = %q, ждали один gc и commit-graph", got)
 	}
 }
+
+// move по имени роли: колонки waiting нет, есть blocked с ролью waiting - задача уходит в blocked.
+func TestMove_RoleName_GoesToColumnWithRole(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	a := mkCrit(t, s, "A", "doing")
+	if _, err := s.Move(a, "waiting", core.MoveOpts{Message: "ждёт ответа"}, "claude:a"); err != nil {
+		t.Fatalf("move %s waiting: %v", a, err)
+	}
+	got, _, err := s.Get(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "blocked" {
+		t.Errorf("статус %q, ждали blocked", got.Status)
+	}
+	if subj := e.subject(); !strings.Contains(subj, "move doing > blocked") {
+		t.Errorf("тема коммита %q, ждали имя колонки: move doing > blocked", subj)
+	}
+	_, err = s.Move(a, "nowhere", core.MoveOpts{}, "claude:a")
+	wantRule(t, "неизвестное имя", err, `unknown column "nowhere"; columns: idea=inbox todo=ready`)
+	_, err = s.Move(a, "", core.MoveOpts{}, "claude:a")
+	wantRule(t, "пустое имя", err, `unknown column ""`)
+}
+
+// Имя колонки важнее роли: колонка "waiting" с ролью ready берёт задачу, а не blocked.
+func TestMove_ColumnNameBeatsRole(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	clk := newClock()
+	mkIn(t, e.openAt(clk), "Seed", "idea")
+	s := e.withConfig(clk, "[[column]]\nname = \"idea\"\nrole = \"inbox\"\n\n[[column]]\nname = \"waiting\"\nrole = \"ready\"\n\n"+
+		"[[column]]\nname = \"doing\"\nrole = \"active\"\n\n[[column]]\nname = \"blocked\"\nrole = \"waiting\"\n\n"+
+		"[[column]]\nname = \"done\"\nrole = \"closed\"\n")
+	a := mkCrit(t, s, "A", "doing")
+	if _, err := s.Move(a, "waiting", core.MoveOpts{}, "claude:a"); err != nil {
+		t.Fatalf("move %s waiting: %v", a, err)
+	}
+	if got, _, _ := s.Get(a); got == nil || got.Status != "waiting" {
+		t.Errorf("задача ушла не в колонку waiting: %+v", got)
+	}
+}

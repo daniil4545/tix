@@ -30,7 +30,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 <ready column>`.
+- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 ready`. `move` takes a column name or a role; `tix ctx` prints which column has which role.
 
 ## Checks
 
