@@ -4,7 +4,7 @@
 
 A personal terminal task tracker for humans and agents: tasks are md files in `~/tasks` under git,
 agents work through the `tix` CLI, the human works through the TUI. The user decides. The behavior
-canon is `docs/spec.md`, tasks are in `docs/backlog.md`, task plans in `docs/plans/`.
+canon is `docs/spec.md`, tasks are in tix (project `tracker`), task plans in `docs/plans/`.
 
 ## Principles
 
@@ -53,12 +53,12 @@ Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 |---|---|
 | Autonomy | the agent decides technical questions within the spec; it approves the task plan itself if `spec-reviewer` raised no questions about functionality; a question about behavior, anything irreversible and spending subscription limits go to the user |
 | Subagents | every task runs through the `orchestrate` skill: plan, `spec-reviewer`, up to 5 concurrent agents (workers and tester), thorough `code-reviewer`, `skeptic` by `regress` |
-| Tracker | `docs/backlog.md`, the task plan is `docs/plans/<task>.md` |
+| Tracker | tix, project `tracker`; the plan of a heavy task is `docs/plans/<task>.md` |
 | Subagent header | `~/.claude/templates/subagent-brief.md` |
 | Findings file | `docs/findings.jsonl` |
 
 - Branches: a task goes in the branch `z<N>-<name>`, the merge into `main` happens at acceptance with the user's confirmation.
-- Hosting and CI: none, no remote is set up.
+- Hosting and CI: this repository has no remote. The public repository `daniil4545/tix` is a snapshot with CI; the steps are in `docs/state.md`.
 
 ## Critical invariants
 

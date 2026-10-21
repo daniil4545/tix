@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/daniil4545/tix/internal/assets"
 )
 
 // Migration: a store of the former version (.tracker, entries in .gitignore) gets .tix after the first Open,
@@ -164,5 +166,62 @@ func TestOpen_BothDirs_GitignoreGetsTixLines(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(got), ".tracker/lock\n") || !strings.Contains(string(got), ".tix/lock\n") {
 		t.Errorf(".gitignore with two folders:\n%s", got)
+	}
+}
+
+// writeRules puts text into the store RULES.md and commits it, as an older version left it.
+func writeRules(t *testing.T, e *env, text []byte) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(e.root, "RULES.md"), text, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e.git("add", "-A")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "old rules")
+}
+
+// An untouched RULES.md of an earlier version gets the current text with the next write; the
+// operation commits it. A RULES.md edited by the owner stays as it is.
+func TestPrepare_OutdatedRules_Refreshed_EditedKept(t *testing.T) {
+	defer guard(t)
+	old, err := os.ReadFile(filepath.Join("testdata", "rules-2026-10-20.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name string
+		text []byte
+		want string
+	}{
+		{"untouched old", old, assets.Rules},
+		{"edited by owner", append(old[:len(old):len(old)], "\nMy own rule.\n"...), string(old) + "\nMy own rule.\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			e := newEnv(t)
+			s := e.open(0)
+			r := mustCreate(t, s, "Seed")
+			writeRules(t, e, c.text)
+			before := e.count()
+			if _, err := s.Comment(r.ID, "next write", "tester"); err != nil {
+				t.Fatalf("Comment: %v", err)
+			}
+			got, err := os.ReadFile(filepath.Join(e.root, "RULES.md"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != c.want {
+				t.Errorf("RULES.md after the write:\n%.200s", got)
+			}
+			if out := e.git("status", "--porcelain"); out != "" {
+				t.Errorf("the write left changes uncommitted:\n%s", out)
+			}
+			// One commit: the refresh rides in the operation commit, not in a separate external edit.
+			if n := e.count() - before; n != 1 {
+				t.Errorf("the write made %d commits, want 1", n)
+			}
+			changed := strings.Contains(e.git("show", "--name-only", "--format=", "HEAD"), "RULES.md")
+			if refreshed := c.want == assets.Rules; changed != refreshed {
+				t.Errorf("RULES.md in the operation commit: %v, want %v", changed, refreshed)
+			}
+		})
 	}
 }

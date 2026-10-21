@@ -104,7 +104,8 @@ func (s *Store) lock() (func(), error) {
 }
 
 // prepare under the lock: git init, removal of index.lock, cleanup of own temp files, .gitignore, config.toml and
-// RULES.md. Existing files are not touched, even if the text differs.
+// RULES.md. Existing files are not touched, even if the text differs; the one exception is an untouched
+// RULES.md of an earlier version, which gets the current text.
 func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 	tx := &txEnv{repo: repo, skip: map[string]bool{}}
 	if _, err := os.Stat(filepath.Join(s.root, ".git")); os.IsNotExist(err) {
@@ -135,6 +136,12 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 	for _, f := range files {
 		path := filepath.Join(s.root, filepath.FromSlash(f.rel))
 		if _, err := os.Stat(path); err == nil {
+			if f.rel == rulesFile {
+				if err := s.refreshRules(tx, path, f.data); err != nil {
+					// Old rules do not block a write: the agent still works, the next write retries.
+					s.log.Warn("RULES.md refresh skipped", "op", "refresh_rules", "err", err)
+				}
+			}
 			continue
 		}
 		if err := s.writeNew(path, f.data); err != nil {
@@ -144,6 +151,25 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 		tx.skip[f.rel] = true
 	}
 	return tx, nil
+}
+
+// refreshRules replaces an untouched RULES.md of an earlier version with the current text; the
+// operation commits it. A file edited by the owner, or changed during the check, stays as it is.
+func (s *Store) refreshRules(tx *txEnv, path string, data []byte) error {
+	old, err := os.ReadFile(path) //nolint:gosec // path inside the store, set by the owner
+	if err != nil {
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	if !assets.OutdatedRules(old) {
+		return nil
+	}
+	ok, err := s.replace(path, old, data)
+	if err != nil || !ok {
+		return err
+	}
+	tx.extra = append(tx.extra, gitx.File{Path: rulesFile, Data: data})
+	tx.skip[rulesFile] = true
+	return nil
 }
 
 // cleanTmp removes core temp files left by a killed process: under the lock they belong to no one.
