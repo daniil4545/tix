@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-21
+
+### Changed
+
+- The agent skill applies to agreed work in any project, not only in a project
+  that already has tasks, and tells the agent to create a task when none covers
+  the work.
+
+### Fixed
+
+- `RULES.md` in an existing store now gets the current text when it is an
+  untouched copy from an earlier version. A copy you edited is kept as it is.
+
 ## [0.1.0] - 2026-10-21
 
 First public release.
@@ -59,5 +72,6 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/daniil4545/tix/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daniil4545/tix/releases/tag/v0.1.0

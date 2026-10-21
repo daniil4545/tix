@@ -1,9 +1,33 @@
 // Package assets holds the texts embedded in the binary.
 package assets
 
-import _ "embed"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+
+	_ "embed"
+)
 
 // Rules - RULES.md: the rules for an agent working with the tracker.
 //
 //go:embed RULES.md
 var Rules string
+
+// RulesHash - sha256 of Rules. A test keeps it equal to RULES.md: when the text changes, the old
+// hash moves into previousRules, so a store with an untouched old copy gets the new text.
+const RulesHash = "5d390bc8cb3b7642b757e75f82c5efe6de935d45db3ad3e7a1db73a6184e676f"
+
+// previousRules - sha256 of RULES.md texts shipped by earlier versions. An empty file is not here:
+// the owner may have emptied it on purpose.
+var previousRules = map[string]bool{
+	"5086330dcf376195052547a558e048d28ac25f322e77f9fc26edb0387a3bbaee": true,
+	"746f63b8c9224912cb57bf64bdc7b9552e9a27d8e06fa5927eac213eaf5c1363": true,
+	"80665ac8179d1012e30ea1328750c34f36bdaeacbc7d77aa2cfcf6b4f3fb1e6c": true,
+	"d2aa24fdb03d5f06044407753702400c9a499733cdf8b83ea8d85999e013e0da": true,
+}
+
+// OutdatedRules reports whether text is an untouched RULES.md of an earlier version.
+func OutdatedRules(text []byte) bool {
+	sum := sha256.Sum256(text)
+	return previousRules[hex.EncodeToString(sum[:])]
+}
