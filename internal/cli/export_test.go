@@ -2,7 +2,7 @@ package cli
 
 import "time"
 
-// SetHookReadTimeout сокращает срок чтения stdin хука; возвращает откат.
+// SetHookReadTimeout shortens the hook stdin read timeout; returns a restore func.
 func SetHookReadTimeout(d time.Duration) func() {
 	old := hookReadTimeout
 	hookReadTimeout = d

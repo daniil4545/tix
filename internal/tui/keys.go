@@ -8,13 +8,13 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// Сообщения между фоновыми командами и Update.
+// Messages between background commands and Update.
 type (
-	watchStart struct{}            // пора запускать наблюдатель
-	watchReady struct{ err error } // наблюдатель запущен или не смог
-	fsEvent    struct{}            // в корне что-то изменилось
-	reloadTick struct{}            // окно склейки событий закрылось
-	loaded     struct {            // свежий список задач
+	watchStart struct{}            // time to start the watcher
+	watchReady struct{ err error } // the watcher started or failed
+	fsEvent    struct{}            // something changed in the root
+	reloadTick struct{}            // the event merge window closed
+	loaded     struct {            // a fresh task list
 		tasks   []*task.Task
 		skipped int
 	}
@@ -27,7 +27,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	return m.dispatch(msg.String())
 }
 
-// dispatch выполняет клавишу k; клик по кнопке подсказки вызывает его с именем той же клавиши.
+// dispatch runs key k; a click on a hint button calls it with the name of the same key.
 func (m *Model) dispatch(k string) tea.Cmd {
 	if m.grab != nil {
 		return m.grabKey(k)
@@ -113,7 +113,7 @@ func (m *Model) cardKey(k string) tea.Cmd {
 	return nil
 }
 
-// siblingCard открывает предыдущую (dir -1) или следующую задачу той же колонки; на краю - ничего.
+// siblingCard opens the previous (dir -1) or next task of the same column; at the edge - nothing.
 func (m *Model) siblingCard(dir int) tea.Cmd {
 	for _, ts := range m.colTasks {
 		for i, t := range ts {
@@ -129,7 +129,7 @@ func (m *Model) siblingCard(dir int) tea.Cmd {
 	return nil
 }
 
-// helpKey: справка закрывается esc или ?; q и ctrl+c выходят, прочее игнорируется.
+// helpKey: help closes with esc or ?; q and ctrl+c quit, anything else is ignored.
 func (m *Model) helpKey(k string) tea.Cmd {
 	switch k {
 	case "esc", "?":
@@ -140,7 +140,7 @@ func (m *Model) helpKey(k string) tea.Cmd {
 	return nil
 }
 
-// taskKey - клавиши, общие для доски и карточки: действие над текущей задачей.
+// taskKey - keys shared by the board and the card: an action on the current task.
 func (m *Model) taskKey(k string) tea.Cmd {
 	switch k {
 	case "e":
@@ -151,7 +151,7 @@ func (m *Model) taskKey(k string) tea.Cmd {
 	return nil
 }
 
-// event разбирает не клавиатурные сообщения.
+// event handles non-keyboard messages.
 func (m *Model) event(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case watchStart:
@@ -187,7 +187,7 @@ func (m *Model) event(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-// settle склеивает события файлов в одно перечитывание.
+// settle merges file events into one reread.
 func (m *Model) settle() tea.Cmd {
 	if m.pending {
 		return nil

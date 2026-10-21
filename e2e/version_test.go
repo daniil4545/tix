@@ -18,7 +18,7 @@ func runVersion(t *testing.T, bin string) string {
 
 func TestVersion_NoLdflags_PrintsDev(t *testing.T) {
 	if got := runVersion(t, tixBin); got != "dev\n" {
-		t.Errorf("--version без ldflags = %q, ждали %q", got, "dev\n")
+		t.Errorf("--version without ldflags = %q, want %q", got, "dev\n")
 	}
 }
 
@@ -31,6 +31,6 @@ func TestVersion_Ldflags_PrintsValue(t *testing.T) {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
 	if got := runVersion(t, bin); got != "1.2.3\n" {
-		t.Errorf("--version с ldflags = %q, ждали %q", got, "1.2.3\n")
+		t.Errorf("--version with ldflags = %q, want %q", got, "1.2.3\n")
 	}
 }

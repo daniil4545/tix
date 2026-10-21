@@ -13,7 +13,7 @@ import (
 
 func guard(t *testing.T) {
 	if r := recover(); r != nil {
-		t.Fatalf("паника: %v", r)
+		t.Fatalf("panic: %v", r)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestDetect(t *testing.T) {
 	mk(t, filepath.Join(root, ".git"), filepath.Join(root, "sub"), filepath.Join(proj, ".git"),
 		filepath.Join(proj, "pkg", "deep"), filepath.Join(base, "plain", "dir"),
 		filepath.Join(base, "dev", "main"))
-	// настоящий worktree: .git - файл с указателем, рядом commondir
+	// a real worktree: .git is a file with a pointer, commondir next to it
 	gitEnv := append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
 	for _, args := range [][]string{
 		{"-C", filepath.Join(base, "dev", "main"), "init", "-q"},
@@ -56,20 +56,20 @@ func TestDetect(t *testing.T) {
 		want string
 		ok   bool
 	}{
-		{"корень репозитория", proj, config.Default(), "myproj", true},
-		{"глубокая папка", filepath.Join(proj, "pkg", "deep"), config.Default(), "myproj", true},
-		{"карта имён", filepath.Join(proj, "pkg"), mapped, "трекер", true},
-		{"worktree даёт основную папку", filepath.Join(base, "dev", "wt", "src"), config.Default(), "main", true},
-		{"сам root", root, config.Default(), "", false},
-		{"внутри root, хотя там .git", filepath.Join(root, "sub"), config.Default(), "", false},
-		{"вне git", filepath.Join(base, "plain", "dir"), config.Default(), "", false},
+		{"repository root", proj, config.Default(), "myproj", true},
+		{"deep folder", filepath.Join(proj, "pkg", "deep"), config.Default(), "myproj", true},
+		{"name map", filepath.Join(proj, "pkg"), mapped, "трекер", true},
+		{"worktree gives the main folder", filepath.Join(base, "dev", "wt", "src"), config.Default(), "main", true},
+		{"root itself", root, config.Default(), "", false},
+		{"inside root, though .git is there", filepath.Join(root, "sub"), config.Default(), "", false},
+		{"outside git", filepath.Join(base, "plain", "dir"), config.Default(), "", false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			defer guard(t)
 			got, ok := project.Detect(c.cwd, root, c.cfg)
 			if got != c.want || ok != c.ok {
-				t.Errorf("Detect(%s) = %q, %v; ждали %q, %v", c.cwd, got, ok, c.want, c.ok)
+				t.Errorf("Detect(%s) = %q, %v; want %q, %v", c.cwd, got, ok, c.want, c.ok)
 			}
 		})
 	}

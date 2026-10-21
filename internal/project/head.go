@@ -6,21 +6,21 @@ import (
 	"strings"
 )
 
-// Head возвращает полный sha HEAD репозитория в dir без вызова git. false: нет HEAD
-// (нет коммитов, reftable, вне git). Формат файлов - docs/api/git.md, раздел 7.
+// Head returns the full HEAD sha of the repository in dir without calling git. false: no HEAD
+// (no commits, reftable, outside git). File format - docs/api/git.md, section 7.
 func Head(dir string) (string, bool) {
 	gitDir, ok := gitDirOf(dir)
 	if !ok {
 		return "", false
 	}
 	common := gitDir
-	if data, err := os.ReadFile(filepath.Join(gitDir, "commondir")); err == nil { //nolint:gosec // путь из файла .git
+	if data, err := os.ReadFile(filepath.Join(gitDir, "commondir")); err == nil { //nolint:gosec // path from the .git file
 		common = absFrom(gitDir, strings.TrimSpace(string(data)))
 	}
-	if _, err := os.Stat(filepath.Join(common, "reftable")); err == nil { //nolint:gosec // путь из файла .git
+	if _, err := os.Stat(filepath.Join(common, "reftable")); err == nil { //nolint:gosec // path from the .git file
 		return "", false
 	}
-	head, err := os.ReadFile(filepath.Join(gitDir, "HEAD")) //nolint:gosec // путь из файла .git
+	head, err := os.ReadFile(filepath.Join(gitDir, "HEAD")) //nolint:gosec // path from the .git file
 	if err != nil {
 		return "", false
 	}
@@ -32,7 +32,7 @@ func Head(dir string) (string, bool) {
 	return resolveRef(common, strings.TrimSpace(ref))
 }
 
-// gitDirOf возвращает git dir: сам .git или папку из "gitdir:" (worktree, submodule).
+// gitDirOf returns the git dir: .git itself or the folder from "gitdir:" (worktree, submodule).
 func gitDirOf(dir string) (string, bool) {
 	root := findGitDir(dir)
 	if root == "" {
@@ -46,7 +46,7 @@ func gitDirOf(dir string) (string, bool) {
 	if fi.IsDir() {
 		return gitPath, true
 	}
-	data, err := os.ReadFile(gitPath) //nolint:gosec // путь .git найден поиском вверх от dir
+	data, err := os.ReadFile(gitPath) //nolint:gosec // the .git path was found by searching up from dir
 	if err != nil {
 		return "", false
 	}
@@ -57,15 +57,15 @@ func gitDirOf(dir string) (string, bool) {
 	return absFrom(root, strings.TrimSpace(path)), true
 }
 
-// resolveRef читает ref как loose-файл, затем из packed-refs.
+// resolveRef reads a ref as a loose file, then from packed-refs.
 func resolveRef(common, ref string) (string, bool) {
 	if !strings.HasPrefix(ref, "refs/") || !filepath.IsLocal(ref) {
 		return "", false
 	}
-	if data, err := os.ReadFile(filepath.Join(common, filepath.FromSlash(ref))); err == nil { //nolint:gosec // ref проверен выше
+	if data, err := os.ReadFile(filepath.Join(common, filepath.FromSlash(ref))); err == nil { //nolint:gosec // ref is checked above
 		return sha(strings.TrimSpace(string(data)))
 	}
-	packed, err := os.ReadFile(filepath.Join(common, "packed-refs")) //nolint:gosec // путь из файла .git
+	packed, err := os.ReadFile(filepath.Join(common, "packed-refs")) //nolint:gosec // path from the .git file
 	if err != nil {
 		return "", false
 	}
@@ -77,7 +77,7 @@ func resolveRef(common, ref string) (string, bool) {
 	return "", false
 }
 
-// sha принимает строку из 40 (sha1) или 64 (sha256) шестнадцатеричных знаков.
+// sha accepts a string of 40 (sha1) or 64 (sha256) hexadecimal characters.
 func sha(s string) (string, bool) {
 	if len(s) != 40 && len(s) != 64 {
 		return "", false

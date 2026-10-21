@@ -30,11 +30,11 @@ func TestBoard_NavigateOpenCardEscKeepsSelection(t *testing.T) {
 	e.key("j", "enter")
 	e.screenHas("Bravo", "hello from agent", "* needs you: pick A or B")
 	if s := e.text(); strings.Contains(s, "Alpha") || strings.Contains(s, "Gamma") {
-		t.Errorf("карточка показывает чужие задачи:\n%s", s)
+		t.Errorf("card shows other tasks:\n%s", s)
 	}
 	e.key("esc")
 	e.screenHas("Alpha", "Gamma")
-	e.key("enter") // выбор сохранён: снова Bravo
+	e.key("enter") // selection kept: Bravo again
 	e.screenHas("Bravo", "hello from agent")
 	e.key("esc", "l", "enter")
 	e.screenHas("Gamma", "new")
@@ -77,7 +77,7 @@ role = "closed"
 `
 
 func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
-	t.Run("ввод и enter", func(t *testing.T) {
+	t.Run("input and enter", func(t *testing.T) {
 		e := newEnv(t, moveCfg)
 		e.create("Alpha", "p", "work")
 		e.start("", 140, 30)
@@ -86,9 +86,9 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		e.screenHas("waiting for:")
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("задача в wait с причиной", func() bool { st, w, _, _ := e.get("T-1"); return st == "wait" && w == "vendor reply" })
+		e.until("task in wait with a reason", func() bool { st, w, _, _ := e.get("T-1"); return st == "wait" && w == "vendor reply" })
 	})
-	t.Run("esc отменяет", func(t *testing.T) {
+	t.Run("esc cancels", func(t *testing.T) {
 		e := newEnv(t, moveCfg)
 		e.create("Alpha", "p", "work")
 		n := e.gitOut("rev-list", "--count", "HEAD")
@@ -97,12 +97,12 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		e.key(" ", "l", " ")
 		e.screenHas("waiting for:")
 		e.key("esc")
-		e.until("строка ввода закрыта", func() bool { return !strings.Contains(e.text(), "waiting for:") })
+		e.until("input line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
 		if st, _, _, _ := e.get("T-1"); st != "work" || e.gitOut("rev-list", "--count", "HEAD") != n {
-			t.Errorf("отмена изменила задачу: статус %s", st)
+			t.Errorf("cancel changed the task: status %s", st)
 		}
 	})
-	t.Run("поле уже заполнено - без вопроса", func(t *testing.T) {
+	t.Run("field already filled - no question", func(t *testing.T) {
 		e := newEnv(t, moveCfg)
 		e.create("Alpha", "p", "work")
 		if _, err := e.store.Set("T-1", []core.Field{{Name: "waiting", Value: "set earlier"}}, "seed"); err != nil {
@@ -111,7 +111,7 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
 		e.key(" ", "l", " ")
-		e.until("задача в wait", func() bool { st, _, _, _ := e.get("T-1"); return st == "wait" })
+		e.until("task in wait", func() bool { st, _, _, _ := e.get("T-1"); return st == "wait" })
 	})
 }
 
@@ -129,23 +129,23 @@ func TestMove_AgentMovedDuringPrompt_HumanMoveRefused(t *testing.T) {
 	e.key("enter")
 	e.screenHas("meanwhile")
 	if st, _, _, _ := e.get("T-1"); st != "fin" {
-		t.Errorf("перенос человека перезаписал перенос агента: fin -> %s", st)
+		t.Errorf("human move overwrote the agent move: fin -> %s", st)
 	}
 }
 
 func TestMove_RuleViolation_ShownInStatusLine(t *testing.T) {
 	e := newEnv(t, "")
-	e.create("Alpha", "p", "idea") // в todo нужен критерий
+	e.create("Alpha", "p", "idea") // todo needs a criterion
 	_, err := e.store.Move("T-1", "todo", core.MoveOpts{}, "probe")
 	if err == nil {
-		t.Fatal("ядро пустило задачу без критерия в ready")
+		t.Fatal("core let a task without a criterion into ready")
 	}
 	e.start("", 140, 30)
 	e.screenHas("Alpha")
 	e.key(" ", "l", " ")
 	e.screenHas(err.Error())
 	if st, _, _, _ := e.get("T-1"); st != "idea" {
-		t.Errorf("статус %s после отказа", st)
+		t.Errorf("status %s after the refusal", st)
 	}
 }
 
@@ -153,9 +153,9 @@ func TestMove_ToClosed_CriteriaCases(t *testing.T) {
 	cases := []struct {
 		name, body, reply, subject, comment string
 	}{
-		{"неотмеченные критерии: причина и Force", "## Details\n- [ ] one\n", "skipped", "T-1: done force", "Result: skipped"},
-		{"критериев нет: причина как -m", "just text\n", "fine", "T-1: done", "Result: fine"},
-		{"все отмечены: без вопроса", "## Details\n- [x] one\n", "", "T-1: done", ""},
+		{"unchecked criteria: reason and Force", "## Details\n- [ ] one\n", "skipped", "T-1: done force", "Result: skipped"},
+		{"no criteria: reason as -m", "just text\n", "fine", "T-1: done", "Result: fine"},
+		{"all checked: no question", "## Details\n- [x] one\n", "", "T-1: done", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -170,14 +170,14 @@ func TestMove_ToClosed_CriteriaCases(t *testing.T) {
 				e.tm.Type(c.reply)
 				e.key("enter")
 			}
-			e.until("задача в fin", func() bool { st, _, _, _ := e.get("T-1"); return st == "fin" })
-			e.until("коммит "+c.subject, func() bool { return e.gitOut("log", "-1", "--format=%s") == c.subject })
+			e.until("task in fin", func() bool { st, _, _, _ := e.get("T-1"); return st == "fin" })
+			e.until("commit "+c.subject, func() bool { return e.gitOut("log", "-1", "--format=%s") == c.subject })
 			_, _, _, comments := e.get("T-1")
 			if c.comment != "" && !strings.Contains(strings.Join(comments, "|"), c.comment) {
-				t.Errorf("комментарии %v без %q", comments, c.comment)
+				t.Errorf("comments %v without %q", comments, c.comment)
 			}
 			if c.reply == "" && strings.Contains(e.text(), "close reason:") {
-				t.Error("вопрос показан, хотя критерии отмечены")
+				t.Error("question shown although the criteria are checked")
 			}
 		})
 	}
@@ -209,8 +209,8 @@ func TestReorder_JK_MovesWithinColumn_EdgesDoNothing(t *testing.T) {
 	step := func(k string, want string) {
 		t.Helper()
 		e.key(k)
-		e.until("порядок "+want, func() bool { return strings.Join(order(e, "idea"), ",") == want })
-		e.until("экран с порядком "+want, func() bool {
+		e.until("order "+want, func() bool { return strings.Join(order(e, "idea"), ",") == want })
+		e.until("screen with order "+want, func() bool {
 			s, prev := e.text(), -1
 			for _, title := range strings.Split(want, ",") {
 				i := strings.Index(s, title)
@@ -225,20 +225,20 @@ func TestReorder_JK_MovesWithinColumn_EdgesDoNothing(t *testing.T) {
 	step("J", "Bravo,Alpha,Charlie,Delta")
 	step("J", "Bravo,Charlie,Alpha,Delta")
 	step("K", "Bravo,Alpha,Charlie,Delta")
-	step("K", "Alpha,Bravo,Charlie,Delta") // к верху - First
-	// Файл меняется раньше коммита: счётчик читаем, когда запись закоммичена.
-	e.until("запись закоммичена", func() bool {
+	step("K", "Alpha,Bravo,Charlie,Delta") // to the top - First
+	// The file changes before the commit: the counter is read when the write is committed.
+	e.until("write committed", func() bool {
 		out, err := exec.CommandContext(context.Background(), gitBin, "-C", e.root,
 			"--no-optional-locks", "status", "--porcelain", "--", "T-*.md").Output()
 		return err == nil && len(strings.TrimSpace(string(out))) == 0
 	})
 	n := e.gitOut("rev-list", "--count", "HEAD")
-	e.key("K") // у верха ничего
+	e.key("K") // nothing at the top
 	e.key("j", "j", "j", "J")
 	e.key("esc")
 	e.screenHas("Alpha")
 	if got := e.gitOut("rev-list", "--count", "HEAD"); got != n {
-		t.Errorf("на краю появился коммит: было %s, стало %s", n, got)
+		t.Errorf("a commit appeared at the edge: was %s, now %s", n, got)
 	}
 }
 
@@ -251,7 +251,7 @@ func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
 	seen := map[string]bool{}
 	for i := 0; i < 4; i++ {
 		e.key("p")
-		e.until("кадр после p", func() bool {
+		e.until("frame after p", func() bool {
 			s := e.text()
 			a, b := strings.Contains(s, "Alpha task"), strings.Contains(s, "Beta task")
 			switch {
@@ -268,7 +268,7 @@ func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
 		})
 	}
 	if !seen["all"] || !seen["alpha"] || !seen["beta"] {
-		t.Errorf("за четыре нажатия p видели %v; ждали все, alpha, beta", seen)
+		t.Errorf("four presses of p saw %v; expected all, alpha, beta", seen)
 	}
 
 	f := newEnv(t, "")
@@ -277,7 +277,7 @@ func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
 	f.start("alpha", 140, 30)
 	f.screenHas("Alpha task")
 	if strings.Contains(f.text(), "Beta task") {
-		t.Errorf("начальный фильтр alpha показывает beta:\n%s", f.text())
+		t.Errorf("initial filter alpha shows beta:\n%s", f.text())
 	}
 }
 
@@ -289,14 +289,14 @@ func TestCard_Comment_WrittenAsHumanEmptyCancels(t *testing.T) {
 	e.key("enter")
 	e.screenHas("new")
 	n := e.gitOut("rev-list", "--count", "HEAD")
-	e.key("c", "enter") // пустой текст - отмена
+	e.key("c", "enter") // empty text - cancel
 	if got := e.gitOut("rev-list", "--count", "HEAD"); got != n {
-		t.Error("пустой комментарий создал коммит")
+		t.Error("empty comment created a commit")
 	}
 	e.key("c")
 	e.tm.Type("note to self")
 	e.key("enter")
-	e.until("комментарий записан", func() bool {
+	e.until("comment written", func() bool {
 		_, _, _, cs := e.get("T-1")
 		return len(cs) == 1 && cs[0] == "human: note to self"
 	})
@@ -319,6 +319,6 @@ func TestCard_HistoryFoldsSetsAndShowsCommentOnce(t *testing.T) {
 	e.key("enter")
 	e.screenHas("3 edits", "unique-comment-text")
 	if n := strings.Count(e.text(), "unique-comment-text"); n != 1 {
-		t.Errorf("комментарий показан %d раз, ждали 1:\n%s", n, e.text())
+		t.Errorf("comment shown %d times, expected 1:\n%s", n, e.text())
 	}
 }

@@ -8,11 +8,11 @@ import (
 	"time"
 )
 
-// sections - разделы тела в каноническом порядке; SetSection пишет первые два.
+// sections - body sections in canonical order; SetSection writes the first two.
 var sections = []string{"Abstract", "Summary", "Details"}
 
-// SetField меняет поле frontmatter: title, waiting, due, tags, ask, external.
-// Значение - одна строка; title не бывает пустым; due - 2006-01-02 или пусто.
+// SetField changes a frontmatter field: title, waiting, due, tags, ask, external.
+// The value is one line; title is never empty; due is 2006-01-02 or empty.
 func (t *Task) SetField(name, value string) error {
 	switch name {
 	case "title", "waiting", "due", "ask", "external":
@@ -37,7 +37,7 @@ func (t *Task) SetField(name, value string) error {
 	return nil
 }
 
-// splitTags делит список через запятую; пустые элементы отбрасываются.
+// splitTags splits a comma-separated list; empty elements are dropped.
 func splitTags(value string) []string {
 	tags := []string{}
 	for _, tag := range strings.Split(value, ",") {
@@ -48,8 +48,8 @@ func splitTags(value string) []string {
 	return tags
 }
 
-// SetSection заменяет текст раздела (Abstract, Summary). "## " внутри текста - ошибка.
-// Нет раздела - он вставляется по каноническому порядку Abstract, Summary, Details.
+// SetSection replaces the section text (Abstract, Summary). "## " inside the text is an error.
+// No section - it is inserted by the canonical order Abstract, Summary, Details.
 func (t *Task) SetSection(name, text string) error {
 	i := slices.IndexFunc(sections[:2], func(s string) bool { return strings.EqualFold(s, name) })
 	if i < 0 {
@@ -92,7 +92,7 @@ func (t *Task) SetSection(name, text string) error {
 	return nil
 }
 
-// sectionText печатает текст раздела с переводом строки; пустой текст - пусто.
+// sectionText prints the section text with a line break; empty text - empty.
 func sectionText(text string) string {
 	if text == "" {
 		return ""
@@ -100,8 +100,8 @@ func sectionText(text string) string {
 	return text + "\n"
 }
 
-// insertSection вставляет новый раздел перед первым разделом, что идёт позже в
-// каноническом порядке, иначе в конец тела.
+// insertSection inserts a new section before the first section that comes later in
+// the canonical order, otherwise at the end of the body.
 func (t *Task) insertSection(lines []string, idx int, heading, text string) {
 	at := len(lines)
 	for j, ln := range lines {

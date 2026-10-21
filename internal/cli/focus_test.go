@@ -1,7 +1,7 @@
 package cli_test
 
-// Фокус сессии агента: docs/plans/mvp-actions.md, раздел 4a.1 и сценарий 8 (запись файла).
-// Пишутся по спеке, без чтения кода зоны H. Окружение подаётся через box.extra.
+// Focus of the agent session: file write. Written from the spec, without reading the code of zone H.
+// The environment is passed through box.extra.
 
 import (
 	"os"
@@ -21,10 +21,10 @@ func (b *box) focusFiles() []string {
 	return files
 }
 
-// focusDir - каталог фокуса вне базы (TIX_FOCUS_DIR перекрывает os.UserCacheDir()/tix/focus).
+// focusDir - the focus dir outside the store (TIX_FOCUS_DIR overrides os.UserCacheDir()/tix/focus).
 func (b *box) focusDir() string { return filepath.Join(b.root, "focus") }
 
-// agentEnv - окружение сессии Claude "c1" с адресом вкладки url (пусто - переменной нет).
+// agentEnv - the environment of Claude session "c1" with tab address url (empty - no variable).
 func (b *box) agentEnv(url string) map[string]string {
 	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_FOCUS_DIR": b.focusDir()}
 	if url != "" {
@@ -33,7 +33,7 @@ func (b *box) agentEnv(url string) map[string]string {
 	return env
 }
 
-// 4a.1: любая команда записи агента пишет адрес в каталог фокуса, файл <агент>-<id сессии>, 0600, одна строка.
+// Any agent write command writes the address to the focus dir, file <agent>-<session id>, 0600, one line.
 func TestFocus_AgentWriteCommands_StoreURL(t *testing.T) {
 	cases := []struct {
 		name string
@@ -54,43 +54,43 @@ func TestFocus_AgentWriteCommands_StoreURL(t *testing.T) {
 			b.ok("", c.args...)
 			files := b.focusFiles()
 			if len(files) != 1 {
-				t.Fatalf("файлов фокуса %d (%v), ждали один", len(files), files)
+				t.Fatalf("focus files %d (%v), want one", len(files), files)
 			}
 			if name := filepath.Base(files[0]); name != "claude-c1" {
-				t.Errorf("имя файла %q, ждали claude-c1 (<агент>-<id сессии>)", name)
+				t.Errorf("file name %q, want claude-c1 (<agent>-<session id>)", name)
 			}
 			data, err := os.ReadFile(files[0])
 			if err != nil {
 				t.Fatal(err)
 			}
 			if got := strings.TrimRight(string(data), "\n"); got != warpURL || strings.Contains(got, "\n") {
-				t.Errorf("содержимое %q, ждали одну строку %q", data, warpURL)
+				t.Errorf("content %q, want one line %q", data, warpURL)
 			}
 			info, err := os.Stat(files[0])
 			if err != nil {
 				t.Fatal(err)
 			}
 			if info.Mode().Perm() != 0o600 {
-				t.Errorf("права %v, ждали 0600", info.Mode().Perm())
+				t.Errorf("permissions %v, want 0600", info.Mode().Perm())
 			}
 		})
 	}
 }
 
-// 4a.1: значение не вида ^warp://session/[0-9a-f]{32}$ не пишется; команда при этом проходит.
+// A value not of the form ^warp://session/[0-9a-f]{32}$ is not written; the command still passes.
 func TestFocus_ValueOfOtherShape_NotWritten(t *testing.T) {
 	hex32 := "0123456789abcdef0123456789abcdef"
 	cases := []struct{ name, url string }{
-		{"не warp", "https://example.com/session/" + hex32},
-		{"буквы вне hex", "warp://session/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"},
-		{"заглавные", "warp://session/0123456789ABCDEF0123456789ABCDEF"},
-		{"31 знак", "warp://session/" + hex32[:31]},
-		{"33 знака", "warp://session/" + hex32 + "a"},
-		{"хвост после адреса", warpURL + "/extra"},
-		{"перевод строки в конце", warpURL + "\n"},
-		{"вторая строка", warpURL + "\nwarp://session/" + hex32},
-		{"пробел в начале", " " + warpURL},
-		{"схема другого терминала", "ghostty://session/" + hex32},
+		{"not warp", "https://example.com/session/" + hex32},
+		{"non-hex letters", "warp://session/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"},
+		{"uppercase", "warp://session/0123456789ABCDEF0123456789ABCDEF"},
+		{"31 chars", "warp://session/" + hex32[:31]},
+		{"33 chars", "warp://session/" + hex32 + "a"},
+		{"tail after the address", warpURL + "/extra"},
+		{"trailing newline", warpURL + "\n"},
+		{"second line", warpURL + "\nwarp://session/" + hex32},
+		{"leading space", " " + warpURL},
+		{"scheme of another terminal", "ghostty://session/" + hex32},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -99,36 +99,36 @@ func TestFocus_ValueOfOtherShape_NotWritten(t *testing.T) {
 			b.extra = b.agentEnv(c.url)
 			b.ok("", "new", "Work", "--to", "todo")
 			if files := b.focusFiles(); len(files) != 0 {
-				t.Errorf("значение %q записано в %v", c.url, files)
+				t.Errorf("value %q written to %v", c.url, files)
 			}
 		})
 	}
 }
 
-// 4a.1: человек (личность human) файл не пишет; без WARP_FOCUS_URL файла нет.
+// A human (identity human) writes no file; without WARP_FOCUS_URL there is no file.
 func TestFocus_HumanOrNoURL_NotWritten(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.extra = b.agentEnv(warpURL)
 	b.ok("", "new", "By human", "--to", "todo", "--as", "human")
 	if files := b.focusFiles(); len(files) != 0 {
-		t.Errorf("запись human оставила файл фокуса: %v", files)
+		t.Errorf("a human write left a focus file: %v", files)
 	}
 
 	b2 := newBox(t)
 	b2.extra = b2.agentEnv("")
 	b2.ok("", "new", "No url", "--to", "todo")
 	if files := b2.focusFiles(); len(files) != 0 {
-		t.Errorf("без WARP_FOCUS_URL появился файл: %v", files)
+		t.Errorf("a file appeared without WARP_FOCUS_URL: %v", files)
 	}
 }
 
-// 4a.1: ошибка записи файла не роняет команду: запись в базу прошла ровно одним коммитом, код 0.
+// A file write error does not fail the command: the store write passed as exactly one commit, code 0.
 func TestFocus_FileWriteFails_CommandStillSucceeds(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "First", "--to", "todo")
-	// на месте каталога фокуса лежит обычный файл: mkdir и запись невозможны
+	// a regular file sits in place of the focus dir: mkdir and write are impossible
 	if err := os.WriteFile(b.focusDir(), []byte("blocker"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -136,29 +136,29 @@ func TestFocus_FileWriteFails_CommandStillSucceeds(t *testing.T) {
 	b.extra = b.agentEnv(warpURL)
 	r := b.tix("", "note", "T-1", "still works")
 	if r.code != 0 {
-		t.Fatalf("note при сбое записи фокуса: код %d, stderr %q, ждали 0", r.code, r.err)
+		t.Fatalf("note on focus write failure: code %d, stderr %q, want 0", r.code, r.err)
 	}
 	if after := b.commitCount(); after != before+1 {
-		t.Errorf("коммитов %d -> %d, ждали ровно один (запись note)", before, after)
+		t.Errorf("commits %d -> %d, want exactly one (the note write)", before, after)
 	}
 }
 
-// Адрес вкладки привязан к машине: файл фокуса лежит вне базы и не уходит в git
-// (ни как отслеживаемый, ни как external edit следующей операции).
+// The tab address is bound to the machine: the focus file lies outside the store and does not go to git
+// (neither as tracked nor as an external edit of the next operation).
 func TestFocus_FileNeverCommittedToGit(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.extra = b.agentEnv(warpURL)
 	b.ok("", "new", "First", "--to", "todo")
 	if len(b.focusFiles()) != 1 {
-		t.Fatalf("файл фокуса не записан: %v", b.focusFiles())
+		t.Fatalf("focus file not written: %v", b.focusFiles())
 	}
 	b.extra = nil
-	b.ok("", "new", "Second", "--to", "todo") // следующая операция подбирает чужие правки дерева
+	b.ok("", "new", "Second", "--to", "todo") // the next operation picks up foreign tree edits
 	if tracked := b.git("ls-files"); strings.Contains(tracked, "focus") {
-		t.Errorf("файл фокуса попал в git: %q", tracked)
+		t.Errorf("focus file got into git: %q", tracked)
 	}
 	if st := b.git("status", "--porcelain"); strings.Contains(st, "focus") {
-		t.Errorf("файл фокуса висит в git status: %q", st)
+		t.Errorf("focus file hangs in git status: %q", st)
 	}
 }

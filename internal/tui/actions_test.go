@@ -1,8 +1,8 @@
 package tui
 
-// Тесты основного пути человека на доске (docs/plans/mvp-actions.md, разделы 3, 4, 4a, 5).
-// Пакет внутренний ради стенда mv* из mvp_test.go; свои хелперы с префиксом ac. Пишутся по спеке,
-// без чтения кода зон F, G, H. Среда (HOME, git) - TestMain из harness_test.go.
+// Tests of the human main path on the board.
+// The package is internal for the mv* harness from mvp_test.go; own helpers have prefix ac. Written from the spec,
+// without reading the code of zones F, G, H. The environment (HOME, git) comes from TestMain in harness_test.go.
 
 import (
 	"os"
@@ -30,10 +30,10 @@ const (
 )
 
 // ---------------------------------------------------------------------------------------------
-// Хелперы стенда
+// Harness helpers
 // ---------------------------------------------------------------------------------------------
 
-// acPress шлёт клавишу: имена стрелок и backspace - кодом, прочее - как e.key.
+// acPress sends a key: arrow and backspace names by code, others as e.key.
 func (e *mvEnv) acPress(keys ...string) {
 	for _, k := range keys {
 		codes := map[string]rune{"left": tea.KeyLeft, "right": tea.KeyRight, "up": tea.KeyUp, "down": tea.KeyDown, "backspace": tea.KeyBackspace}
@@ -54,8 +54,8 @@ func (e *mvEnv) acCommitCount() int {
 	return n
 }
 
-// acCommitsSettled ждёт (до срока), пока коммитов станет want, затем даёт очереди дописать лишнее
-// и возвращает итоговое число: запись файла идёт раньше коммита.
+// acCommitsSettled waits (until a deadline) for the commit count to reach want, then lets the queue add extras
+// and returns the final count: the file write goes before the commit.
 func (e *mvEnv) acCommitsSettled(want int) int {
 	e.t.Helper()
 	for end := time.Now().Add(3 * time.Second); time.Now().Before(end) && e.acCommitCount() < want; time.Sleep(10 * time.Millisecond) {
@@ -83,7 +83,7 @@ func (e *mvEnv) acByTitle(title string) *task.Task {
 	return nil
 }
 
-// acOrder - id задач колонки по rank, как их хранит ядро.
+// acOrder - the task ids of a column by rank, as the core stores them.
 func (e *mvEnv) acOrder(column string) string {
 	tasks, _ := e.store.List()
 	var in []*task.Task
@@ -100,7 +100,7 @@ func (e *mvEnv) acOrder(column string) string {
 	return strings.Join(ids, " ")
 }
 
-// acFind - клетка первого знака sub в нижней из строк экрана, где он есть.
+// acFind - the cell of the first character of sub in the lowest screen line that has it.
 func (e *mvEnv) acFind(sub string) (x, y int) {
 	e.t.Helper()
 	ls := e.lines()
@@ -109,11 +109,11 @@ func (e *mvEnv) acFind(sub string) (x, y int) {
 			return utf8.RuneCountInString(ls[y][:i]), y
 		}
 	}
-	e.t.Fatalf("на экране нет %q:\n%s", sub, e.text())
+	e.t.Fatalf("%q is not on the screen:\n%s", sub, e.text())
 	return 0, 0
 }
 
-// acClickOn ждёт sub на экране и кликает в его середину.
+// acClickOn waits for sub on the screen and clicks in its middle.
 func (e *mvEnv) acClickOn(sub string) {
 	e.t.Helper()
 	e.screenHas(sub)
@@ -121,7 +121,7 @@ func (e *mvEnv) acClickOn(sub string) {
 	e.click(x+utf8.RuneCountInString(sub)/2, y)
 }
 
-// acColX - колонка экрана, с которой начинается title в первой строке с ним.
+// acColX - the screen column where title starts in the first line with it.
 func (e *mvEnv) acColX(title string) int {
 	for _, ln := range e.lines() {
 		if i := strings.Index(ln, title); i >= 0 {
@@ -131,22 +131,22 @@ func (e *mvEnv) acColX(title string) int {
 	return -1
 }
 
-// acWaitStatus ждёт, пока задача получит статус.
+// acWaitStatus waits until the task gets the status.
 func (e *mvEnv) acWaitStatus(id, status string) {
 	e.t.Helper()
-	e.until(id+" в "+status, func() bool { st, _ := e.status(id); return st == status })
+	e.until(id+" in "+status, func() bool { st, _ := e.status(id); return st == status })
 }
 
-// acStillOn: после обработки всего посланного на экране есть sub (и нет лишнего).
+// acStillOn: after everything sent is handled, the screen has sub (and nothing extra).
 func (e *mvEnv) acStillOn(sub string) {
 	e.t.Helper()
 	e.settle()
 	if !strings.Contains(e.text(), sub) {
-		e.t.Fatalf("на экране нет %q:\n%s", sub, e.text())
+		e.t.Fatalf("%q is not on the screen:\n%s", sub, e.text())
 	}
 }
 
-// acStartIn запускает TUI с начальным проектом (фильтром) project.
+// acStartIn starts the TUI with the initial project (filter) project.
 func (e *mvEnv) acStartIn(project string, w, h int) {
 	e.t.Helper()
 	ctx := e.t.Context()
@@ -159,15 +159,15 @@ func (e *mvEnv) acStartIn(project string, w, h int) {
 	})
 }
 
-// acOpenCard открывает карточку выбранной задачи.
+// acOpenCard opens the card of the selected task.
 func (e *mvEnv) acOpenCard(title string) {
 	e.t.Helper()
 	e.key("enter")
 	e.opened(title)
-	e.settle() // кадр карточки уже с размером окна: клики считаются по нему
+	e.settle() // the card frame already has the window size: clicks are computed by it
 }
 
-// acEditor - заглушка $EDITOR: считает вызовы, копирует файл при запуске, выполняет script над файлом.
+// acEditor - an $EDITOR stub: counts calls, copies the file at start, runs script over the file.
 type acEditor struct {
 	t   *testing.T
 	dir string
@@ -185,7 +185,7 @@ func acStubEditor(t *testing.T, script string) *acEditor {
 	t.Helper()
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "editor.sh")
-	if err := os.WriteFile(bin, []byte(acEditorScript), 0o700); err != nil { //nolint:gosec // заглушка теста
+	if err := os.WriteFile(bin, []byte(acEditorScript), 0o700); err != nil { //nolint:gosec // test stub
 		t.Fatal(err)
 	}
 	if script != "" {
@@ -200,23 +200,23 @@ func acStubEditor(t *testing.T, script string) *acEditor {
 }
 
 func (s *acEditor) calls() int {
-	b, _ := os.ReadFile(filepath.Join(s.dir, "count")) //nolint:gosec // путь теста
+	b, _ := os.ReadFile(filepath.Join(s.dir, "count")) //nolint:gosec // test path
 	n, _ := strconv.Atoi(strings.TrimSpace(string(b)))
 	return n
 }
 
 func (s *acEditor) seen(n int) string {
-	b, _ := os.ReadFile(filepath.Join(s.dir, "seen."+strconv.Itoa(n))) //nolint:gosec // путь теста
+	b, _ := os.ReadFile(filepath.Join(s.dir, "seen."+strconv.Itoa(n))) //nolint:gosec // test path
 	return string(b)
 }
 
-// acFakeOpen подменяет команду open скриптом в PATH; возвращает путь журнала вызовов (по строке на вызов).
+// acFakeOpen replaces the open command with a script in PATH; returns the call log path (one line per call).
 func acFakeOpen(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	log := filepath.Join(dir, "open.log")
 	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TIX_AC_OPEN_LOG\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "open"), []byte(script), 0o700); err != nil { //nolint:gosec // заглушка теста
+	if err := os.WriteFile(filepath.Join(dir, "open"), []byte(script), 0o700); err != nil { //nolint:gosec // test stub
 		t.Fatal(err)
 	}
 	t.Setenv("TIX_AC_OPEN_LOG", log)
@@ -225,12 +225,12 @@ func acFakeOpen(t *testing.T) string {
 }
 
 func acRead(path string) string {
-	b, _ := os.ReadFile(path) //nolint:gosec // путь теста
+	b, _ := os.ReadFile(path) //nolint:gosec // test path
 	return string(b)
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 1: подсказка-кнопки
+// Scenario 1: hint buttons
 // ---------------------------------------------------------------------------------------------
 
 func acBoard(t *testing.T, w, h int) *mvEnv {
@@ -239,11 +239,11 @@ func acBoard(t *testing.T, w, h int) *mvEnv {
 	e.create("Alpha", "idea")
 	e.start(w, h)
 	e.screenHas("Alpha")
-	e.settle() // первый кадр рисуется до размера окна: клики считаются по кадру после него
+	e.settle() // the first frame is drawn before the window size: clicks are computed by the frame after it
 	return e
 }
 
-// 3 "Подсказка-кнопки": последняя строка доски - новая подсказка.
+// The last board line is the new hint.
 func TestHint_BoardLastLine_IsNewHint(t *testing.T) {
 	e := acBoard(t, 140, 30)
 	e.screenHas("q quit")
@@ -255,11 +255,11 @@ func TestHint_BoardLastLine_IsNewHint(t *testing.T) {
 		}
 	}
 	if last != acHint {
-		t.Errorf("последняя строка доски %q, ждали %q", last, acHint)
+		t.Errorf("last board line %q, expected %q", last, acHint)
 	}
 }
 
-// 5.1: клик по паре равен нажатию клавиши.
+// A click on a pair equals a key press.
 func TestHint_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"n new", "title:"},
@@ -276,57 +276,57 @@ func TestHint_ClickButton_ActsAsKey(t *testing.T) {
 	}
 }
 
-// 5.1: клик по q quit выходит.
+// A click on q quit exits.
 func TestHint_ClickQuit_ExitsProgram(t *testing.T) {
 	e := acBoard(t, 140, 30)
 	e.screenHas("q quit")
 	x, y := e.acFind("q quit")
-	e.mouse(tea.MouseClickMsg(mvM(x+2, y, tea.MouseLeft))) // выход на нажатии: отпускание уже не придёт
+	e.mouse(tea.MouseClickMsg(mvM(x+2, y, tea.MouseLeft))) // exit on the press: the release will not come
 	e.tm.WaitFinished(t, teatest.WithFinalTimeout(5*time.Second))
 }
 
-// 3: arrows select - не кнопка; клик по промежутку между парами тоже ничего не делает.
+// arrows select is not a button; a click on the gap between pairs does nothing either.
 func TestHint_ClickNonButton_DoesNothing(t *testing.T) {
 	e := acBoard(t, 140, 30)
 	e.screenHas("arrows select")
 	before := e.acCommitCount()
 	e.acClickOn("arrows select")
-	gap := strings.Index(acHint, "enter open  n new") + len("enter open") + 1 // второй пробел между парами
+	gap := strings.Index(acHint, "enter open  n new") + len("enter open") + 1 // the second space between pairs
 	_, y := e.acFind("p project")
 	e.click(gap, y)
 	e.settle()
 	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
 		if strings.Contains(e.text(), bad) {
-			t.Errorf("клик не по кнопке вызвал %q:\n%s", bad, e.text())
+			t.Errorf("a click off a button triggered %q:\n%s", bad, e.text())
 		}
 	}
 	if !strings.Contains(e.text(), "enter open") || e.acCommitCount() != before {
-		t.Errorf("клик не по кнопке изменил состояние:\n%s", e.text())
+		t.Errorf("a click off a button changed the state:\n%s", e.text())
 	}
 }
 
-// 5.1 и 3: обрезанная по ширине пара не кликается; целая рядом работает.
+// A pair cut by the width is not clickable; a whole one next to it works.
 func TestHint_TruncatedPair_NotClickable(t *testing.T) {
-	e := acBoard(t, len(acHint)-2, 30) // "q quit" обрезано до "q qu"
-	e.until("подсказка обрезана по ширине", func() bool {
+	e := acBoard(t, len(acHint)-2, 30) // "q quit" cut to "q qu"
+	e.until("hint cut by the width", func() bool {
 		return strings.Contains(e.text(), "p project") && !strings.Contains(e.text(), "q quit")
 	})
 	_, y := e.acFind("p project")
-	e.click(strings.Index(acHint, "q quit"), y) // на букву q
+	e.click(strings.Index(acHint, "q quit"), y) // on the letter q
 	e.click(strings.Index(acHint, "q quit")+2, y)
-	e.settle() // зависнет с ошибкой, если программа вышла
+	e.settle() // hangs with an error if the program quit
 	if !strings.Contains(e.text(), "enter open") {
-		t.Errorf("клик по обрезанной паре изменил экран:\n%s", e.text())
+		t.Errorf("a click on a cut pair changed the screen:\n%s", e.text())
 	}
 	e.acClickOn("n new")
 	e.screenHas("title:")
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарии 2 и 3: захват
+// Scenarios 2 and 3: grab
 // ---------------------------------------------------------------------------------------------
 
-// acCriterion дописывает задаче один критерий: колонка ready принимает только задачи с критерием.
+// acCriterion adds one criterion to a task: column ready accepts only tasks with a criterion.
 func (e *mvEnv) acCriterion(ids ...string) {
 	e.t.Helper()
 	for _, id := range ids {
@@ -352,7 +352,7 @@ func acGrabEnv(t *testing.T) *mvEnv {
 	return e
 }
 
-// 5.2 и 3.1-3.3: space, right, space и enter - карточка в соседней колонке, один коммит, до отпускания записи нет.
+// space, right, space and enter - the card in the neighbor column, one commit, no write before the release.
 func TestGrab_RightThenDrop_MovesToNeighborWithOneCommit(t *testing.T) {
 	for _, drop := range []string{" ", "enter"} {
 		t.Run("drop="+strconv.Quote(drop), func(t *testing.T) {
@@ -360,33 +360,33 @@ func TestGrab_RightThenDrop_MovesToNeighborWithOneCommit(t *testing.T) {
 			before := e.acCommitCount()
 			e.key(" ")
 			e.screenHas(acMoving)
-			e.until("маркер '=' у захваченной карточки", func() bool {
+			e.until("marker '=' on the grabbed card", func() bool {
 				y := e.yOf("T-1 p")
 				return y >= 0 && strings.Contains(e.lines()[y], "=T-1")
 			})
 			e.acPress("right")
-			e.until("Alpha на экране в соседней колонке", func() bool { x := e.acColX("Alpha"); return x >= 26 && x <= 49 })
+			e.until("Alpha on the screen in the neighbor column", func() bool { x := e.acColX("Alpha"); return x >= 26 && x <= 49 })
 			if st, _ := e.status("T-1"); st != "idea" || e.acCommitCount() != before {
-				t.Fatalf("до отпускания записано: статус %s, коммитов %d -> %d", st, before, e.acCommitCount())
+				t.Fatalf("written before the release: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 			e.key(drop)
 			e.acWaitStatus("T-1", "todo")
 			e.settle()
 			if after := e.acCommitsSettled(before + 1); after != before+1 {
-				t.Errorf("коммитов %d -> %d, ждали ровно один", before, after)
+				t.Errorf("commits %d -> %d, expected exactly one", before, after)
 			}
 			if strings.Contains(e.text(), "moving T-1") {
-				t.Errorf("захват не снят после отпускания:\n%s", e.text())
+				t.Errorf("grab not dropped after the release:\n%s", e.text())
 			}
 		})
 	}
 }
 
-// 5.2 и 3.2-3.3: место в колонке; стрелки и h j k l равны; место пишется как First или After соседа сверху.
+// The place in a column; arrows and h j k l are equal; the place is written as First or After of the neighbor above.
 func TestGrab_UpDown_ChoosesPlaceInColumn(t *testing.T) {
 	cases := []struct {
 		name   string
-		pick   int // сколько j до space
+		pick   int // how many j before space
 		keys   []string
 		wanted string
 	}{
@@ -406,27 +406,27 @@ func TestGrab_UpDown_ChoosesPlaceInColumn(t *testing.T) {
 			e.acPress(c.keys...)
 			e.settle()
 			if got := e.acOrder("idea"); got != "T-1 T-2 T-3" || e.acCommitCount() != before {
-				t.Fatalf("до отпускания записано: порядок %s, коммитов %d -> %d", got, before, e.acCommitCount())
+				t.Fatalf("written before the release: order %s, commits %d -> %d", got, before, e.acCommitCount())
 			}
 			e.key(" ")
-			e.until("порядок "+c.wanted, func() bool { return e.acOrder("idea") == c.wanted })
+			e.until("order "+c.wanted, func() bool { return e.acOrder("idea") == c.wanted })
 			e.settle()
 			if after := e.acCommitsSettled(before + 1); after != before+1 {
-				t.Errorf("коммитов %d -> %d, ждали ровно один", before, after)
+				t.Errorf("commits %d -> %d, expected exactly one", before, after)
 			}
 		})
 	}
 }
 
-// 3.3: та же колонка и то же место - ничего не пишется; захват снят.
+// The same column and the same place - nothing is written; the grab is dropped.
 func TestGrab_DropAtOriginalPlace_NoCommit(t *testing.T) {
 	cases := []struct {
 		name string
 		keys []string
 	}{
-		{"сразу отпустить", nil},
-		{"вправо и обратно", []string{"right", "left"}},
-		{"вниз и обратно", []string{"down", "up"}},
+		{"release at once", nil},
+		{"right and back", []string{"right", "left"}},
+		{"down and back", []string{"down", "up"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -436,59 +436,59 @@ func TestGrab_DropAtOriginalPlace_NoCommit(t *testing.T) {
 			e.screenHas("moving T-1")
 			e.acPress(c.keys...)
 			e.key(" ")
-			e.until("захват снят", func() bool { return !strings.Contains(e.text(), "moving T-1") })
+			e.until("grab dropped", func() bool { return !strings.Contains(e.text(), "moving T-1") })
 			e.settle()
 			if after := e.acCommitCount(); after != before {
-				t.Errorf("коммитов %d -> %d, ждали без записи", before, after)
+				t.Errorf("commits %d -> %d, expected no write", before, after)
 			}
 			if got := e.acOrder("idea"); got != "T-1 T-2 T-3" {
-				t.Errorf("порядок изменился: %s", got)
+				t.Errorf("order changed: %s", got)
 			}
 		})
 	}
 }
 
-// 5.2 и 3.4: esc - отмена, карточка на прежнем месте, коммита нет.
+// esc - cancel, the card at the previous place, no commit.
 func TestGrab_Esc_CancelsWithoutCommit(t *testing.T) {
 	e := acGrabEnv(t)
 	before := e.acCommitCount()
 	e.key(" ")
 	e.screenHas("moving T-1")
 	e.acPress("right")
-	e.until("Alpha ушла в соседнюю колонку", func() bool { return e.acColX("Alpha") >= 26 })
+	e.until("Alpha went to the neighbor column", func() bool { return e.acColX("Alpha") >= 26 })
 	e.key("esc")
-	e.until("Alpha вернулась в свою колонку", func() bool { x := e.acColX("Alpha"); return x >= 0 && x < 26 })
+	e.until("Alpha returned to its column", func() bool { x := e.acColX("Alpha"); return x >= 0 && x < 26 })
 	e.settle()
 	if strings.Contains(e.text(), "moving T-1") {
-		t.Errorf("строка захвата осталась после esc:\n%s", e.text())
+		t.Errorf("the grab line stayed after esc:\n%s", e.text())
 	}
 	if st, _ := e.status("T-1"); st != "idea" || e.acCommitCount() != before {
-		t.Errorf("отмена записала: статус %s, коммитов %d -> %d", st, before, e.acCommitCount())
+		t.Errorf("cancel wrote: status %s, commits %d -> %d", st, before, e.acCommitCount())
 	}
 }
 
-// 3.4: при захвате прочие клавиши и мышь игнорируются.
+// During a grab other keys and the mouse are ignored.
 func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 	e := acGrabEnv(t)
 	before := e.acCommitCount()
 	e.key(" ")
 	e.screenHas("moving T-1")
 	e.key("n", "a", "c", "o", "p", "q")
-	e.click(mvX(0)+3, mvY(1)) // клик по Bravo
-	e.click(mvX(1)+22, 2)     // и по "+" колонки todo
+	e.click(mvX(0)+3, mvY(1)) // click on Bravo
+	e.click(mvX(1)+22, 2)     // and on "+" of column todo
 	e.settle()
 	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
 		if strings.Contains(e.text(), bad) {
-			t.Fatalf("при захвате сработало %q:\n%s", bad, e.text())
+			t.Fatalf("%q fired during the grab:\n%s", bad, e.text())
 		}
 	}
 	if !strings.Contains(e.text(), "moving T-1") || e.acCommitCount() != before {
-		t.Errorf("захват сбит прочими событиями, коммитов %d -> %d:\n%s", before, e.acCommitCount(), e.text())
+		t.Errorf("grab broken by other events, commits %d -> %d:\n%s", before, e.acCommitCount(), e.text())
 	}
 	e.key("esc")
 }
 
-// 5.2 и 3.3: перенос в waiting и closed спрашивает причину, как m; esc строки ввода оставляет задачу.
+// A move to waiting and closed asks for a reason, like m; esc of the input line leaves the task.
 func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 	setup := func(t *testing.T) *mvEnv {
 		e := mvNewEnv(t, mvCfgWork)
@@ -498,7 +498,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.screenHas("Alpha", "Bravo")
 		return e
 	}
-	t.Run("waiting: причина переносит", func(t *testing.T) {
+	t.Run("waiting: a reason moves", func(t *testing.T) {
 		e := setup(t)
 		before := e.acCommitCount()
 		e.key(" ")
@@ -506,17 +506,17 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.key(" ")
 		e.screenHas("waiting for:")
 		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
-			t.Fatalf("до ответа записано: %s, коммитов %d -> %d", st, before, e.acCommitCount())
+			t.Fatalf("written before the answer: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("T-1 в wait с причиной", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "vendor reply" })
+		e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "vendor reply" })
 		e.settle()
 		if after := e.acCommitsSettled(before + 1); after != before+1 {
-			t.Errorf("коммитов %d -> %d, ждали один", before, after)
+			t.Errorf("commits %d -> %d, expected one", before, after)
 		}
 	})
-	t.Run("waiting: esc оставляет задачу", func(t *testing.T) {
+	t.Run("waiting: esc leaves the task", func(t *testing.T) {
 		e := setup(t)
 		before := e.acCommitCount()
 		e.key(" ")
@@ -524,10 +524,10 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.key(" ")
 		e.screenHas("waiting for:")
 		e.key("esc")
-		e.until("строка закрыта", func() bool { return !strings.Contains(e.text(), "waiting for:") })
+		e.until("line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
 		e.settle()
 		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
-			t.Errorf("esc записал: %s, коммитов %d -> %d", st, before, e.acCommitCount())
+			t.Errorf("esc wrote: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 	})
 	t.Run("closed: close reason", func(t *testing.T) {
@@ -542,7 +542,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 	})
 }
 
-// 5.3 и 3.5: задачу удалили в другом окне - отмена и "T-1 removed", захват снят (space не роняет в запись).
+// The task was deleted in another window - cancel and "T-1 removed", the grab is dropped (space does not fall into a write).
 func TestGrab_TaskRemovedMeanwhile_ReportsRemovedAndReleases(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -558,22 +558,22 @@ func TestGrab_TaskRemovedMeanwhile_ReportsRemovedAndReleases(t *testing.T) {
 	}
 	e.screenHas("T-1 removed")
 	if strings.Contains(e.text(), "moving T-1") {
-		t.Errorf("захват удалённой задачи не снят:\n%s", e.text())
+		t.Errorf("grab of the deleted task not dropped:\n%s", e.text())
 	}
 	after := e.acCommitCount()
-	e.key(" ") // захвата нет: это новый захват выбранной Bravo, а не отпускание
+	e.key(" ") // no grab: this is a new grab of the selected Bravo, not a release
 	e.screenHas("moving T-2")
 	e.key("esc")
 	e.settle()
 	if e.acCommitCount() != after {
-		t.Error("после удаления захваченной задачи что-то записано")
+		t.Error("something was written after the grabbed task was deleted")
 	}
 	if st, _ := e.status("T-2"); st != "idea" {
-		t.Errorf("T-2 перенесена: %s", st)
+		t.Errorf("T-2 moved: %s", st)
 	}
 }
 
-// 3.5: иное изменение базы захват не снимает: он держится по id и доводит перенос.
+// Another store change does not drop the grab: it holds by id and finishes the move.
 func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -585,7 +585,7 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e.awaitWatcher(canary)
 	e.key(" ")
 	e.screenHas("moving T-1")
-	e.create("Delta", "idea") // агент добавил задачу выше нашей в колонке по rank не встанет, но база перечитана
+	e.create("Delta", "idea") // the agent added a task that does not rank above ours in the column, but the store is reread
 	e.screenHas("Delta")
 	e.acStillOn("moving T-1")
 	e.acPress("right")
@@ -593,7 +593,7 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e.acWaitStatus("T-1", "todo")
 }
 
-// 3.6: порядок по сроку включён - захват меняет только колонку, строка состояния об этом говорит.
+// Due order is on - the grab changes only the column, the status line says so.
 func TestGrab_OrderByDue_ColumnOnly(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
@@ -611,19 +611,19 @@ func TestGrab_OrderByDue_ColumnOnly(t *testing.T) {
 	e.acWaitStatus("T-1", "todo")
 	e.settle()
 	if after := e.acCommitsSettled(before + 1); after != before+1 {
-		t.Errorf("коммитов %d -> %d, ждали один", before, after)
+		t.Errorf("commits %d -> %d, expected one", before, after)
 	}
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 4: новая задача
+// Scenario 4: new task
 // ---------------------------------------------------------------------------------------------
 
-// 5.4 и 3 "Новая задача": клик по "+" колонки todo, заголовок, редактор; курсор на новой задаче.
+// New task: a click on "+" of column todo, title, editor; the cursor on the new task.
 func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 	cases := []struct{ name, script, wantBody string }{
-		{"редактор без правки", "", ""},
-		{"редактор с правкой", `printf '## Abstract\nedited-abstract\n' > "$1"`, "edited-abstract"},
+		{"editor without an edit", "", ""},
+		{"editor with an edit", `printf '## Abstract\nedited-abstract\n' > "$1"`, "edited-abstract"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -633,19 +633,19 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			e.create("Beta", "todo")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Beta")
-			plusX := mvColStep + 23 // последний знак ячейки второй колонки
+			plusX := mvColStep + 23 // the last character of the second column cell
 			if r := []rune(e.lines()[2]); len(r) <= plusX || r[plusX] != '+' {
-				t.Fatalf("в строке имён колонок на x=%d нет '+': %q", plusX, e.lines()[2])
+				t.Fatalf("no '+' at x=%d in the column names line: %q", plusX, e.lines()[2])
 			}
 			e.click(plusX, 2)
 			e.screenHas("title:")
 			e.tm.Type("Brand new")
 			e.key("enter")
-			e.until("редактор вызван", func() bool { return st.calls() == 1 && st.seen(1) != "" })
-			e.until("задача создана", func() bool { return e.acByTitle("Brand new") != nil })
+			e.until("editor called", func() bool { return st.calls() == 1 && st.seen(1) != "" })
+			e.until("task created", func() bool { return e.acByTitle("Brand new") != nil })
 			tk := e.acByTitle("Brand new")
 			if tk.Status != "todo" || tk.Project != "personal" {
-				t.Errorf("задача: колонка %q, проект %q, ждали todo и personal", tk.Status, tk.Project)
+				t.Errorf("task: column %q, project %q, expected todo and personal", tk.Status, tk.Project)
 			}
 			acCheckTemplate(t, st.seen(1))
 			e.settle()
@@ -659,28 +659,28 @@ func acCheckTemplate(t *testing.T, seen string) {
 	t.Helper()
 	for _, part := range []string{"## Abstract", "## Summary", "## Details", "- [ ] "} {
 		if !strings.Contains(seen, part) {
-			t.Errorf("шаблон тела в редакторе без %q:\n%s", part, seen)
+			t.Errorf("body template in the editor without %q:\n%s", part, seen)
 		}
 	}
 }
 
-// acCheckBody: want пусто - тело пустое (выход без правки), иначе тело получает want.
+// acCheckBody: an empty want - the body is empty (exit without an edit), otherwise the body gets want.
 func (e *mvEnv) acCheckBody(id, want string) {
 	e.t.Helper()
 	if want == "" {
 		if body := e.acTask(id).Body; strings.TrimSpace(body) != "" {
-			e.t.Errorf("выход без правки оставил тело %q, ждали пустое", body)
+			e.t.Errorf("exit without an edit left the body %q, expected empty", body)
 		}
 		return
 	}
-	e.until("правка редактора в теле", func() bool { return strings.Contains(e.acTask(id).Body, want) })
+	e.until("editor edit in the body", func() bool { return strings.Contains(e.acTask(id).Body, want) })
 }
 
-// 3 "Новая задача": n - в выбранной колонке; проект - фильтр запуска, иначе personal.
+// New task: n - in the selected column; project - the launch filter, otherwise personal.
 func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 	cases := []struct{ name, launch, seed, want string }{
-		{"без фильтра", "", "p", "personal"},
-		{"проект запуска", "launch", "launch", "launch"},
+		{"no filter", "", "p", "personal"},
+		{"launch project", "launch", "launch", "launch"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -694,20 +694,20 @@ func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 			}
 			e.acStartIn(c.launch, 140, 30)
 			e.screenHas("Alpha", "Beta")
-			e.key("l", "n") // колонка todo
+			e.key("l", "n") // column todo
 			e.screenHas("title:")
 			e.tm.Type("From key")
 			e.key("enter")
-			e.until("задача создана", func() bool { return e.acByTitle("From key") != nil })
+			e.until("task created", func() bool { return e.acByTitle("From key") != nil })
 			tk := e.acByTitle("From key")
 			if tk.Status != "todo" || tk.Project != c.want {
-				t.Errorf("задача: колонка %q, проект %q, ждали todo и %q", tk.Status, tk.Project, c.want)
+				t.Errorf("task: column %q, project %q, expected todo and %q", tk.Status, tk.Project, c.want)
 			}
 		})
 	}
 }
 
-// 3 "Новая задача" п.2: пустой заголовок или esc - отмена: ни задачи, ни коммита, ни редактора.
+// New task: an empty title or esc - cancel: no task, no commit, no editor.
 func TestNewTask_EmptyTitleOrEsc_Cancels(t *testing.T) {
 	for _, cancel := range []string{"enter", "esc"} {
 		t.Run(cancel, func(t *testing.T) {
@@ -717,10 +717,10 @@ func TestNewTask_EmptyTitleOrEsc_Cancels(t *testing.T) {
 			e.key("n")
 			e.screenHas("title:")
 			e.key(cancel)
-			e.until("строка закрыта", func() bool { return !strings.Contains(e.text(), "title:") })
+			e.until("line closed", func() bool { return !strings.Contains(e.text(), "title:") })
 			e.settle()
 			if tasks, _ := e.store.List(); len(tasks) != 1 || e.acCommitCount() != before || st.calls() != 0 {
-				t.Errorf("отмена оставила след: задач %d, коммитов %d -> %d, вызовов редактора %d",
+				t.Errorf("cancel left a trace: tasks %d, commits %d -> %d, editor calls %d",
 					len(tasks), before, e.acCommitCount(), st.calls())
 			}
 		})
@@ -728,7 +728,7 @@ func TestNewTask_EmptyTitleOrEsc_Cancels(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 5: ответ на вопрос агента
+// Scenario 5: answer to an agent question
 // ---------------------------------------------------------------------------------------------
 
 func acAsked(t *testing.T, ask string) *mvEnv {
@@ -744,7 +744,7 @@ func acAsked(t *testing.T, ask string) *mvEnv {
 	return e
 }
 
-// 5.5: без вопроса - "no question", ничего не записано (доска и карточка).
+// Without a question - "no question", nothing is written (board and card).
 func TestAnswer_NoQuestion_SaysNoQuestion(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		t.Run(where, func(t *testing.T) {
@@ -757,13 +757,13 @@ func TestAnswer_NoQuestion_SaysNoQuestion(t *testing.T) {
 			e.screenHas("T-1: no question")
 			e.settle()
 			if strings.Contains(e.text(), "answer:") || e.acCommitCount() != before {
-				t.Errorf("ответ без вопроса открыл строку или записал, коммитов %d -> %d", before, e.acCommitCount())
+				t.Errorf("an answer without a question opened a line or wrote, commits %d -> %d", before, e.acCommitCount())
 			}
 		})
 	}
 }
 
-// 5.5: с вопросом - комментарий "Answer: ..." от человека, ask очищен (доска и карточка).
+// With a question - a comment "Answer: ..." from the human, ask is cleared (board and card).
 func TestAnswer_WithQuestion_CommentsAndClearsAsk(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		t.Run(where, func(t *testing.T) {
@@ -775,19 +775,19 @@ func TestAnswer_WithQuestion_CommentsAndClearsAsk(t *testing.T) {
 			e.screenHas("answer:")
 			e.tm.Type("use B")
 			e.key("enter")
-			e.until("комментарий и пустой ask", func() bool {
+			e.until("comment and empty ask", func() bool {
 				tk := e.acTask("T-1")
 				return tk.Ask == "" && len(tk.Comments) == 1
 			})
 			c := e.acTask("T-1").Comments[0]
 			if c.Text != "Answer: use B" || c.Actor != "human" {
-				t.Errorf("комментарий %q от %q, ждали %q от human", c.Text, c.Actor, "Answer: use B")
+				t.Errorf("comment %q from %q, expected %q from human", c.Text, c.Actor, "Answer: use B")
 			}
 		})
 	}
 }
 
-// 4.2: агент успел задать новый вопрос - ответ записан, новый вопрос остался, строка "new question".
+// The agent managed to ask a new question - the answer is written, the new question stays, line "new question".
 func TestAnswer_AgentAskedAgain_KeepsNewQuestion(t *testing.T) {
 	e := acAsked(t, "pick A or B")
 	e.key("a")
@@ -796,13 +796,13 @@ func TestAnswer_AgentAskedAgain_KeepsNewQuestion(t *testing.T) {
 	e.set("T-1", "ask", "second question")
 	e.key("enter")
 	e.screenHas("T-1: new question")
-	e.until("комментарий записан", func() bool { return len(e.acTask("T-1").Comments) == 1 })
+	e.until("comment written", func() bool { return len(e.acTask("T-1").Comments) == 1 })
 	if tk := e.acTask("T-1"); tk.Ask != "second question" || tk.Comments[0].Text != "Answer: use B" {
-		t.Errorf("ask %q, комментарий %q: ждали новый вопрос и записанный ответ", tk.Ask, tk.Comments[0].Text)
+		t.Errorf("ask %q, comment %q: expected the new question and the written answer", tk.Ask, tk.Comments[0].Text)
 	}
 }
 
-// 4.2: пусто или esc - отмена без записи.
+// Empty or esc - cancel without a write.
 func TestAnswer_EmptyOrEsc_Cancels(t *testing.T) {
 	for _, cancel := range []string{"enter", "esc"} {
 		t.Run(cancel, func(t *testing.T) {
@@ -811,17 +811,17 @@ func TestAnswer_EmptyOrEsc_Cancels(t *testing.T) {
 			e.key("a")
 			e.screenHas("answer:")
 			e.key(cancel)
-			e.until("строка закрыта", func() bool { return !strings.Contains(e.text(), "answer:") })
+			e.until("line closed", func() bool { return !strings.Contains(e.text(), "answer:") })
 			e.settle()
 			if tk := e.acTask("T-1"); tk.Ask != "pick A or B" || len(tk.Comments) != 0 || e.acCommitCount() != before {
-				t.Errorf("отмена записала: ask %q, комментариев %d, коммитов %d -> %d",
+				t.Errorf("cancel wrote: ask %q, comments %d, commits %d -> %d",
 					tk.Ask, len(tk.Comments), before, e.acCommitCount())
 			}
 		})
 	}
 }
 
-// 5.5 и 4.2: клик по строке "* needs you:" в карточке открывает "answer:".
+// A click on the line "* needs you:" in the card opens "answer:".
 func TestAnswer_ClickNeedsYouLine_OpensAnswerLine(t *testing.T) {
 	e := acAsked(t, "pick A or B")
 	e.acOpenCard("Alpha")
@@ -832,10 +832,10 @@ func TestAnswer_ClickNeedsYouLine_OpensAnswerLine(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 6: поля
+// Scenario 6: fields
 // ---------------------------------------------------------------------------------------------
 
-// acFieldCard: карточка Alpha (проект projx) открыта; due - начальный срок.
+// acFieldCard: the Alpha card (project projx) is open; due - the initial due.
 func acFieldCard(t *testing.T, due string) *mvEnv {
 	t.Helper()
 	e := mvNewEnv(t, "")
@@ -856,7 +856,7 @@ type acDueCase struct {
 	erase, wantCommit                         bool
 }
 
-// enterDue проходит f, d, правку значения и enter.
+// enterDue goes through f, d, the value edit and enter.
 func (e *mvEnv) enterDue(c acDueCase) {
 	e.t.Helper()
 	e.key("f")
@@ -872,13 +872,13 @@ func (e *mvEnv) enterDue(c acDueCase) {
 	e.key("enter")
 }
 
-// 5.6 и 4.3: срок записан; пустое значение очищает; отказ ядра виден; без изменения записи нет.
+// Due is written; an empty value clears; a core refusal is visible; without a change there is no write.
 func TestField_Due_SetClearRefusedUnchanged(t *testing.T) {
 	cases := []acDueCase{
-		{"записать", "", "2026-11-01", "2026-11-01", "", false, true},
-		{"очистить пустым", "2026-10-01", "", "", "", true, true},
-		{"отказ ядра", "", "not-a-date", "", "due must be", false, false},
-		{"без изменения", "2026-10-01", "", "2026-10-01", "", false, false},
+		{"write", "", "2026-11-01", "2026-11-01", "", false, true},
+		{"clear with empty", "2026-10-01", "", "", "", true, true},
+		{"core refusal", "", "not-a-date", "", "due must be", false, false},
+		{"no change", "2026-10-01", "", "2026-10-01", "", false, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -893,16 +893,16 @@ func TestField_Due_SetClearRefusedUnchanged(t *testing.T) {
 				want++
 			}
 			if after := e.acCommitsSettled(want); after != want {
-				t.Errorf("коммитов %d -> %d, ждали %d", before, after, want)
+				t.Errorf("commits %d -> %d, expected %d", before, after, want)
 			}
 			if tk := e.acTask("T-1"); tk.Due != c.wantDue {
-				t.Errorf("срок %q, ждали %q", tk.Due, c.wantDue)
+				t.Errorf("due %q, expected %q", tk.Due, c.wantDue)
 			}
 		})
 	}
 }
 
-// 4.3: строка поля открывается с текущим значением (правка дописывает к нему).
+// The field line opens with the current value (an edit appends to it).
 func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
 	e := acFieldCard(t, "")
 	e.key("f")
@@ -911,12 +911,12 @@ func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
 	e.screenHas("title:")
 	e.tm.Type("X")
 	e.key("enter")
-	e.until("заголовок AlphaX", func() bool { return e.acTask("T-1").Title == "AlphaX" })
+	e.until("title AlphaX", func() bool { return e.acTask("T-1").Title == "AlphaX" })
 }
 
-// 4.3: поле из нескольких строк строкой не правится; из одной - правится.
+// A multi-line field is not edited through the line; a one-line one is.
 func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
-	t.Run("несколько строк", func(t *testing.T) {
+	t.Run("several lines", func(t *testing.T) {
 		e := mvNewEnv(t, "")
 		e.create("Alpha", "idea")
 		e.summary("T-1", "first line\nsecond line")
@@ -928,10 +928,10 @@ func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
 		e.screenHas("T-1: summary has several lines, use e")
 		e.settle()
 		if strings.Contains(e.text(), "summary:") || e.acCommitCount() != before {
-			t.Errorf("строка открылась или записано, коммитов %d -> %d", before, e.acCommitCount())
+			t.Errorf("the line opened or wrote, commits %d -> %d", before, e.acCommitCount())
 		}
 	})
-	t.Run("одна строка", func(t *testing.T) {
+	t.Run("one line", func(t *testing.T) {
 		e := mvNewEnv(t, "")
 		e.create("Alpha", "idea")
 		e.summary("T-1", "only line")
@@ -943,26 +943,26 @@ func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
 	})
 }
 
-// 4.3: выбор поля - кликом по паре; клик по строке полей карточки открывает тот же выбор.
+// Field choice - by a click on a pair; a click on the card fields line opens the same choice.
 func TestField_SelectByClick_AndFieldsRowOpensSelect(t *testing.T) {
 	e := acFieldCard(t, "")
 	e.screenHas("projx")
 	e.settle()
-	_, y := e.acFind("projx") // строка полей: проект первым
+	_, y := e.acFind("projx") // fields line: project first
 	e.click(2, y)
 	e.screenHas(acFieldRow)
 	e.acClickOn("d due")
 	e.screenHas("due:")
 	e.tm.Type("2026-12-24")
 	e.key("enter")
-	e.until("срок записан", func() bool { return e.acTask("T-1").Due == "2026-12-24" })
+	e.until("due written", func() bool { return e.acTask("T-1").Due == "2026-12-24" })
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 7: строка действий карточки
+// Scenario 7: the card actions line
 // ---------------------------------------------------------------------------------------------
 
-// lastNonEmpty - индекс последней непустой строки экрана.
+// lastNonEmpty - the index of the last non-empty screen line.
 func (e *mvEnv) acLastLine() int {
 	ls := e.lines()
 	for y := len(ls) - 1; y >= 0; y-- {
@@ -973,17 +973,17 @@ func (e *mvEnv) acLastLine() int {
 	return -1
 }
 
-// 5.7 и 4.1: строка действий - последняя строка карточки и видна при непустой строке состояния;
-// строка состояния над ней. Проверка на просторном и на низком экране с длинной историей.
+// The actions line is the last card line and is visible with a non-empty status line;
+// the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 	const row = "e edit  c comment  a answer  f field  g session  del delete  j k history  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int
-		n    int // комментариев в истории
+		n    int // comments in the history
 	}{
-		{"просторный экран", 140, 30, 0},
-		{"низкий экран, длинная история", 100, 14, 30},
+		{"roomy screen", 140, 30, 0},
+		{"low screen, long history", 100, 14, 30},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := mvNewEnv(t, "")
@@ -1001,16 +1001,16 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 			e.settle()
 			last := e.acLastLine()
 			if last < 1 || strings.TrimSpace(e.lines()[last]) != row {
-				t.Fatalf("последняя строка карточки %q, ждали %q:\n%s", e.lines()[max(last, 0)], row, e.text())
+				t.Fatalf("last card line %q, expected %q:\n%s", e.lines()[max(last, 0)], row, e.text())
 			}
 			if !strings.Contains(e.lines()[last-1], "T-1: no question") {
-				t.Errorf("над строкой действий %q, ждали строку состояния", e.lines()[last-1])
+				t.Errorf("above the actions line %q, expected the status line", e.lines()[last-1])
 			}
 		})
 	}
 }
 
-// 5.7: клик по паре строки действий равен клавише.
+// A click on an actions-line pair equals the key.
 func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"c comment", "comment:"},
@@ -1032,11 +1032,11 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 		e := acAsked(t, "")
 		e.acOpenCard("Alpha")
 		e.acClickOn("e edit")
-		e.until("редактор вызван", func() bool { return st.calls() == 1 })
+		e.until("editor called", func() bool { return st.calls() == 1 })
 	})
 }
 
-// 4.4: клик по пустому месту карточки - ничего.
+// A click on an empty place of the card - nothing.
 func TestCardActions_ClickEmptySpace_DoesNothing(t *testing.T) {
 	e := acAsked(t, "")
 	e.acOpenCard("Alpha")
@@ -1046,16 +1046,16 @@ func TestCardActions_ClickEmptySpace_DoesNothing(t *testing.T) {
 	e.click(60, 3)
 	e.settle()
 	if got := e.text(); got != before || e.acCommitCount() != commits {
-		t.Errorf("клик по пустому месту изменил карточку:\n%s\nбыло:\n%s", got, before)
+		t.Errorf("a click on an empty place changed the card:\n%s\nwas:\n%s", got, before)
 	}
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарий 8a: критерии в карточке
+// Scenario 8a: criteria in the card
 // ---------------------------------------------------------------------------------------------
 
-// acCriteriaCard: карточка Alpha с двумя критериями открыта; курсор уведён к первому критерию
-// (сначала критерии, потом история: k вверх по истории доходит до них и там упирается).
+// acCriteriaCard: the Alpha card with two criteria is open; the cursor is led to the first criterion
+// (criteria first, then history: k up the history reaches them and stops there).
 func acCriteriaCard(t *testing.T) *mvEnv {
 	t.Helper()
 	e := mvNewEnv(t, "")
@@ -1084,40 +1084,40 @@ func (e *mvEnv) acDone() string {
 	return strings.Join(out, " ")
 }
 
-// 5.8a и 4.4: j до пункта, enter - отмечен, enter ещё раз - снят (в файле снова "- [ ]").
+// j to the item, enter - checked, enter again - unchecked (the file has "- [ ]" again).
 func TestCriteria_JThenEnter_TogglesAndUntoggles(t *testing.T) {
 	e := acCriteriaCard(t)
-	e.key("j") // второй критерий
+	e.key("j") // second criterion
 	e.settle()
 	e.key("enter")
-	e.until("отмечен второй критерий", func() bool { return e.acDone() == "false true" })
+	e.until("second criterion checked", func() bool { return e.acDone() == "false true" })
 	if _, _, raw, err := e.store.Show("T-1"); err != nil || !strings.Contains(string(raw), "- [x] two") || !strings.Contains(string(raw), "- [ ] one") {
-		t.Errorf("файл после отметки (err=%v):\n%s", err, raw)
+		t.Errorf("file after the check (err=%v):\n%s", err, raw)
 	}
 	e.key("enter")
-	e.until("отметка снята", func() bool { return e.acDone() == "false false" })
+	e.until("check removed", func() bool { return e.acDone() == "false false" })
 	if _, _, raw, _ := e.store.Show("T-1"); !strings.Contains(string(raw), "- [ ] two") || strings.Contains(string(raw), "[x]") {
-		t.Errorf("файл после снятия:\n%s", raw)
+		t.Errorf("file after the uncheck:\n%s", raw)
 	}
 }
 
-// 5.8a: клик по строке критерия отмечает его; повторный клик снимает.
+// A click on a criterion line checks it; a repeated click unchecks.
 func TestCriteria_Click_TogglesCriterion(t *testing.T) {
 	e := acCriteriaCard(t)
 	x, y := e.acFind("[ ] one")
 	e.click(x+1, y)
-	e.until("отмечен первый критерий", func() bool { return e.acDone() == "true false" })
+	e.until("first criterion checked", func() bool { return e.acDone() == "true false" })
 	e.screenHas("[x] one")
 	x, y = e.acFind("[x] one")
 	e.click(x+1, y)
-	e.until("отметка снята", func() bool { return e.acDone() == "false false" })
+	e.until("check removed", func() bool { return e.acDone() == "false false" })
 }
 
 // ---------------------------------------------------------------------------------------------
-// Сценарии 8 (удаление, справка, m M убраны) и 9 (переход в сессию агента, сторона TUI)
+// Scenarios 8 (delete, help, m M removed) and 9 (the jump into an agent session, the TUI side)
 // ---------------------------------------------------------------------------------------------
 
-// Раздел 1: m и M удалены - ни строки причины, ни записи, на доске и в карточке.
+// m and M are removed - no reason line, no write, on the board and in the card.
 func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		t.Run(where, func(t *testing.T) {
@@ -1132,16 +1132,16 @@ func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 			e.key("m", "M")
 			e.settle()
 			if strings.Contains(e.text(), "waiting for:") || strings.Contains(e.text(), "close reason:") {
-				t.Errorf("m или M открыли строку переноса:\n%s", e.text())
+				t.Errorf("m or M opened the move line:\n%s", e.text())
 			}
 			if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
-				t.Errorf("m M записали: статус %s, коммитов %d -> %d", st, before, e.acCommitCount())
+				t.Errorf("m M wrote: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 		})
 	}
 }
 
-// acPressDelete шлёт клавишу Delete: delete или backspace.
+// acPressDelete sends the Delete key: delete or backspace.
 func (e *mvEnv) acPressDelete(name string) {
 	code := tea.KeyDelete
 	if name == "backspace" {
@@ -1159,8 +1159,8 @@ func acDeleteEnv(t *testing.T, where string) *mvEnv {
 	return e
 }
 
-// 5.8 и раздел 1: Delete (delete и backspace) на доске и в карточке спрашивает "delete T-1? y/n";
-// y удаляет одним коммитом.
+// Delete (delete and backspace) on the board and in the card asks "delete T-1? y/n";
+// y deletes with one commit.
 func TestDelete_ConfirmYesRemoves(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		for _, del := range []string{"delete", "backspace"} {
@@ -1170,19 +1170,19 @@ func TestDelete_ConfirmYesRemoves(t *testing.T) {
 				e.acPressDelete(del)
 				e.screenHas("delete T-1? y/n")
 				if _, _, err := e.store.Get("T-1"); err != nil || e.acCommitCount() != before {
-					t.Fatalf("до подтверждения удалено: err=%v, коммитов %d -> %d", err, before, e.acCommitCount())
+					t.Fatalf("deleted before confirmation: err=%v, commits %d -> %d", err, before, e.acCommitCount())
 				}
 				e.key("y")
-				e.until("задачи нет", func() bool { _, _, err := e.store.Get("T-1"); return err != nil })
+				e.until("task gone", func() bool { _, _, err := e.store.Get("T-1"); return err != nil })
 				if after := e.acCommitsSettled(before + 1); after != before+1 {
-					t.Errorf("коммитов %d -> %d, ждали один", before, after)
+					t.Errorf("commits %d -> %d, expected one", before, after)
 				}
 			})
 		}
 	}
 }
 
-// 5.8: любая клавиша, кроме y, отменяет удаление.
+// Any key except y cancels the deletion.
 func TestDelete_OtherKeyCancels(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		for _, other := range []string{"n", "x", "esc", "enter"} {
@@ -1192,34 +1192,34 @@ func TestDelete_OtherKeyCancels(t *testing.T) {
 				e.acPressDelete("delete")
 				e.screenHas("delete T-1? y/n")
 				e.key(other)
-				e.until("вопрос закрыт", func() bool { return !strings.Contains(e.text(), "delete T-1?") })
+				e.until("question closed", func() bool { return !strings.Contains(e.text(), "delete T-1?") })
 				e.settle()
 				if _, _, err := e.store.Get("T-1"); err != nil || e.acCommitCount() != before {
-					t.Errorf("отмена клавишей %q удалила: err=%v, коммитов %d -> %d", other, err, before, e.acCommitCount())
+					t.Errorf("cancel by key %q deleted: err=%v, commits %d -> %d", other, err, before, e.acCommitCount())
 				}
 			})
 		}
 	}
 }
 
-// 5.8: клик по кнопке "del delete" строки действий карточки равен клавише.
+// A click on the "del delete" button of the card actions line equals the key.
 func TestDelete_CardButton_AsksConfirmation(t *testing.T) {
 	e := acAsked(t, "")
 	e.acOpenCard("Alpha")
 	e.acClickOn("del delete")
 	e.screenHas("delete T-1? y/n")
 	e.key("y")
-	e.until("задачи нет", func() bool { _, _, err := e.store.Get("T-1"); return err != nil })
+	e.until("task gone", func() bool { _, _, err := e.store.Get("T-1"); return err != nil })
 }
 
-// 5.8: ? открывает справку со всеми клавишами; esc или ? возвращают на доску; кнопка "? help" равна клавише.
+// ? opens help with all keys; esc or ? return to the board; the "? help" button equals the key.
 func TestHelp_QuestionMark_OpensAndCloses(t *testing.T) {
 	for _, closer := range []string{"esc", "?"} {
 		t.Run("close="+closer, func(t *testing.T) {
 			e := acBoard(t, 140, 30)
 			board := e.text()
 			e.key("?")
-			e.until("справка вместо доски", func() bool {
+			e.until("help instead of the board", func() bool {
 				s := e.text()
 				return s != board && strings.Contains(s, "grab") && strings.Contains(s, "delete")
 			})
@@ -1231,28 +1231,28 @@ func TestHelp_QuestionMark_OpensAndCloses(t *testing.T) {
 		e := acBoard(t, 140, 30)
 		board := e.text()
 		e.acClickOn("? help")
-		e.until("справка вместо доски", func() bool { return e.text() != board && !strings.Contains(e.text(), "arrows select") })
+		e.until("help instead of the board", func() bool { return e.text() != board && !strings.Contains(e.text(), "arrows select") })
 	})
 }
 
 type acFocusCase struct {
 	name     string
 	claim    bool
-	fileName string // "" - файла нет
+	fileName string // "" - no file
 	content  string
 	wantOpen bool
 	ways     []string
 }
 
-// acFocusEnv готовит задачу Alpha с захватом (если claim) и файлом фокуса в каталоге dir.
+// acFocusEnv prepares task Alpha with a claim (if claim) and a focus file in directory dir.
 func acFocusEnv(t *testing.T, c acFocusCase, dir string) *mvEnv {
 	t.Helper()
-	steps := 0 // сколько колонок вправо от idea до задачи
+	steps := 0 // how many columns right from idea to the task
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.acCriterion("T-1")
 	if c.claim {
-		// Take берёт задачу из ready и переносит в active: колонку курсора ищем по статусу
+		// Take takes a task from ready and moves it to active: the cursor column is found by status
 		if _, err := e.store.Move("T-1", "todo", core.MoveOpts{}, "seed"); err != nil {
 			t.Fatalf("Move: %v", err)
 		}
@@ -1273,17 +1273,17 @@ func acFocusEnv(t *testing.T, c acFocusCase, dir string) *mvEnv {
 	return e
 }
 
-// 4a.2: g - только при живом захвате и файле фокуса его владельца, прошедшем проверку вида; иначе
-// "no session to open". Вызов open - подменённой командой в PATH.
+// g - only with a live claim and the owner focus file that passed the form check; otherwise
+// "no session to open". The open call is a substituted command in PATH.
 func TestFocus_G_OpensOnlyForLiveClaimWithValidFile(t *testing.T) {
 	all := []string{"board", "card", "button"}
 	cases := []acFocusCase{
-		{"захват и файл владельца", true, "claude-c1", acFocusURL, true, all},
-		{"нет захвата", false, "claude-c1", acFocusURL, false, all},
-		{"захват есть, файла нет", true, "", "", false, all},
-		{"файл чужого агента", true, "codex-x9", acFocusURL, false, []string{"board"}},
-		{"значение не того вида", true, "claude-c1", "warp://session/XYZ", false, []string{"board"}},
-		{"другая схема", true, "claude-c1", "https://example.com/s", false, []string{"board"}},
+		{"claim and owner file", true, "claude-c1", acFocusURL, true, all},
+		{"no claim", false, "claude-c1", acFocusURL, false, all},
+		{"claim exists, no file", true, "", "", false, all},
+		{"another agent file", true, "codex-x9", acFocusURL, false, []string{"board"}},
+		{"value of the wrong form", true, "claude-c1", "warp://session/XYZ", false, []string{"board"}},
+		{"other scheme", true, "claude-c1", "https://example.com/s", false, []string{"board"}},
 	}
 	for _, c := range cases {
 		for _, way := range c.ways {
@@ -1294,20 +1294,20 @@ func TestFocus_G_OpensOnlyForLiveClaimWithValidFile(t *testing.T) {
 				e := acFocusEnv(t, c, dir)
 				e.acPressG(way)
 				if c.wantOpen {
-					e.until("open вызван с адресом", func() bool { return strings.TrimSpace(acRead(log)) == acFocusURL })
+					e.until("open called with the address", func() bool { return strings.TrimSpace(acRead(log)) == acFocusURL })
 					return
 				}
 				e.screenHas("T-1: no session to open")
 				e.settle()
 				if got := acRead(log); got != "" {
-					t.Errorf("open вызван без права: %q", got)
+					t.Errorf("open called without the right: %q", got)
 				}
 			})
 		}
 	}
 }
 
-// acPressG: g на доске, g в карточке или кнопка "g session" карточки.
+// acPressG: g on the board, g in the card or the "g session" button of the card.
 func (e *mvEnv) acPressG(way string) {
 	e.t.Helper()
 	if way != "board" {

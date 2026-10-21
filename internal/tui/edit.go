@@ -13,16 +13,16 @@ import (
 	"github.com/daniil4545/tix/internal/core"
 )
 
-// editSession - одна правка тела в $EDITOR. rev - версия файла, против которой править;
-// orig - текст в копии на момент запуска редактора.
+// editSession - one body edit in $EDITOR. rev - the file version to edit against;
+// orig - the text in the copy at the editor start.
 type editSession struct {
 	id, path, rev, orig string
 	conflicted          bool
 }
 
 type (
-	editReady  struct{ s *editSession } // копия готова, можно запускать редактор
-	editorDone struct {                 // редактор закрыт
+	editReady  struct{ s *editSession } // the copy is ready, the editor can start
+	editorDone struct {                 // the editor is closed
 		s   *editSession
 		err error
 	}
@@ -30,7 +30,7 @@ type (
 
 const conflictMarker = "<<<<<<<"
 
-// startEdit читает задачу с её rev и кладёт копию тела в .tix/tmp.
+// startEdit reads the task with its rev and puts a copy of the body into .tix/tmp.
 func (m *Model) startEdit() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -50,7 +50,7 @@ func (m *Model) startEdit() tea.Cmd {
 	})
 }
 
-// writeCopy создаёт .tix/tmp/ed-<id>-<n>.md (0600) с текстом; n первый свободный.
+// writeCopy creates .tix/tmp/ed-<id>-<n>.md (0600) with the text; n is the first free one.
 func (m *Model) writeCopy(id, text string) (string, error) {
 	dir := filepath.Join(m.d.Root, ".tix", "tmp")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -58,7 +58,7 @@ func (m *Model) writeCopy(id, text string) (string, error) {
 	}
 	for n := 1; ; n++ {
 		path := filepath.Join(dir, fmt.Sprintf("ed-%s-%d.md", id, n))
-		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // путь строит TUI
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600) //nolint:gosec // the TUI builds the path
 		if errors.Is(err, os.ErrExist) {
 			continue
 		}
@@ -77,7 +77,7 @@ func (m *Model) writeCopy(id, text string) (string, error) {
 	}
 }
 
-// runEditor запускает $VISUAL, $EDITOR или vi на копии: без оболочки, делится по пробелам.
+// runEditor starts $VISUAL, $EDITOR or vi on the copy: without a shell, split by spaces.
 func runEditor(s *editSession) tea.Cmd {
 	args := []string{"vi"}
 	for _, key := range []string{"VISUAL", "EDITOR"} {
@@ -86,11 +86,11 @@ func runEditor(s *editSession) tea.Cmd {
 			break
 		}
 	}
-	cmd := exec.Command(args[0], append(args[1:], s.path)...) //nolint:gosec,noctx // редактор задаёт владелец окружения; жизнью процесса правит Bubble Tea
+	cmd := exec.Command(args[0], append(args[1:], s.path)...) //nolint:gosec,noctx // the editor is set by the environment owner; Bubble Tea controls the process life
 	return tea.ExecProcess(cmd, func(err error) tea.Msg { return editorDone{s: s, err: err} })
 }
 
-// editFinished сверяет копию с тем, что было, и ставит правку в очередь.
+// editFinished compares the copy with what was and queues the edit.
 func (m *Model) editFinished(msg editorDone) tea.Cmd {
 	s := msg.s
 	if msg.err != nil {
@@ -103,7 +103,7 @@ func (m *Model) editFinished(msg editorDone) tea.Cmd {
 		return nil
 	}
 	text := string(data)
-	// После конфликта нетронутая копия - отмена, но в маркерах правка человека: копия остаётся.
+	// After a conflict an untouched copy is a cancel, but in markers it is a human edit: the copy stays.
 	switch {
 	case same(text, s.orig) && s.conflicted:
 		m.keepCopy(s, "edit cancelled")
@@ -121,7 +121,7 @@ func (m *Model) editFinished(msg editorDone) tea.Cmd {
 	})
 }
 
-// editResult разбирает итог записи правки: успех, конфликт (редактор снова) или отказ.
+// editResult handles the outcome of an edit write: success, conflict (editor again) or refusal.
 func (m *Model) editResult(msg opDone) tea.Cmd {
 	s := msg.edit
 	var ce *core.ConflictError
@@ -143,10 +143,10 @@ func (m *Model) editResult(msg opDone) tea.Cmd {
 	return m.loadCmd()
 }
 
-// keepCopy оставляет копию; строка ошибки начинается с её пути, та же строка идёт в лог.
+// keepCopy keeps the copy; the error line starts with its path, the same line goes to the log.
 func (m *Model) keepCopy(s *editSession, reason string) {
 	lead := "copy kept: "
-	// Узкий экран: путь важнее надписи, он виден целиком, если сам короче ширины.
+	// Narrow screen: the path matters more than the label, it is fully visible if shorter than the width.
 	if m.w > 0 && len(lead)+len(s.path) > m.w && len(s.path) < m.w {
 		lead = ""
 	}

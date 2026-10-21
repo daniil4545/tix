@@ -16,7 +16,7 @@ import (
 
 func guard(t *testing.T) {
 	if r := recover(); r != nil {
-		t.Fatalf("паника: %v", r)
+		t.Fatalf("panic: %v", r)
 	}
 }
 
@@ -40,38 +40,38 @@ func section(b brief.Brief, column string) (brief.Section, bool) {
 	return brief.Section{}, false
 }
 
-// Спека 2.2: до 5 на колонку по rank, дальше "ещё K"; следующая - первая в ready.
+// Spec 2.2: up to 5 per column by rank, then "K more"; next is the first in ready.
 func TestBuild_SevenReady_FiveRowsTwoMore_NextIsFirst(t *testing.T) {
 	defer guard(t)
 	var tasks []*task.Task
-	for i := 7; i >= 1; i-- { // порядок входа не по rank
+	for i := 7; i >= 1; i-- { // input order is not by rank
 		tasks = append(tasks, mk(fmt.Sprintf("T-%d", i), "task", "todo", float64(i)))
 	}
 	tasks = append(tasks, mk("T-20", "idea", "idea", 1), mk("T-21", "finished", "done", 1))
 	b := brief.Build(input(tasks...))
 	s, ok := section(b, "todo")
 	if !ok || len(s.Rows) != 5 || s.More != 2 {
-		t.Fatalf("секция todo: %+v, ждали 5 строк и More=2", s)
+		t.Fatalf("section todo: %+v, want 5 lines and More=2", s)
 	}
 	for i, r := range s.Rows {
 		if want := fmt.Sprintf("T-%d", i+1); r.ID != want {
-			t.Errorf("строка %d: %s, ждали %s (по rank)", i, r.ID, want)
+			t.Errorf("line %d: %s, want %s (by rank)", i, r.ID, want)
 		}
 	}
 	if b.Next != "T-1" {
-		t.Errorf("Next = %q, ждали T-1", b.Next)
+		t.Errorf("Next = %q, want T-1", b.Next)
 	}
 	text := b.Text()
 	if !strings.Contains(text, "2 more") || !strings.Contains(text, "next T-1") {
-		t.Errorf("в тексте нет `2 more` или `next T-1`:\n%s", text)
+		t.Errorf("the text lacks `2 more` or `next T-1`:\n%s", text)
 	}
 	for _, c := range []string{"idea", "done"} {
 		if _, has := section(b, c); has {
-			t.Errorf("колонка %s без роли active, waiting, ready попала в ctx", c)
+			t.Errorf("column %s without role active, waiting, ready got into ctx", c)
 		}
 	}
 	if strings.Contains(text, "T-20") || strings.Contains(text, "T-21") {
-		t.Errorf("задачи из inbox и closed в тексте:\n%s", text)
+		t.Errorf("tasks from inbox and closed are in the text:\n%s", text)
 	}
 }
 
@@ -98,29 +98,29 @@ func TestBuild_ClaimAndDetail(t *testing.T) {
 		}
 	}
 	if rows["T-1"].Claim != "@you" {
-		t.Errorf("свой claim = %q, ждали @you", rows["T-1"].Claim)
+		t.Errorf("own claim = %q, want @you", rows["T-1"].Claim)
 	}
 	if c := rows["T-2"].Claim; c == "" || c == "@you" || !strings.Contains(c, "zed") {
-		t.Errorf("чужой claim = %q, ждали имя владельца", c)
+		t.Errorf("other's claim = %q, want the owner name", c)
 	}
 	if c := rows["T-3"].Claim; c != "" {
-		t.Errorf("истёкший claim показан: %q", c)
+		t.Errorf("expired claim is shown: %q", c)
 	}
 	if !strings.Contains(b.Text(), "stale") || strings.Contains(b.Text(), "ghost") {
-		t.Errorf("задача с истёкшим claim должна быть в ctx без владельца:\n%s", b.Text())
+		t.Errorf("a task with an expired claim must be in ctx without an owner:\n%s", b.Text())
 	}
 	if d := rows["T-4"].Detail; !strings.Contains(d, "Waiting: need key") {
 		t.Errorf("Detail waiting = %q", d)
 	}
 	if d := rows["T-5"].Detail; d != "First line." {
-		t.Errorf("Detail со сводкой = %q, ждали первую строку", d)
+		t.Errorf("Detail with summary = %q, want the first line", d)
 	}
 	if d := rows["T-6"].Detail; !strings.Contains(d, "1/3") {
-		t.Errorf("Detail с критериями = %q, ждали 1/3", d)
+		t.Errorf("Detail with criteria = %q, want 1/3", d)
 	}
 }
 
-// Спека 2.2: до 2000 знаков, строка до 160; сжатие не теряет счёт задач.
+// Spec 2.2: up to 2000 characters, a line up to 160; compression does not lose the task count.
 func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 	defer guard(t)
 	long := strings.Repeat("Очень длинное название задачи ", 12)
@@ -134,11 +134,11 @@ func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 	b := brief.Build(input(tasks...))
 	text := b.Text()
 	if n := utf8.RuneCountInString(text); n > 2000 {
-		t.Errorf("текст %d рун, предел 2000", n)
+		t.Errorf("text is %d runes, limit 2000", n)
 	}
 	for _, line := range strings.Split(text, "\n") {
 		if n := utf8.RuneCountInString(line); n > 160 {
-			t.Errorf("строка %d рун, предел 160: %q", n, line)
+			t.Errorf("line is %d runes, limit 160: %q", n, line)
 		}
 	}
 	total := 0
@@ -146,10 +146,10 @@ func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 		total += len(s.Rows) + s.More
 	}
 	if total != 40 {
-		t.Errorf("строки и More дают %d задач, ждали 40", total)
+		t.Errorf("lines and More give %d tasks, want 40", total)
 	}
 	if !regexp.MustCompile(`(?m)^next T-\d+$`).MatchString(text) {
-		t.Errorf("после сжатия пропала строка next:\n%s", text)
+		t.Errorf("the next line is lost after compression:\n%s", text)
 	}
 }
 
@@ -158,16 +158,16 @@ func TestText_HeaderRulesAndRowLines(t *testing.T) {
 	text := brief.Build(input(mk("T-12", "Fix it", "doing", 1), mk("T-17", "Next one", "todo", 1))).Text()
 	lines := strings.Split(strings.TrimSpace(text), "\n")
 	if !strings.HasPrefix(lines[0], "project p") || !strings.Contains(lines[0], "rules: /h/RULES.md") {
-		t.Errorf("первая строка %q, ждали `project p   rules: /h/RULES.md`", lines[0])
+		t.Errorf("first line %q, want `project p   rules: /h/RULES.md`", lines[0])
 	}
 	if !strings.Contains(text, "tix take") || !strings.Contains(text, "tix note") {
-		t.Errorf("нет строки цикла `take: tix take; step: tix note; ...`:\n%s", text)
+		t.Errorf("no cycle line `take: tix take; step: tix note; ...`:\n%s", text)
 	}
 	if !regexp.MustCompile(`(?m)^doing\s+T-12 Fix it`).MatchString(text) || !regexp.MustCompile(`(?m)^todo\s+T-17 Next one`).MatchString(text) {
-		t.Errorf("строки задач не по формату `<колонка> T-N <название>`:\n%s", text)
+		t.Errorf("task lines do not match the format `<column> T-N <title>`:\n%s", text)
 	}
 	if last := lines[len(lines)-1]; last != "next T-17" {
-		t.Errorf("последняя строка %q, ждали `next T-17`", last)
+		t.Errorf("last line %q, want `next T-17`", last)
 	}
 }
 
@@ -184,41 +184,41 @@ func TestBrief_JSON_LowercaseFields(t *testing.T) {
 	}
 	for _, k := range []string{"project", "rules", "sections", "next"} {
 		if _, has := m[k]; !has {
-			t.Errorf("в JSON нет поля %q: %s", k, raw)
+			t.Errorf("JSON lacks field %q: %s", k, raw)
 		}
 	}
 	secs, _ := m["sections"].([]any)
 	if len(secs) == 0 {
-		t.Fatalf("sections пуст: %s", raw)
+		t.Fatalf("sections is empty: %s", raw)
 	}
 	sec, _ := secs[0].(map[string]any)
 	for _, k := range []string{"column", "rows", "more"} {
 		if _, has := sec[k]; !has {
-			t.Errorf("в секции JSON нет %q: %s", k, raw)
+			t.Errorf("JSON section lacks %q: %s", k, raw)
 		}
 	}
 	rows, _ := sec["rows"].([]any)
 	row, _ := rows[0].(map[string]any)
 	for _, k := range []string{"id", "title", "detail", "claim"} {
 		if _, has := row[k]; !has {
-			t.Errorf("в строке JSON нет %q: %s", k, raw)
+			t.Errorf("JSON line lacks %q: %s", k, raw)
 		}
 	}
 }
 
-// Третья строка ctx - колонки с ролями: агент видит, какое имя у колонки роли waiting.
+// The third ctx line lists columns with roles: the agent sees the name of the waiting-role column.
 func TestText_ColumnsLine(t *testing.T) {
 	defer guard(t)
 	b := brief.Build(input(mk("T-1", "x", "todo", 1)))
 	want := "- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed"
 	if lines := strings.Split(b.Text(), "\n"); len(lines) < 3 || lines[2] != want {
-		t.Errorf("третья строка ctx, ждали %q:\n%s", want, b.Text())
+		t.Errorf("third ctx line, want %q:\n%s", want, b.Text())
 	}
 	raw, err := json.Marshal(b)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(raw), `"columns":"idea=inbox todo=ready`) {
-		t.Errorf("в JSON нет columns: %s", raw)
+		t.Errorf("JSON lacks columns: %s", raw)
 	}
 }

@@ -90,7 +90,7 @@ func TestLoad_CommitsAndFileCommentsByTime_CommentCommitNotDuplicated(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Время комментария из файла задаёт тест: ровно между note и done.
+	// The comment time from the file is set by the test: exactly between note and done.
 	tk.Comments = []task.Comment{{At: at(11, 0), Actor: "daniil", Text: "hello"}}
 
 	got, err := history.Load(repo, tk)
@@ -99,10 +99,10 @@ func TestLoad_CommitsAndFileCommentsByTime_CommentCommitNotDuplicated(t *testing
 	}
 	want := []string{"new", "take", "note", "comment", "done"}
 	if g := ops(got); strings.Join(g, ",") != strings.Join(want, ",") {
-		t.Fatalf("операции по времени: %v, ждали %v", g, want)
+		t.Fatalf("operations by time: %v, want %v", g, want)
 	}
 	if c := got[3]; c.Actor != "daniil" || !strings.Contains(c.Text, "hello") {
-		t.Errorf("комментарий из файла: %+v", c)
+		t.Errorf("comment from the file: %+v", c)
 	}
 	if n := got[2]; !strings.Contains(n.Text, "half done") || n.Actor != "claude:a" {
 		t.Errorf("note: %+v", n)
@@ -117,7 +117,7 @@ func TestLoad_ExternalEdits_OwnAuthor_SeveralIDsInOneCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// Правка мимо ядра обоих файлов; следующая операция коммитит её как external edit.
+	// An edit bypassing the core in both files; the next operation commits it as an external edit.
 	editOutside(t, repo.Dir, "T-1")
 	editOutside(t, repo.Dir, "T-2")
 	clock(t, at(9, 30))
@@ -134,17 +134,17 @@ func TestLoad_ExternalEdits_OwnAuthor_SeveralIDsInOneCommit(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !hasExternalEdit(es) {
-			t.Errorf("%s: нет строки external edit от автора external: %+v", id, es)
+			t.Errorf("%s: no external edit line from author external: %+v", id, es)
 		}
 	}
 }
 
-// editOutside правит файл задачи мимо ядра.
+// editOutside edits a task file bypassing the core.
 func editOutside(t *testing.T, dir, id string) {
 	t.Helper()
 	matches, _ := filepath.Glob(filepath.Join(dir, id+" *.md"))
 	if len(matches) != 1 {
-		t.Fatalf("файл %s: %v", id, matches)
+		t.Fatalf("file %s: %v", id, matches)
 	}
 	data, _ := os.ReadFile(matches[0])
 	if err := os.WriteFile(matches[0], []byte(strings.Replace(string(data), "tags: []", "tags: [x]", 1)+"\n"), 0o600); err != nil {
@@ -172,7 +172,7 @@ func TestLoad_UnknownCommitType_ShownAsIs(t *testing.T) {
 	}
 	es, err := history.Load(repo, &task.Task{ID: "T-1"})
 	if err != nil || len(es) != 1 || !strings.Contains(es[0].Op+" "+es[0].Text, "frobnicate") {
-		t.Fatalf("Load = %+v, %v; ждали одну строку со словом frobnicate", es, err)
+		t.Fatalf("Load = %+v, %v; want one line with the word frobnicate", es, err)
 	}
 }
 
@@ -184,7 +184,7 @@ func TestLoad_NoCommits_OnlyFileComments(t *testing.T) {
 	tk := &task.Task{ID: "T-7", Comments: []task.Comment{{At: at(10, 0), Actor: "a", Text: "x"}}}
 	es, err := history.Load(repo, tk)
 	if err != nil || len(es) != 1 || es[0].Op != "comment" {
-		t.Fatalf("Load без коммитов = %+v, %v; ждали один комментарий", es, err)
+		t.Fatalf("Load without commits = %+v, %v; want one comment", es, err)
 	}
 }
 
@@ -196,17 +196,17 @@ func TestFold(t *testing.T) {
 	cases := []struct {
 		name string
 		in   []history.Entry
-		want string // операции результата через запятую; "set*3" - свёрнутая строка из трёх
+		want string // result operations separated by commas; "set*3" - a folded line of three
 	}{
-		{"два подряд одного автора", []history.Entry{e("set", "A", 1), e("set", "A", 2)}, "fold(2)"},
-		{"одна правка не сворачивается", []history.Entry{e("set", "A", 1)}, "set"},
-		{"разные типы мелких правок одного автора", []history.Entry{e("set", "A", 1), e("check", "A", 2), e("edit", "A", 3)}, "fold(3)"},
-		{"разные авторы", []history.Entry{e("set", "A", 1), e("set", "B", 2)}, "set,set"},
-		{"комментарий разрывает серию", []history.Entry{e("set", "A", 1), e("comment", "A", 2), e("set", "A", 3)}, "set,comment,set"},
-		{"видимые типы не сворачиваются", []history.Entry{e("note", "A", 1), e("note", "A", 2), e("move", "A", 3), e("move", "A", 4)}, "note,note,move,move"},
-		{"external отдельный автор", []history.Entry{e("external edit", "external", 1), e("external edit", "external", 2), e("edit", "A", 3), e("edit", "A", 4)}, "fold(2),fold(2)"},
-		{"серия между видимыми", []history.Entry{e("take", "A", 1), e("set", "A", 2), e("release", "A", 3), e("done", "A", 4)}, "take,fold(2),done"},
-		{"незнакомый тип виден", []history.Entry{e("frobnicate", "A", 1), e("frobnicate", "A", 2)}, "frobnicate,frobnicate"},
+		{"two in a row by one author", []history.Entry{e("set", "A", 1), e("set", "A", 2)}, "fold(2)"},
+		{"one edit does not fold", []history.Entry{e("set", "A", 1)}, "set"},
+		{"different kinds of minor edits by one author", []history.Entry{e("set", "A", 1), e("check", "A", 2), e("edit", "A", 3)}, "fold(3)"},
+		{"different authors", []history.Entry{e("set", "A", 1), e("set", "B", 2)}, "set,set"},
+		{"a comment breaks the series", []history.Entry{e("set", "A", 1), e("comment", "A", 2), e("set", "A", 3)}, "set,comment,set"},
+		{"visible kinds do not fold", []history.Entry{e("note", "A", 1), e("note", "A", 2), e("move", "A", 3), e("move", "A", 4)}, "note,note,move,move"},
+		{"external is a separate author", []history.Entry{e("external edit", "external", 1), e("external edit", "external", 2), e("edit", "A", 3), e("edit", "A", 4)}, "fold(2),fold(2)"},
+		{"series between visible ones", []history.Entry{e("take", "A", 1), e("set", "A", 2), e("release", "A", 3), e("done", "A", 4)}, "take,fold(2),done"},
+		{"unknown kind is visible", []history.Entry{e("frobnicate", "A", 1), e("frobnicate", "A", 2)}, "frobnicate,frobnicate"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -216,14 +216,14 @@ func TestFold(t *testing.T) {
 				if len(g.Folded) > 0 {
 					parts = append(parts, fmt.Sprintf("fold(%d)", len(g.Folded)))
 					if want := fmt.Sprintf("%d edits", len(g.Folded)); !strings.Contains(g.Text, want) {
-						t.Errorf("свёрнутая строка %+v: ждали текст %q", g, want)
+						t.Errorf("folded line %+v: want text %q", g, want)
 					}
 				} else {
 					parts = append(parts, g.Op)
 				}
 			}
 			if s := strings.Join(parts, ","); s != c.want {
-				t.Errorf("Fold = %s, ждали %s", s, c.want)
+				t.Errorf("Fold = %s, want %s", s, c.want)
 			}
 		})
 	}

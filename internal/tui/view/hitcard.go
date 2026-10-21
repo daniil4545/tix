@@ -2,8 +2,8 @@ package view
 
 import "strings"
 
-// actionBtn - пара строки действий карточки. Key пуст у подсказки без кнопки: у пары двух
-// клавиш (`m M`, `j k`) нет одного действия под клик.
+// actionBtn - a pair of the card actions line. Key is empty for a hint without a button: a pair of two
+// keys (`m M`, `j k`) has no single action under a click.
 type actionBtn struct{ text, key string }
 
 var cardActions = []actionBtn{
@@ -11,13 +11,13 @@ var cardActions = []actionBtn{
 	{"del delete", "del"}, {"j k history", ""}, {"esc back", "esc"},
 }
 
-// actionSpan - место кнопки в строке действий: клетки [from, to).
+// actionSpan - the place of a button in the actions line: cells [from, to).
 type actionSpan struct {
 	from, to int
 	key      string
 }
 
-// actionsText склеивает строку действий и считает места её кнопок.
+// actionsText joins the actions line and computes the places of its buttons.
 func actionsText() (string, []actionSpan) {
 	var b strings.Builder
 	var spans []actionSpan
@@ -34,28 +34,28 @@ func actionsText() (string, []actionSpan) {
 	return b.String(), spans
 }
 
-// CardHitKind - что под клеткой кадра карточки.
+// CardHitKind - what is under a cell of the card frame.
 type CardHitKind int
 
-// Виды попадания в карточку.
+// Card hit kinds.
 const (
-	CardNone      CardHitKind = iota // пустое место, история, тело
-	CardAsk                          // строка вопроса агента `* needs you:`
-	CardFields                       // строка полей
-	CardAction                       // кнопка строки действий; клавиша в CardHit.Key
-	CardCriterion                    // строка критерия; номер с нуля в CardHit.Index
+	CardNone      CardHitKind = iota // empty space, history, body
+	CardAsk                          // the agent ask line `* needs you:`
+	CardFields                       // the fields line
+	CardAction                       // an actions-line button; the key is in CardHit.Key
+	CardCriterion                    // a criterion line; the zero-based number is in CardHit.Index
 )
 
-// CardHit - результат HitCard. Key - клавиша кнопки (`e`, `c`, `esc`), пусто вне CardAction.
+// CardHit - the HitCard result. Key - the button key (`e`, `c`, `esc`), empty outside CardAction.
 type CardHit struct {
 	Kind CardHitKind
 	Key  string
-	// Index - номер критерия с нуля для CardCriterion.
+	// Index - the zero-based criterion number for CardCriterion.
 	Index int
 }
 
-// HitCard находит, что лежит под клеткой (x, y) кадра RenderCard(c): те же строки и прокрутка,
-// что у рисования. Обрезанная по ширине кнопка не кликается.
+// HitCard finds what lies under cell (x, y) of the RenderCard(c) frame: the same lines and scroll
+// as in drawing. A button cut by the width is not clickable.
 func HitCard(c Card, x, y int) CardHit {
 	lay := layoutCard(c)
 	if x < 0 || x >= lay.w || y < 0 || y >= len(lay.lines) {
@@ -78,7 +78,7 @@ func HitCard(c Card, x, y int) CardHit {
 	return CardHit{}
 }
 
-// critAt - номер критерия на строке y кадра или -1.
+// critAt - the criterion number on frame line y or -1.
 func (l cardLay) critAt(y int) int {
 	for _, r := range l.crits {
 		if y >= r.from && y < r.to {

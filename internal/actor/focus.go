@@ -7,17 +7,17 @@ import (
 	"strings"
 )
 
-// focusURLRe - единственный допустимый вид адреса вкладки Warp (спека mvp-actions, 4a).
+// focusURLRe - the only allowed form of a Warp tab address.
 var focusURLRe = regexp.MustCompile(`^warp://session/[0-9a-f]{32}$`)
 
-// maxFocusName - предел длины имени файла фокуса.
+// maxFocusName - the limit on focus file name length.
 const maxFocusName = 120
 
-// ValidFocusURL: адрес вкладки терминала годится для записи в файл фокуса и для `open`.
+// ValidFocusURL: a terminal tab address fits writing to a focus file and `open`.
 func ValidFocusURL(s string) bool { return focusURLRe.MatchString(s) }
 
-// FocusFile - имя файла фокуса агента в каталоге фокуса: "claude:8f3a" - "claude-8f3a".
-// Пусто для человека и неизвестной личности: сессии для перехода у них нет.
+// FocusFile - the agent focus file name in the focus directory: "claude:8f3a" - "claude-8f3a".
+// Empty for a human and an unknown identity: they have no session to jump to.
 func FocusFile(name string) string {
 	if name == "" || name == Unknown || name == "human" {
 		return ""
@@ -37,12 +37,12 @@ func FocusFile(name string) string {
 	if len(out) > maxFocusName {
 		out = out[:maxFocusName]
 	}
-	// Имя из точек не должно указывать на каталог.
+	// A name made of dots must not point to a directory.
 	return strings.TrimLeft(out, ".")
 }
 
-// FocusDir - каталог файлов фокуса: данные машины, не базы. TIX_FOCUS_DIR перекрывает путь
-// (тесты), иначе os.UserCacheDir()/tix/focus. Пусто, если каталог кэша неизвестен.
+// FocusDir - the directory of focus files: machine data, not the store. TIX_FOCUS_DIR overrides the path
+// (tests), otherwise os.UserCacheDir()/tix/focus. Empty if the cache directory is unknown.
 func FocusDir(getenv func(string) string) string {
 	if dir := getenv("TIX_FOCUS_DIR"); dir != "" {
 		return dir

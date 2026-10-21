@@ -18,11 +18,11 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// Рабочий цикл агента, З2: docs/plans/z2-agent-cycle.md, разделы 3 и 5.
+// The agent cycle, slice S2.
 
 const (
 	critBody = "## Details\n- [ ] one\n- [ ] two\n- [ ] three\n"
-	// reviewConfig: колонка review без роли; остальные роли как по умолчанию.
+	// reviewConfig: the review column without a role; the other roles as by default.
 	reviewConfig = "[[column]]\nname = \"idea\"\nrole = \"inbox\"\n\n[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n" +
 		"[[column]]\nname = \"review\"\n\n[[column]]\nname = \"doing\"\nrole = \"active\"\n\n" +
 		"[[column]]\nname = \"blocked\"\nrole = \"waiting\"\n\n[[column]]\nname = \"done\"\nrole = \"closed\"\n"
@@ -59,7 +59,7 @@ func (e *env) openAt(c *clock) *core.Store {
 	return s
 }
 
-// withConfig пишет config.toml и открывает базу заново.
+// withConfig writes config.toml and opens the store again.
 func (e *env) withConfig(c *clock, text string) *core.Store {
 	e.t.Helper()
 	if err := os.WriteFile(filepath.Join(e.root, ".tix", "config.toml"), []byte(text), 0o644); err != nil {
@@ -88,7 +88,7 @@ func mkIn(t *testing.T, s *core.Store, title, column string) string {
 	return r.ID
 }
 
-// mkCrit создаёт задачу в колонке и записывает три критерия.
+// mkCrit creates a task in a column and writes three criteria.
 func mkCrit(t *testing.T, s *core.Store, title, column string) string {
 	t.Helper()
 	r, err := s.Create(title, "proj", column, "tester")
@@ -120,15 +120,15 @@ func ensure(t *testing.T, ok bool, format string, args ...any) {
 func wantRule(t *testing.T, what string, err error, substr string) {
 	t.Helper()
 	if !errors.Is(err, core.ErrRule) {
-		t.Errorf("%s: ошибка %v, ждали ErrRule", what, err)
+		t.Errorf("%s: error %v, want ErrRule", what, err)
 		return
 	}
 	if substr != "" && !strings.Contains(err.Error(), substr) {
-		t.Errorf("%s: текст %q, ждали подстроку %q", what, err.Error(), substr)
+		t.Errorf("%s: text %q, want substring %q", what, err.Error(), substr)
 	}
 }
 
-// lifecycle - один захват задачи на фейковых часах; фазы идут друг за другом.
+// lifecycle - one task claim on a fake clock; the phases follow one another.
 type lifecycle struct {
 	t   *testing.T
 	e   *env
@@ -148,21 +148,21 @@ func (l *lifecycle) takeAndRefuseForeign() {
 	if err != nil {
 		l.t.Fatalf("Take: %v", err)
 	}
-	l.ensure(strings.Contains(r.Info, "todo > doing"), "Info = %q, ждали `todo > doing  @... until ...`", r.Info)
+	l.ensure(strings.Contains(r.Info, "todo > doing"), "Info = %q, want `todo > doing  @... until ...`", r.Info)
 	l.ensure(get(l.t, l.s, l.id).Status == "doing" && strings.Contains(l.e.text(l.id), "claim: claude:a until 2026-10-20T15:00"),
-		"после Take нет статуса doing и claim на 3 часа:\n%s", l.e.text(l.id))
-	l.ensure(l.e.subject() == l.id+": take", "тема коммита %q, ждали %q", l.e.subject(), l.id+": take")
+		"after Take there is no status doing and a 3-hour claim:\n%s", l.e.text(l.id))
+	l.ensure(l.e.subject() == l.id+": take", "commit subject %q, want %q", l.e.subject(), l.id+": take")
 
-	// Чужой на живой claim: отказ с владельцем и подсказкой, история цела.
+	// Another actor on a live claim: a refusal with the owner and a hint, the history is intact.
 	n := l.e.count()
 	_, err = l.s.Take(l.id, core.Take, "claude:b")
 	l.ensure(errors.Is(err, core.ErrClaimed) && strings.Contains(err.Error(), "claude:a") &&
 		strings.Contains(err.Error(), "--steal") && strings.Contains(err.Error(), "15:00"),
-		"Take чужого = %v, ждали ErrClaimed с владельцем, сроком 15:00 и `--steal`", err)
-	l.ensure(l.e.count() == n, "отказ Take добавил коммит")
+		"Take of another's = %v, want ErrClaimed with the owner, the expiry 15:00 and `--steal`", err)
+	l.ensure(l.e.count() == n, "a Take refusal added a commit")
 }
 
-// extend: владелец изменил файл - срок now+3 ч в том же коммите; note и чужой не двигают срок.
+// extend: the owner changed the file - the expiry is now+3 h in the same commit; note and another actor do not move the expiry.
 func (l *lifecycle) extend() {
 	l.t.Helper()
 	n := l.e.count()
@@ -170,8 +170,8 @@ func (l *lifecycle) extend() {
 	if _, err := l.s.Comment(l.id, "progress", "claude:a"); err != nil {
 		l.t.Fatal(err)
 	}
-	l.ensure(strings.Contains(l.e.text(l.id), "until 2026-10-20T16:00"), "comment владельца не продлил claim до 16:00:\n%s", l.e.text(l.id))
-	l.ensure(l.e.count() == n+1, "продление ушло отдельным коммитом: %d коммитов, ждали %d", l.e.count(), n+1)
+	l.ensure(strings.Contains(l.e.text(l.id), "until 2026-10-20T16:00"), "the owner's comment did not extend the claim to 16:00:\n%s", l.e.text(l.id))
+	l.ensure(l.e.count() == n+1, "the extension went in a separate commit: %d commits, want %d", l.e.count(), n+1)
 	l.clk.add(30 * time.Minute)
 	if _, err := l.s.Note(l.id, "step", "claude:a"); err != nil {
 		l.t.Fatal(err)
@@ -179,13 +179,13 @@ func (l *lifecycle) extend() {
 	if _, err := l.s.Comment(l.id, "from stranger", "claude:b"); err != nil {
 		l.t.Fatal(err)
 	}
-	l.ensure(strings.Contains(l.e.text(l.id), "until 2026-10-20T16:00"), "note или чужой comment сдвинули claim:\n%s", l.e.text(l.id))
+	l.ensure(strings.Contains(l.e.text(l.id), "until 2026-10-20T16:00"), "note or another's comment moved the claim:\n%s", l.e.text(l.id))
 
-	// Повтор: свой take - без коммита, срок прежний.
+	// Repeat: own take - no commit, the expiry as before.
 	n = l.e.count()
 	_, err := l.s.Take(l.id, core.Take, "claude:a")
 	l.ensure(err == nil && l.e.count() == n && strings.Contains(l.e.text(l.id), "until 2026-10-20T16:00"),
-		"повторный Take: err %v, коммитов %d (было %d)", err, l.e.count(), n)
+		"repeated Take: err %v, commits %d (was %d)", err, l.e.count(), n)
 }
 
 func (l *lifecycle) stealAndRelease() {
@@ -194,24 +194,24 @@ func (l *lifecycle) stealAndRelease() {
 		l.t.Fatalf("Steal: %v", err)
 	}
 	subj := l.e.subject()
-	l.ensure(strings.HasPrefix(subj, l.id+": steal ") && strings.Contains(subj, "claude:a"), "тема перехвата %q, ждали `%s: steal claude:a`", subj, l.id)
-	l.ensure(strings.Contains(l.e.text(l.id), "claim: claude:b"), "после Steal владелец не b:\n%s", l.e.text(l.id))
+	l.ensure(strings.HasPrefix(subj, l.id+": steal ") && strings.Contains(subj, "claude:a"), "steal subject %q, want `%s: steal claude:a`", subj, l.id)
+	l.ensure(strings.Contains(l.e.text(l.id), "claim: claude:b"), "after Steal the owner is not b:\n%s", l.e.text(l.id))
 
-	// Чужой снять не может; владелец снимает; повтор снятия - без коммита.
+	// Another actor cannot release; the owner releases; a repeated release - no commit.
 	_, err := l.s.Take(l.id, core.Release, "claude:a")
-	l.ensure(errors.Is(err, core.ErrClaimed), "Release чужого живого claim = %v, ждали ErrClaimed", err)
+	l.ensure(errors.Is(err, core.ErrClaimed), "Release of another's live claim = %v, want ErrClaimed", err)
 	if _, err := l.s.Take(l.id, core.Release, "claude:b"); err != nil {
-		l.t.Fatalf("Release владельца: %v", err)
+		l.t.Fatalf("Release by the owner: %v", err)
 	}
 	_, ok := get(l.t, l.s, l.id).ClaimInfo()
-	l.ensure(!ok, "после Release claim остался")
-	l.ensure(l.e.subject() == l.id+": release", "тема %q, ждали %q", l.e.subject(), l.id+": release")
+	l.ensure(!ok, "the claim remained after Release")
+	l.ensure(l.e.subject() == l.id+": release", "subject %q, want %q", l.e.subject(), l.id+": release")
 	n := l.e.count()
 	_, err = l.s.Take(l.id, core.Release, "claude:b")
-	l.ensure(err == nil && l.e.count() == n, "повторный Release: err %v, коммитов %d, было %d", err, l.e.count(), n)
+	l.ensure(err == nil && l.e.count() == n, "repeated Release: err %v, commits %d, was %d", err, l.e.count(), n)
 }
 
-// expired: истёкший claim свободен, take без --steal, тема без steal.
+// expired: an expired claim is free, take without --steal, no steal in the subject.
 func (l *lifecycle) expired() {
 	l.t.Helper()
 	if _, err := l.s.Take(l.id, core.Take, "claude:c"); err != nil {
@@ -219,12 +219,12 @@ func (l *lifecycle) expired() {
 	}
 	l.clk.add(4 * time.Hour)
 	if _, err := l.s.Take(l.id, core.Take, "claude:d"); err != nil {
-		l.t.Fatalf("Take истёкшего claim: %v", err)
+		l.t.Fatalf("Take of an expired claim: %v", err)
 	}
-	l.ensure(l.e.subject() == l.id+": take", "тема после истёкшего claim %q, ждали %q (steal только при живом чужом)", l.e.subject(), l.id+": take")
+	l.ensure(l.e.subject() == l.id+": take", "subject after an expired claim %q, want %q (steal only on a live foreign claim)", l.e.subject(), l.id+": take")
 }
 
-// Гонка, истёк, продление; перехват и снятие (раздел 3, строки 1 и 4).
+// Race, expiry, extension; steal and release.
 func TestTake_ClaimLifecycle_ExtendExpireStealRelease(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -250,21 +250,21 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 
 	n := e.count()
 	before := e.text(ready)
-	for _, c := range []struct{ name, id string }{{"inbox", inbox}, {"closed", closed}, {"колонка без роли", norole}} {
+	for _, c := range []struct{ name, id string }{{"inbox", inbox}, {"closed", closed}, {"column without a role", norole}} {
 		_, err := s.Take(c.id, core.Take, "claude:a")
-		wantRule(t, "Take из "+c.name, err, "tix move")
+		wantRule(t, "Take from "+c.name, err, "tix move")
 	}
 	for _, who := range []string{"", "unknown"} {
 		if _, err := s.Take(ready, core.Take, who); !errors.Is(err, core.ErrNoIdentity) {
-			t.Errorf("Take от %q = %v, ждали ErrNoIdentity", who, err)
+			t.Errorf("Take by %q = %v, want ErrNoIdentity", who, err)
 		}
 	}
 	if e.count() != n || e.text(ready) != before {
-		t.Error("отказ Take изменил историю или файл")
+		t.Error("a Take refusal changed the history or the file")
 	}
 }
 
-// Раздел 3: move отказ; waiting; повтор; выход из waiting чистит поле (Р52).
+// move refusal; waiting; repeat; leaving waiting clears the field (D52).
 func TestMove_Rules(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -278,68 +278,68 @@ func TestMove_Rules(t *testing.T) {
 
 	n := e.count()
 	_, err := s.Move(bare, "todo", core.MoveOpts{}, "claude:a")
-	wantRule(t, "в ready без критерия", err, "ready needs a criterion")
+	wantRule(t, "to ready without a criterion", err, "ready needs a criterion")
 	_, err = s.Move(good, "review", core.MoveOpts{}, "claude:a")
-	wantRule(t, "в колонку без роли", err, "review has no role")
+	wantRule(t, "to a column without a role", err, "review has no role")
 	_, err = s.Move(norole, "todo", core.MoveOpts{}, "claude:a")
-	wantRule(t, "из колонки без роли", err, "review has no role")
+	wantRule(t, "from a column without a role", err, "review has no role")
 	_, err = s.Move(act, "blocked", core.MoveOpts{}, "claude:a")
-	wantRule(t, "в waiting без поля и -m", err, "waiting needs a reason")
+	wantRule(t, "to waiting without a field and -m", err, "waiting needs a reason")
 	_, err = s.Move(act, "todo", core.MoveOpts{Message: "x"}, "claude:a")
-	wantRule(t, "-m вне waiting и closed", err, "")
+	wantRule(t, "-m outside waiting and closed", err, "")
 	if e.count() != n {
-		t.Fatalf("отказы Move добавили коммиты: %d, было %d", e.count(), n)
+		t.Fatalf("Move refusals added commits: %d, was %d", e.count(), n)
 	}
 
 	if _, err := s.Move(good, "todo", core.MoveOpts{}, "claude:a"); err != nil {
-		t.Fatalf("Move с критерием в ready: %v", err)
+		t.Fatalf("Move to ready with a criterion: %v", err)
 	}
 	if got := e.subject(); got != good+": move idea > todo" {
-		t.Errorf("тема %q, ждали `%s: move idea > todo`", got, good)
+		t.Errorf("subject %q, want `%s: move idea > todo`", got, good)
 	}
-	// Повтор: та же колонка - ok без коммита.
+	// Repeat: the same column - ok without a commit.
 	n = e.count()
 	if _, err := s.Move(good, "todo", core.MoveOpts{}, "claude:a"); err != nil || e.count() != n {
-		t.Errorf("Move в ту же колонку: err %v, коммитов %d, было %d", err, e.count(), n)
+		t.Errorf("Move to the same column: err %v, commits %d, was %d", err, e.count(), n)
 	}
 
-	// waiting: -m пишет поле; выход чистит его.
+	// waiting: -m writes the field; leaving clears it.
 	if _, err := s.Move(act, "blocked", core.MoveOpts{Message: "need key"}, "claude:a"); err != nil {
-		t.Fatalf("Move в waiting с -m: %v", err)
+		t.Fatalf("Move to waiting with -m: %v", err)
 	}
 	if w := get(t, s, act).Waiting; w != "need key" {
-		t.Errorf("поле waiting = %q, ждали `need key`", w)
+		t.Errorf("waiting field = %q, want `need key`", w)
 	}
 	if _, err := s.Move(act, "todo", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	if w := get(t, s, act).Waiting; w != "" {
-		t.Errorf("после выхода из waiting поле = %q, ждали пусто", w)
+		t.Errorf("after leaving waiting the field = %q, want empty", w)
 	}
-	// Поле уже стоит: перенос в waiting проходит без -m.
+	// The field is already set: a move to waiting passes without -m.
 	if _, err := s.Set(act, []core.Field{{Name: "waiting", Value: "from field"}}, "claude:a"); err != nil {
-		t.Fatalf("Set waiting вне waiting: %v", err)
+		t.Fatalf("Set waiting outside waiting: %v", err)
 	}
 	if _, err := s.Move(act, "blocked", core.MoveOpts{}, "claude:a"); err != nil {
-		t.Errorf("Move в waiting с готовым полем: %v", err)
+		t.Errorf("Move to waiting with a ready field: %v", err)
 	}
-	// Take из waiting чистит поле (Р52).
+	// Take from waiting clears the field (D52).
 	if _, err := s.Take(act, core.Take, "claude:a"); err != nil {
-		t.Fatalf("Take из waiting: %v", err)
+		t.Fatalf("Take from waiting: %v", err)
 	}
 	if tk := get(t, s, act); tk.Waiting != "" || tk.Status != "doing" {
-		t.Errorf("после Take из waiting: статус %q, waiting %q", tk.Status, tk.Waiting)
+		t.Errorf("after Take from waiting: status %q, waiting %q", tk.Status, tk.Waiting)
 	}
-	// Выход из active снимает claim.
+	// Leaving active drops the claim.
 	if _, err := s.Move(act, "todo", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := get(t, s, act).ClaimInfo(); ok {
-		t.Error("выход из active не снял claim")
+		t.Error("leaving active did not drop the claim")
 	}
 }
 
-// Раздел 3: закрытие с неотмеченными; done -m дважды; 0 критериев (Р40).
+// Closing with unchecked criteria; done -m twice; 0 criteria (D40).
 func TestMove_Close_CriteriaForceResult(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -351,26 +351,26 @@ func TestMove_Close_CriteriaForceResult(t *testing.T) {
 	}
 	n := e.count()
 	_, err := s.Move(a, "done", core.MoveOpts{}, "claude:a")
-	wantRule(t, "закрытие с неотмеченными", err, "1/3 criteria checked")
+	wantRule(t, "closing with unchecked", err, "1/3 criteria checked")
 	if err != nil && !strings.Contains(err.Error(), "tix check "+a+" 2 3") {
-		t.Errorf("текст %q, ждали подсказку `tix check %s 2 3`", err, a)
+		t.Errorf("text %q, want the hint `tix check %s 2 3`", err, a)
 	}
 	_, err = s.Move(a, "done", core.MoveOpts{Force: true}, "claude:a")
-	wantRule(t, "--force без -m", err, "")
+	wantRule(t, "--force without -m", err, "")
 	if e.count() != n {
-		t.Fatalf("отказы изменили историю: %d, было %d", e.count(), n)
+		t.Fatalf("refusals changed the history: %d, was %d", e.count(), n)
 	}
 	if _, err := s.Move(a, "done", core.MoveOpts{Force: true, Message: "skip rest"}, "claude:a"); err != nil {
 		t.Fatalf("--force -m: %v", err)
 	}
 	if got := e.subject(); got != a+": done force" {
-		t.Errorf("тема %q, ждали `%s: done force`", got, a)
+		t.Errorf("subject %q, want `%s: done force`", got, a)
 	}
 	if !strings.Contains(e.text(a), "Result: skip rest") {
-		t.Errorf("нет комментария `Result: skip rest`:\n%s", e.text(a))
+		t.Errorf("no comment `Result: skip rest`:\n%s", e.text(a))
 	}
 
-	// Все отмечены: закрытие без -m; claim снят.
+	// All checked: closing without -m; the claim is dropped.
 	b := mkCrit(t, s, "B", "todo")
 	if _, err := s.Take(b, core.Take, "claude:a"); err != nil {
 		t.Fatal(err)
@@ -379,34 +379,34 @@ func TestMove_Close_CriteriaForceResult(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.Move(b, "done", core.MoveOpts{}, "claude:a"); err != nil {
-		t.Fatalf("закрытие с отмеченными: %v", err)
+		t.Fatalf("closing with checked: %v", err)
 	}
 	if got := e.subject(); got != b+": done" {
-		t.Errorf("тема %q, ждали %q", got, b+": done")
+		t.Errorf("subject %q, want %q", got, b+": done")
 	}
 	if tk := get(t, s, b); tk.Status != "done" {
-		t.Errorf("статус %q, ждали done", tk.Status)
+		t.Errorf("status %q, want done", tk.Status)
 	} else if _, ok := tk.ClaimInfo(); ok {
-		t.Error("закрытие не сняло claim")
+		t.Error("closing did not drop the claim")
 	}
 
-	// Без критериев: нужен -m; повтор -m на закрытой не пишет второй итог.
+	// Without criteria: -m is required; a repeated -m on a closed task does not write a second result.
 	c := mkIn(t, s, "C", "doing")
 	_, err = s.Move(c, "done", core.MoveOpts{}, "claude:a")
-	wantRule(t, "0 критериев без -m", err, "no criteria")
+	wantRule(t, "0 criteria without -m", err, "no criteria")
 	if _, err := s.Move(c, "done", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	n = e.count()
 	if _, err := s.Move(c, "done", core.MoveOpts{Message: "shipped again"}, "claude:a"); err != nil {
-		t.Fatalf("повторный done: %v", err)
+		t.Fatalf("repeated done: %v", err)
 	}
 	if e.count() != n || strings.Contains(e.text(c), "shipped again") {
-		t.Errorf("повтор done: коммитов %d (было %d), текст:\n%s", e.count(), n, e.text(c))
+		t.Errorf("repeated done: commits %d (was %d), text:\n%s", e.count(), n, e.text(c))
 	}
 }
 
-// Раздел 3: порядок --first, --after (чужая колонка), перенумерация.
+// Order --first, --after (another column), renumbering.
 func order(t *testing.T, s *core.Store, column string) []string {
 	t.Helper()
 	all, _ := s.List()
@@ -438,7 +438,7 @@ func TestMove_Order_FirstAfterForeignColumn(t *testing.T) {
 	want := func(ids ...string) {
 		t.Helper()
 		if got := order(t, s, "doing"); strings.Join(got, ",") != strings.Join(ids, ",") {
-			t.Errorf("порядок doing %v, ждали %v", got, ids)
+			t.Errorf("doing order %v, want %v", got, ids)
 		}
 	}
 	want(a, b, c)
@@ -452,34 +452,34 @@ func TestMove_Order_FirstAfterForeignColumn(t *testing.T) {
 	}
 	want(d, a, c, b)
 	_, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{After: foreign}}, "x:1")
-	wantRule(t, "--after задачи из другой колонки", err, "")
+	wantRule(t, "--after a task from another column", err, "")
 	want(d, a, c, b)
 
-	// Та же колонка: без места - ok без коммита; с --first и --after порядок меняется коммитом (TUI, З4).
+	// The same column: without a place - ok without a commit; with --first and --after the order changes by a commit (TUI, S4).
 	n := e.count()
 	if _, err := s.Move(b, "doing", core.MoveOpts{}, "x:1"); err != nil || e.count() != n {
-		t.Errorf("перенос в ту же колонку без места: err %v, коммитов %d, было %d", err, e.count(), n)
+		t.Errorf("move to the same column without a place: err %v, commits %d, was %d", err, e.count(), n)
 	}
 	want(d, a, c, b)
 	if _, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{First: true}}, "x:1"); err != nil {
-		t.Fatalf("--first в той же колонке: %v", err)
+		t.Fatalf("--first in the same column: %v", err)
 	}
 	if e.count() != n+1 {
-		t.Errorf("--first в той же колонке: коммитов %d, ждали %d", e.count(), n+1)
+		t.Errorf("--first in the same column: commits %d, want %d", e.count(), n+1)
 	}
 	want(b, d, a, c)
 	if _, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{After: a}}, "x:1"); err != nil {
-		t.Fatalf("--after в той же колонке: %v", err)
+		t.Fatalf("--after in the same column: %v", err)
 	}
 	if e.count() != n+2 {
-		t.Errorf("--after в той же колонке: коммитов %d, ждали %d", e.count(), n+2)
+		t.Errorf("--after in the same column: commits %d, want %d", e.count(), n+2)
 	}
 	want(d, a, b, c)
 }
 
 func TestMove_100InsertsAfterSameAnchor_OrderStaysTotal(t *testing.T) {
 	if testing.Short() {
-		t.Skip("долгий ярус: 100 коммитов")
+		t.Skip("long tier: 100 commits")
 	}
 	defer guard(t)
 	e := newEnv(t)
@@ -500,22 +500,22 @@ func TestMove_100InsertsAfterSameAnchor_OrderStaysTotal(t *testing.T) {
 	}
 	got := order(t, s, "doing")
 	if strings.Join(got, ",") != strings.Join(want, ",") {
-		t.Fatalf("порядок после 100 вставок нарушен:\n%v\nждали:\n%v", got, want)
+		t.Fatalf("order after 100 inserts is broken:\n%v\nwant:\n%v", got, want)
 	}
 	all, errs := s.List()
 	if len(errs) != 0 {
-		t.Fatalf("после перенумерации файлы не разбираются: %v", errs)
+		t.Fatalf("after renumbering the files do not parse: %v", errs)
 	}
 	seen := map[float64]bool{}
 	for _, tk := range all {
 		if tk.Status == "doing" && seen[tk.Rank] {
-			t.Fatalf("rank %v повторяется: порядок держится случайно", tk.Rank)
+			t.Fatalf("rank %v repeats: the order holds by chance", tk.Rank)
 		}
 		seen[tk.Rank] = true
 	}
 }
 
-// Раздел 3: set status=; правила Set.
+// set status=; Set rules.
 func TestSet_Rules(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -533,18 +533,18 @@ func TestSet_Rules(t *testing.T) {
 	}
 	for _, name := range []string{"id", "created", "nosuch"} {
 		if _, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1"); err == nil {
-			t.Errorf("Set %s принят", name)
+			t.Errorf("Set %s accepted", name)
 		}
 	}
 	if _, err := s.Set(id, []core.Field{{Name: "nosuch", Value: "x"}}, "x:1"); err == nil || !strings.Contains(err.Error(), "allowed:") {
-		t.Errorf("Set неизвестного поля: %v, ждали подсказку `allowed: ...`", err)
+		t.Errorf("Set of an unknown field: %v, want the hint `allowed: ...`", err)
 	}
 	_, err := s.Set(id, []core.Field{{Name: "title", Value: ""}}, "x:1")
-	wantRule(t, "пустой title", err, "")
+	wantRule(t, "empty title", err, "")
 	_, err = s.Set(w, []core.Field{{Name: "waiting", Value: ""}}, "x:1")
-	wantRule(t, "waiting= в waiting", err, "")
+	wantRule(t, "waiting= in waiting", err, "")
 	if e.count() != n || e.text(id) != before {
-		t.Fatal("отказы Set изменили историю или файл")
+		t.Fatal("Set refusals changed the history or the file")
 	}
 
 	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}, {Name: "tags", Value: "a,b"}, {Name: "summary", Value: "x=y"}}, "x:1"); err != nil {
@@ -552,15 +552,15 @@ func TestSet_Rules(t *testing.T) {
 	}
 	tk := get(t, s, id)
 	if tk.Title != "New" || strings.Join(tk.Tags, ",") != "a,b" || tk.Summary() != "x=y" {
-		t.Errorf("после Set: title %q tags %v summary %q", tk.Title, tk.Tags, tk.Summary())
+		t.Errorf("after Set: title %q tags %v summary %q", tk.Title, tk.Tags, tk.Summary())
 	}
 	subj := e.subject()
 	if !strings.HasPrefix(subj, id+": set ") || !strings.Contains(subj, "title") || !strings.Contains(subj, "summary") {
-		t.Errorf("тема %q, ждали `%s: set title tags summary`", subj, id)
+		t.Errorf("subject %q, want `%s: set title tags summary`", subj, id)
 	}
 	n = e.count()
 	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}}, "x:1"); err != nil || e.count() != n {
-		t.Errorf("Set тем же значением: err %v, коммитов %d, было %d", err, e.count(), n)
+		t.Errorf("Set with the same value: err %v, commits %d, was %d", err, e.count(), n)
 	}
 }
 
@@ -571,24 +571,24 @@ func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	id := mkCrit(t, s, "Work", "doing")
 	r, err := s.Check(id, []int{1, 2}, "x:1")
 	if err != nil || r.Info != "2/3" {
-		t.Fatalf("Check 1 2: info %q, err %v; ждали `2/3`", r.Info, err)
+		t.Fatalf("Check 1 2: info %q, err %v; want `2/3`", r.Info, err)
 	}
 	if got := e.subject(); got != id+": check 1 2" {
-		t.Errorf("тема %q, ждали %q", got, id+": check 1 2")
+		t.Errorf("subject %q, want %q", got, id+": check 1 2")
 	}
 	n, before := e.count(), e.text(id)
 	if _, err := s.Check(id, []int{1}, "x:1"); err != nil || e.count() != n {
-		t.Errorf("повторный Check: err %v, коммитов %d, было %d", err, e.count(), n)
+		t.Errorf("repeated Check: err %v, commits %d, was %d", err, e.count(), n)
 	}
 	if _, err := s.Check(id, []int{9}, "x:1"); err == nil {
-		t.Error("Check несуществующего критерия принят")
+		t.Error("Check of a nonexistent criterion accepted")
 	}
 	if e.count() != n || e.text(id) != before {
-		t.Error("отказ Check изменил историю или файл")
+		t.Error("a Check refusal changed the history or the file")
 	}
 }
 
-// Backup: bare, правка мимо ядра, битый путь, нет origin, нет базы.
+// Backup: bare, an edit around the core, a broken path, no origin, no store.
 func newBareDir(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -619,23 +619,23 @@ func TestBackup_PushesHeadAfterCommittingOutsideEdit(t *testing.T) {
 		t.Fatalf("Backup: %v", err)
 	}
 	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Fatalf("HEAD bare %q != локальный %q", remote, local)
+		t.Fatalf("HEAD bare %q != local %q", remote, local)
 	}
 
-	// Правка мимо ядра: Backup коммитит её и отправляет.
+	// An edit around the core: Backup commits it and pushes.
 	f := e.file(id)
 	d, _ := os.ReadFile(f)
 	if err := os.WriteFile(f, append(d, []byte("edited in Obsidian\n")...), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Backup(ctx); err != nil {
-		t.Fatalf("Backup с внешней правкой: %v", err)
+		t.Fatalf("Backup with an external edit: %v", err)
 	}
 	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("после Backup дерево не чисто:\n%s", st)
+		t.Errorf("after Backup the tree is not clean:\n%s", st)
 	}
 	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Errorf("HEAD bare %q != локальный %q после внешней правки", remote, local)
+		t.Errorf("HEAD bare %q != local %q after an external edit", remote, local)
 	}
 }
 
@@ -647,10 +647,10 @@ func TestBackup_NoOriginBadPathBadCredentials_ErrorsOneKind(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	if _, err := s.Backup(ctx); !errors.Is(err, core.ErrNoRemote) || !strings.Contains(err.Error(), "git remote add origin") {
-		t.Errorf("Backup без origin = %v, ждали ErrNoRemote с подсказкой `git remote add origin <url>`", err)
+		t.Errorf("Backup without origin = %v, want ErrNoRemote with the hint `git remote add origin <url>`", err)
 	}
 
-	// Битый путь: ошибка, но правка мимо ядра всё равно закоммичена (лок отпущен до push).
+	// A broken path: an error, but the edit around the core is still committed (the lock is released before push).
 	e.git("remote", "add", "origin", filepath.Join(e.root, "no", "such.git"))
 	f := e.file(id)
 	d, _ := os.ReadFile(f)
@@ -658,20 +658,20 @@ func TestBackup_NoOriginBadPathBadCredentials_ErrorsOneKind(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := s.Backup(ctx); err == nil || errors.Is(err, core.ErrNoRemote) {
-		t.Errorf("Backup в битый путь = %v, ждали ошибку push", err)
+		t.Errorf("Backup to a broken path = %v, want a push error", err)
 	}
 	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("при сбое push правка не закоммичена:\n%s", st)
+		t.Errorf("on a push failure the edit is not committed:\n%s", st)
 	}
 
-	// user:pass@ в тексте ошибки вырезается.
+	// user:pass@ in the error text is cut out.
 	e.git("remote", "set-url", "origin", "http://user:s3cretpw@127.0.0.1:1/r.git")
 	_, err := s.Backup(ctx)
 	if err == nil {
-		t.Fatal("Backup на недоступный адрес прошёл")
+		t.Fatal("Backup to an unreachable address passed")
 	}
 	if strings.Contains(err.Error(), "s3cretpw") {
-		t.Errorf("пароль remote в тексте ошибки: %v", err)
+		t.Errorf("remote password in the error text: %v", err)
 	}
 }
 
@@ -680,15 +680,15 @@ func TestBackup_NoBase_Error(t *testing.T) {
 	e := newEnv(t)
 	s := e.openAt(newClock())
 	if _, err := s.Backup(context.Background()); err == nil {
-		t.Error("Backup без базы прошёл")
+		t.Error("Backup without a store passed")
 	}
 }
 
-// Раздел 8: каждые 300 коммитов после лока в фоне запускается gc. Подмена - обёртка git:
-// gc и commit-graph не выполняются, а пишутся в gc.log; порог проверяется с запасом.
+// Every 300 commits gc starts in the background after the lock. Replacement - a git wrapper:
+// gc and commit-graph do not run but are written to gc.log; the threshold is checked with a margin.
 func TestGC_EveryThreeHundredCommits(t *testing.T) {
 	if testing.Short() {
-		t.Skip("долгий ярус: 320 коммитов")
+		t.Skip("long tier: 320 commits")
 	}
 	defer guard(t)
 	e := newEnv(t)
@@ -705,9 +705,9 @@ func TestGC_EveryThreeHundredCommits(t *testing.T) {
 			t.Fatalf("Note %d: %v", i, err)
 		}
 	}
-	time.Sleep(200 * time.Millisecond) // фон мог бы стартовать: отрицательный результат ждёт чуть дольше
+	time.Sleep(200 * time.Millisecond) // the background run could start: a negative result waits a bit longer
 	if got := gcLog(); got != "" {
-		t.Fatalf("gc запущен до порога (250 коммитов): %q", got)
+		t.Fatalf("gc started before the threshold (250 commits): %q", got)
 	}
 	for i := 251; i <= 320; i++ {
 		if _, err := s.Note(id, fmt.Sprintf("step %d", i), "x:1"); err != nil {
@@ -720,17 +720,17 @@ func TestGC_EveryThreeHundredCommits(t *testing.T) {
 	}
 	got := gcLog()
 	if strings.Count(got, "gc\n") != 1 || !strings.Contains(got, "commit-graph") {
-		t.Errorf("после 320 коммитов gc.log = %q, ждали один gc и commit-graph", got)
+		t.Errorf("after 320 commits gc.log = %q, want one gc and commit-graph", got)
 	}
 }
 
-// move по имени роли: колонки waiting нет, есть blocked с ролью waiting - задача уходит в blocked.
+// move by role name: there is no waiting column, there is blocked with role waiting - the task goes to blocked.
 func TestMove_RoleName_GoesToColumnWithRole(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
 	a := mkCrit(t, s, "A", "doing")
-	if _, err := s.Move(a, "waiting", core.MoveOpts{Message: "ждёт ответа"}, "claude:a"); err != nil {
+	if _, err := s.Move(a, "waiting", core.MoveOpts{Message: "waiting for a reply"}, "claude:a"); err != nil {
 		t.Fatalf("move %s waiting: %v", a, err)
 	}
 	got, _, err := s.Get(a)
@@ -738,18 +738,18 @@ func TestMove_RoleName_GoesToColumnWithRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Status != "blocked" {
-		t.Errorf("статус %q, ждали blocked", got.Status)
+		t.Errorf("status %q, want blocked", got.Status)
 	}
 	if subj := e.subject(); !strings.Contains(subj, "move doing > blocked") {
-		t.Errorf("тема коммита %q, ждали имя колонки: move doing > blocked", subj)
+		t.Errorf("commit subject %q, want the column name: move doing > blocked", subj)
 	}
 	_, err = s.Move(a, "nowhere", core.MoveOpts{}, "claude:a")
-	wantRule(t, "неизвестное имя", err, `unknown column "nowhere"; columns: idea=inbox todo=ready`)
+	wantRule(t, "unknown name", err, `unknown column "nowhere"; columns: idea=inbox todo=ready`)
 	_, err = s.Move(a, "", core.MoveOpts{}, "claude:a")
-	wantRule(t, "пустое имя", err, `unknown column ""`)
+	wantRule(t, "empty name", err, `unknown column ""`)
 }
 
-// Имя колонки важнее роли: колонка "waiting" с ролью ready берёт задачу, а не blocked.
+// A column name outranks a role: column "waiting" with role ready takes the task, not blocked.
 func TestMove_ColumnNameBeatsRole(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -763,6 +763,6 @@ func TestMove_ColumnNameBeatsRole(t *testing.T) {
 		t.Fatalf("move %s waiting: %v", a, err)
 	}
 	if got, _, _ := s.Get(a); got == nil || got.Status != "waiting" {
-		t.Errorf("задача ушла не в колонку waiting: %+v", got)
+		t.Errorf("the task did not go to column waiting: %+v", got)
 	}
 }

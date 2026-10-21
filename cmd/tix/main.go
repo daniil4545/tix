@@ -1,4 +1,4 @@
-// Команда tix - CLI трекера.
+// Command tix - the tracker CLI.
 package main
 
 import (
@@ -13,7 +13,7 @@ import (
 	"github.com/daniil4545/tix/internal/tui"
 )
 
-// version задаётся сборкой: -ldflags "-X main.version=<значение>". Без флага - dev.
+// version is set by the build: -ldflags "-X main.version=<value>". Without the flag - dev.
 var version = "dev"
 
 func main() {
@@ -25,7 +25,7 @@ func run() int {
 		fmt.Println(version)
 		return 0
 	}
-	// Процесс короткий, куча на 1000 задач единицы МБ: реже GC - list 18 -> 14 мс (замер).
+	// A short process, the heap for 1000 tasks is a few MB: a rarer GC - list 18 to 14 ms (measured).
 	debug.SetGCPercent(400)
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -47,13 +47,13 @@ func run() int {
 	return cli.Run(ctx, os.Args[1:], env)
 }
 
-// isTerminal: stdout - терминал, а не пайп или файл.
+// isTerminal: stdout is a terminal, not a pipe or a file.
 func isTerminal(f *os.File) bool {
 	info, err := f.Stat()
 	return err == nil && info.Mode()&os.ModeCharDevice != 0
 }
 
-// runTUI открывает доску от имени человека (spec 2.4).
+// runTUI opens the board on behalf of a human (spec 2.4).
 func runTUI(ctx context.Context, env cli.Env) int {
 	store, log, root, proj, err := cli.OpenStore(env)
 	if err != nil {

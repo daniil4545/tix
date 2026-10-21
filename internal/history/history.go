@@ -1,4 +1,4 @@
-// Package history собирает ленту карточки задачи: коммиты git и комментарии из файла.
+// Package history builds the task card timeline: git commits and comments from the file.
 package history
 
 import (
@@ -16,27 +16,27 @@ const (
 	opComment  = "comment"
 	opEdits    = "edits"
 	opExternal = "external edit"
-	// actorExternal - автор правок мимо ядра (трейлер Actor).
+	// actorExternal - the author of external edits (the Actor trailer).
 	actorExternal = "external"
 )
 
-// foldable - мелкие правки: от двух подряд одного Actor они сливаются в строку "N edits" (Р60).
-// Переносы, заметки, взятие и комментарии остаются отдельными строками.
+// foldable - minor edits: two or more in a row by one Actor merge into an "N edits" line (D60).
+// Moves, notes, takes and comments stay separate lines.
 var foldable = map[string]bool{"set": true, "check": true, "edit": true, "release": true, opExternal: true}
 
-// subjectRe - начало темы коммита ядра: "T-12: ".
+// subjectRe - the start of a core commit subject: "T-12: ".
 var subjectRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+: `)
 
-// Entry - строка ленты. Folded - свёрнутая серия правок ("N edits"); Op comment - из файла.
+// Entry - a timeline line. Folded - a folded series of edits ("N edits"); Op comment - from the file.
 type Entry struct {
 	At              time.Time
 	Actor, Op, Text string
 	Folded          []Entry
 }
 
-// Load собирает ленту задачи от старых записей к новым и сворачивает её (Fold). Коммиты git
-// дают переносы, заметки и правки; тексты комментариев берутся из t.Comments. Коммит comment
-// сам в ленту не идёт: на его месте встаёт комментарий из файла, иначе он задвоился бы.
+// Load builds the task timeline from old records to new and folds it (Fold). Git commits
+// give moves, notes and edits; comment texts come from t.Comments. A comment commit
+// does not go into the timeline itself: the comment from the file takes its place, otherwise it would double.
 func Load(r gitx.Repo, t *task.Task) ([]Entry, error) {
 	commits, err := r.Log(t.ID)
 	if err != nil {
@@ -44,19 +44,19 @@ func Load(r gitx.Repo, t *task.Task) ([]Entry, error) {
 	}
 	left := append([]task.Comment(nil), t.Comments...)
 	es := make([]Entry, 0, len(commits)+len(left))
-	for i := len(commits) - 1; i >= 0; i-- { // Log отдаёт новые первыми
+	for i := len(commits) - 1; i >= 0; i-- { // Log returns the new ones first
 		e := commitEntry(commits[i])
 		if e.Op != opComment {
 			es = append(es, e)
 			continue
 		}
-		// Маркер в файле хранит минуты, коммит - секунды: пара по автору и минуте.
+		// The marker in the file keeps minutes, the commit keeps seconds: a pair by author and minute.
 		if c, ok := takeComment(&left, e); ok {
 			es = append(es, Entry{At: e.At, Actor: c.Actor, Op: opComment, Text: c.Text})
 		}
 	}
-	// Оставшиеся комментарии пришли без своего коммита comment: `done -m` пишет их коммитом
-	// done. Они встают перед ним; без пары - по времени из файла.
+	// The remaining comments came without their own comment commit: `done -m` writes them in the done
+	// commit. They go before it; without a pair - by the time from the file.
 	for _, c := range left {
 		e := Entry{At: c.At, Actor: c.Actor, Op: opComment, Text: c.Text}
 		if i := findDone(es, c); i >= 0 {
@@ -73,7 +73,7 @@ func Load(r gitx.Repo, t *task.Task) ([]Entry, error) {
 
 func sameMinute(a, b time.Time) bool { return a.Truncate(time.Minute).Equal(b.Truncate(time.Minute)) }
 
-// takeComment вынимает из left первый комментарий того же автора и минуты, что у коммита.
+// takeComment pulls out of left the first comment with the same author and minute as the commit.
 func takeComment(left *[]task.Comment, commit Entry) (task.Comment, bool) {
 	for i, c := range *left {
 		if c.Actor == commit.Actor && sameMinute(c.At, commit.At) {
@@ -84,7 +84,7 @@ func takeComment(left *[]task.Comment, commit Entry) (task.Comment, bool) {
 	return task.Comment{}, false
 }
 
-// findDone ищет коммит done того же автора и минуты, что у комментария; нет - -1.
+// findDone looks for a done commit with the same author and minute as the comment; none - -1.
 func findDone(es []Entry, c task.Comment) int {
 	for i, e := range es {
 		if e.Op == "done" && e.Actor == c.Actor && sameMinute(e.At, c.At) {
@@ -94,8 +94,8 @@ func findDone(es []Entry, c task.Comment) int {
 	return -1
 }
 
-// commitEntry переводит коммит в строку ленты. Тип - слово после "T-12: "; правка мимо ядра
-// (Actor external) - external edit: в таком коммите несколько id, тема несёт только первый.
+// commitEntry turns a commit into a timeline line. The kind is the word after "T-12: "; an edit bypassing the core
+// (Actor external) is an external edit: such a commit has several ids, the subject carries only the first.
 func commitEntry(c gitx.Commit) Entry {
 	e := Entry{At: c.At, Actor: c.Actor}
 	rest := subjectRe.ReplaceAllString(c.Subject, "")
@@ -107,8 +107,8 @@ func commitEntry(c gitx.Commit) Entry {
 	return e
 }
 
-// Fold сворачивает серии мелких правок одного Actor от двух подряд в одну строку
-// Op edits, Text "N edits", Folded - исходные записи. Порядок входа сохраняется.
+// Fold folds series of minor edits by one Actor, two or more in a row, into one line
+// Op edits, Text "N edits", Folded - the source records. The input order is kept.
 func Fold(es []Entry) []Entry {
 	out := make([]Entry, 0, len(es))
 	for i := 0; i < len(es); {

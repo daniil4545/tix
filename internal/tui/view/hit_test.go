@@ -7,7 +7,7 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// hitCases - размеры и положения курсора, где окна колонок и карточек сдвинуты по-разному.
+// hitCases - sizes and cursor positions where the column and card windows are shifted differently.
 var hitCases = []struct {
 	name     string
 	rows     int
@@ -22,7 +22,7 @@ var hitCases = []struct {
 	{"short frame", 5, 80, 6, 1, 3},
 }
 
-// cellText - знаки строки кадра в клетках [from, from+n).
+// cellText - the frame line characters in cells [from, from+n).
 func cellText(line string, from, n int) string {
 	r := []rune(line)
 	if from >= len(r) {
@@ -31,8 +31,8 @@ func cellText(line string, from, n int) string {
 	return string(r[from:min(from+n, len(r))])
 }
 
-// Каждая клетка, которую HitBoard отдаёт карточке, лежит над текстом именно этой карточки
-// в нарисованном кадре: попадание не расходится с рисованием при сдвинутых окнах.
+// Every cell that HitBoard gives to a card lies over the text of exactly that card
+// in the drawn frame: a hit does not diverge from drawing with shifted windows.
 func TestHitBoard_CardCell_MatchesRenderedCard(t *testing.T) {
 	for _, tc := range hitCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestHitBoard_CardCell_MatchesRenderedCard(t *testing.T) {
 	}
 }
 
-// headCells - нарисованные первые строки карточек: клетка начала ID и сам ID.
+// headCells - the drawn first card lines: the cell where the ID starts and the ID itself.
 func headCells(lines []string) (cells [][2]int, ids []string) {
 	for y := 4; y < len(lines); y += 5 {
 		for slot := 0; slot*26 < len([]rune(lines[y])); slot++ {
@@ -72,14 +72,14 @@ func headCells(lines []string) (cells [][2]int, ids []string) {
 	return cells, ids
 }
 
-// Каждая нарисованная карточка находится по клетке с её ID.
+// Every drawn card is found by the cell with its ID.
 func TestHitBoard_RenderedCard_IsHitOnItsFirstLine(t *testing.T) {
 	for _, tc := range hitCases {
 		t.Run(tc.name, func(t *testing.T) {
 			b := bigBoard(tc.rows)
 			b.W, b.H, b.Col, b.Row = tc.w, tc.h, tc.col, tc.row
 			cells, ids := headCells(strings.Split(plain(view.RenderBoard(b)), "\n"))
-			if len(cells) == 0 && tc.h > 7 { // до 7 строк тело не рисуется
+			if len(cells) == 0 && tc.h > 7 { // under 7 lines the body is not drawn
 				t.Fatal("no card rendered")
 			}
 			for i, c := range cells {
@@ -124,7 +124,7 @@ func TestHitBoard_NotACard_IsNone(t *testing.T) {
 
 func TestHitBoard_ShiftedColumnWindow_UsesAbsoluteIndex(t *testing.T) {
 	b := bigBoard(2)
-	b.W, b.H, b.Col, b.Row = 80, 30, 4, 0 // три колонки на странице, курсор на пятой: показаны 3 и 4
+	b.W, b.H, b.Col, b.Row = 80, 30, 4, 0 // three columns per page, cursor on the fifth: 3 and 4 are shown
 	got := view.HitBoard(b, 0, 4)
 	if got.Col != 2 && got.Col != 3 {
 		t.Fatalf("slot 0 of the shifted window hit column %d, want first shown column", got.Col)
@@ -140,11 +140,11 @@ func TestHitBoard_NoColumns_IsNone(t *testing.T) {
 	}
 }
 
-// Липкое окно: пока курсор внутри окна, прежняя первая колонка и верхняя карточка остаются;
-// вышел - окно ставится по курсору, как без подсказки.
+// A sticky window: while the cursor is inside the window, the previous first column and top card stay;
+// when it leaves, the window is set by the cursor, as without a hint.
 func TestFitWindow_CursorInside_KeepsWindow_OutsideMoves(t *testing.T) {
 	b := bigBoard(8)
-	b.W, b.H = 80, 24 // три колонки, три карточки
+	b.W, b.H = 80, 24 // three columns, three cards
 	for _, tc := range []struct {
 		name                 string
 		col, row, first, top int

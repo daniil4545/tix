@@ -1,7 +1,7 @@
-// Package core - единственный путь записи в ~/tasks: лок, временный файл, rename, коммит.
+// Package core - the only write path into ~/tasks: lock, temp file, rename, commit.
 //
-// Алгоритм записи - docs/spec.md, 2.1: лок, коммит чужих правок (external edit), чтение,
-// слияние для edit, запись во временный файл, сверка, rename, коммит путей операции.
+// The write algorithm is in docs/spec.md, 2.1: lock, commit of foreign edits (external edit), read,
+// merge for edit, write to a temp file, check, rename, commit of the operation paths.
 package core
 
 import (
@@ -21,14 +21,14 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// Ошибки ядра. Сравнивать через errors.Is.
+// Core errors. Compare with errors.Is.
 var (
 	ErrConflict = errors.New("edit conflict")
 	ErrLocked   = errors.New("store is busy")
 	ErrNotFound = errors.New("task not found")
 )
 
-// errGitBusy - свежий lock-файл git: ответ "git is busy", errors.Is(err, ErrLocked).
+// errGitBusy - a fresh git lock file: the reply "git is busy", errors.Is(err, ErrLocked).
 type errGitBusy struct{}
 
 func (errGitBusy) Error() string        { return "git is busy" }
@@ -57,20 +57,20 @@ var (
 	fileIDRe = regexp.MustCompile(`^(T-[0-9]+)(?:[ -].*)?\.md$`)
 )
 
-// Options - настройки Open. LockTimeout <= 0 - 5 с (2.1). GitBin - сырое значение
-// TIX_GIT, путь к git находит gitx.Resolve при первом вызове git.
+// Options - settings of Open. LockTimeout <= 0 - 5 s (2.1). GitBin - the raw value of
+// TIX_GIT, gitx.Resolve finds the path to git on the first git call.
 type Options struct {
 	LockTimeout time.Duration
 	GitBin      string
 	Log         *slog.Logger
-	Now         func() time.Time // часы; nil - time.Now
+	Now         func() time.Time // clock; nil - time.Now
 }
 
-// Result - ответ операции записи. Warning: коммит упал, правка в файле.
-// Info - хвост строки ok ("todo > doing  @claude until 20:40").
+// Result - the reply of a write operation. Warning: the commit failed, the edit is in the file.
+// Info - the tail of the ok line ("todo > doing  @claude until 20:40").
 type Result struct{ ID, Rev, Commit, Warning, Info string }
 
-// Store - открытая база задач.
+// Store - an open task store.
 type Store struct {
 	cfg  *config.Config
 	root string
@@ -79,8 +79,8 @@ type Store struct {
 	log  *slog.Logger
 	now  func() time.Time
 
-	// afterRead - шов для тестов: вызывается между чтением файла и сверкой перед rename
-	// (шаг 4 из 2.1). В работе nil.
+	// afterRead - a test seam: called between the file read and the check before rename
+	// (step 4 of 2.1). nil in production.
 	afterRead func(path string, attempt int)
 
 	gitOnce sync.Once
@@ -88,8 +88,8 @@ type Store struct {
 	gitErr  error
 }
 
-// Open открывает базу в root и читает конфиг. Ничего не создаёт: пустой или
-// несуществующий root - пустая база. Единственная правка - миграция .tracker в .tix.
+// Open opens the store at root and reads the config. Creates nothing: an empty or
+// nonexistent root is an empty store. The only edit is the migration of .tracker to .tix.
 func Open(root string, o Options) (*Store, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
@@ -115,10 +115,10 @@ func Open(root string, o Options) (*Store, error) {
 	return s, nil
 }
 
-// Config возвращает конфиг базы.
+// Config returns the store config.
 func (s *Store) Config() *config.Config { return s.cfg }
 
-// git находит бинарь git один раз на Store.
+// git finds the git binary once per Store.
 func (s *Store) git() (gitx.Repo, error) {
 	s.gitOnce.Do(func() {
 		bin, err := gitx.Resolve(s.bin)
@@ -131,7 +131,7 @@ func (s *Store) git() (gitx.Repo, error) {
 	return s.repo, s.gitErr
 }
 
-// Create создаёт задачу в колонке project/column от имени actor.
+// Create creates a task in column project/column on behalf of actor.
 func (s *Store) Create(title, project, column, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -175,7 +175,7 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 		return Result{}, err
 	}
 	rank := 1.0
-	tasks, _ := s.List() // битые файлы на ранг не влияют
+	tasks, _ := s.List() // broken files do not affect the rank
 	for _, t := range tasks {
 		if t.Rank+1 > rank {
 			rank = t.Rank + 1
@@ -209,7 +209,7 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	return res, nil
 }
 
-// Edit заменяет тело; baseRev - версия, которую читал вызывающий.
+// Edit replaces the body; baseRev - the version the caller read.
 func (s *Store) Edit(id, baseRev, body, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -230,7 +230,7 @@ func (s *Store) Edit(id, baseRev, body, actor string) (Result, error) {
 	})
 }
 
-// Comment дописывает комментарий.
+// Comment appends a comment.
 func (s *Store) Comment(id, text, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -245,7 +245,7 @@ func (s *Store) Comment(id, text, actor string) (Result, error) {
 	})
 }
 
-// Note пишет пустой коммит T-N: note <текст>.
+// Note writes an empty commit T-N: note <text>.
 func (s *Store) Note(id, text, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -265,7 +265,7 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 			return err
 		}
 		res = Result{ID: id}
-		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // путь строит ядро
+		if data, err := os.ReadFile(path); err == nil { //nolint:gosec // the path is built by the core
 			res.Rev = blobID(data)
 		}
 		s.commit(tx, &res, tx.extra, id+": note "+text, actor)
@@ -274,7 +274,7 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 	return res, err
 }
 
-// Remove удаляет задачу.
+// Remove deletes a task.
 func (s *Store) Remove(id, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -289,7 +289,7 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 		if err != nil {
 			return err
 		}
-		// os.Remove, а не gitx.Remove: удаление из индекса пишет коммит операции.
+		// os.Remove, not gitx.Remove: removal from the index writes the operation commit.
 		if err := os.Remove(path); err != nil {
 			return fmt.Errorf("remove %s: %w", path, err)
 		}
@@ -301,20 +301,20 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 	return res, err
 }
 
-// Get читает задачу и её rev, пишет blob в git (hash-object -w). Отказ git - warn в лог,
-// rev тогда считается в Go (тот же blob id).
+// Get reads a task and its rev, writes the blob to git (hash-object -w). A git refusal is a warn in the log,
+// then rev is computed in Go (the same blob id).
 func (s *Store) Get(id string) (*task.Task, string, error) {
 	t, rev, _, err := s.Show(id)
 	return t, rev, err
 }
 
-// Show - Get плюс файл как прочитан: rev посчитан по этим же байтам.
+// Show - Get plus the file as read: rev is computed over the same bytes.
 func (s *Store) Show(id string) (*task.Task, string, []byte, error) {
 	path, err := s.findPath(id)
 	if err != nil {
 		return nil, "", nil, err
 	}
-	data, err := os.ReadFile(path) //nolint:gosec // путь строит ядро
+	data, err := os.ReadFile(path) //nolint:gosec // the path is built by the core
 	if err != nil {
 		return nil, "", nil, fmt.Errorf("read %s: %w", path, err)
 	}
@@ -334,7 +334,7 @@ func (s *Store) Show(id string) (*task.Task, string, []byte, error) {
 	return t, rev, data, nil
 }
 
-// pickColumn проверяет колонку; пустое имя - колонка роли inbox, иначе первая.
+// pickColumn checks the column; an empty name - the inbox role column, else the first.
 func pickColumn(cfg *config.Config, column string) (string, error) {
 	if column != "" {
 		for _, c := range cfg.Columns {
@@ -355,7 +355,7 @@ func pickColumn(cfg *config.Config, column string) (string, error) {
 	return cfg.Columns[0].Name, nil
 }
 
-// checkActor подставляет unknown и отклоняет символы, ломающие маркер комментария.
+// checkActor substitutes unknown and rejects characters that break the comment marker.
 func checkActor(actor string) (string, error) {
 	if actor == "" {
 		return unknownActor, nil

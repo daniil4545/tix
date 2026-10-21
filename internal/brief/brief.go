@@ -1,4 +1,4 @@
-// Package brief собирает вывод `tix ctx`. Без IO.
+// Package brief builds the output of `tix ctx`. No IO.
 package brief
 
 import (
@@ -14,17 +14,17 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// maxLine - длина строки задачи в тексте, руны.
+// maxLine - the length of a task line in the text, in runes.
 const maxLine = 160
 
-// howto - вторая строка ctx: три команды цикла агента.
+// howto - the second line of ctx: the three commands of the agent cycle.
 const howto = "- take: tix take; step: tix note; end: tix set summary="
 
-// ctxRoles - роли колонок в порядке показа.
+// ctxRoles - column roles in display order.
 var ctxRoles = []string{"active", "waiting", "ready"}
 
-// Input - вход Build. PerColumn - сколько задач на колонку до сжатия, Limit - лимит рун
-// текста; 0 снимает ограничение (так собирается JSON).
+// Input - the input of Build. PerColumn - how many tasks per column before compression, Limit - the rune limit
+// of the text; 0 removes the limit (this is how JSON is built).
 type Input struct {
 	Tasks                     []*task.Task
 	Cfg                       *config.Config
@@ -33,7 +33,7 @@ type Input struct {
 	PerColumn, Limit          int
 }
 
-// Row - строка задачи. Detail: summary, "Waiting: ...", "k/n"; свой claim - "@you".
+// Row - a task line. Detail: summary, "Waiting: ...", "k/n"; own claim - "@you".
 type Row struct {
 	ID     string `json:"id"`
 	Title  string `json:"title"`
@@ -41,24 +41,24 @@ type Row struct {
 	Claim  string `json:"claim"`
 }
 
-// Section - колонка с ролью active, waiting или ready; More - сколько задач скрыто.
+// Section - a column with role active, waiting or ready; More - how many tasks are hidden.
 type Section struct {
 	Column string `json:"column"`
 	Rows   []Row  `json:"rows"`
 	More   int    `json:"more"`
 }
 
-// Brief - собранный ctx. В JSON имена полей в нижнем регистре, лимит действует только на текст.
+// Brief - the built ctx. In JSON the field names are lowercase, the limit applies to text only.
 type Brief struct {
 	Project  string    `json:"project"`
 	Rules    string    `json:"rules"`
-	Columns  string    `json:"columns"` // колонки с ролями: RULES.md говорит ролями, на доске имена
+	Columns  string    `json:"columns"` // columns with roles: RULES.md speaks in roles, the board shows names
 	Sections []Section `json:"sections"`
 	Next     string    `json:"next"`
 }
 
-// Build собирает Brief: роли active, waiting, ready; сжатие до Limit. Задачи в Input
-// уже отобраны по проекту. Пустой Project печатается как "all".
+// Build builds a Brief: roles active, waiting, ready; compression down to Limit. The tasks in Input
+// are already selected by project. An empty Project prints as "all".
 func Build(in Input) Brief {
 	b := Brief{Project: in.Project, Rules: in.RulesPath, Columns: in.Cfg.Roles(), Sections: []Section{}}
 	if b.Project == "" {
@@ -86,8 +86,8 @@ func Build(in Input) Brief {
 	return b.fit(in.Limit)
 }
 
-// fit уменьшает число задач на колонку, пока текст не влезет в limit.
-// Меньше одной строки на колонку не бывает: колонка без строк прячет активную задачу.
+// fit reduces the number of tasks per column until the text fits into limit.
+// There is never less than one line per column: a column without lines hides an active task.
 func (b Brief) fit(limit int) Brief {
 	if limit <= 0 {
 		return b
@@ -102,7 +102,7 @@ func (b Brief) fit(limit int) Brief {
 	return b
 }
 
-// shrink возвращает копию, где в каждой колонке не больше per строк.
+// shrink returns a copy where each column has at most per lines.
 func (b Brief) shrink(per int) Brief {
 	out := b
 	out.Sections = make([]Section, len(b.Sections))
@@ -116,7 +116,7 @@ func (b Brief) shrink(per int) Brief {
 	return out
 }
 
-// ranked возвращает задачи колонки по rank, при равенстве по id.
+// ranked returns the column tasks by rank, by id on a tie.
 func ranked(tasks []*task.Task, column string) []*task.Task {
 	var out []*task.Task
 	for _, t := range tasks {
@@ -130,13 +130,13 @@ func ranked(tasks []*task.Task, column string) []*task.Task {
 	return out
 }
 
-// liveClaim возвращает захват, если он не истёк.
+// liveClaim returns the claim if it has not expired.
 func liveClaim(t *task.Task, now time.Time) (task.Claim, bool) {
 	c, ok := t.ClaimInfo()
 	return c, ok && now.Before(c.Until)
 }
 
-// nextID возвращает первую задачу ready без живого чужого захвата.
+// nextID returns the first ready task without a live claim of another actor.
 func nextID(ready []*task.Task, in Input) string {
 	for _, t := range ready {
 		if c, ok := liveClaim(t, in.Now); !ok || c.Actor == in.Actor {
@@ -157,7 +157,7 @@ func makeRow(t *task.Task, role string, in Input) Row {
 	return r
 }
 
-// detail: у waiting - причина, у ready - отмечено/всего, у active - summary.
+// detail: for waiting - the reason, for ready - checked/total, for active - the summary.
 func detail(t *task.Task, role string) string {
 	switch role {
 	case "waiting":
@@ -178,12 +178,12 @@ func detail(t *task.Task, role string) string {
 	return oneLine(t.Summary())
 }
 
-// oneLine склеивает пробелы и переводы строк в один пробел.
+// oneLine collapses spaces and line breaks into one space.
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
 
-// Text печатает Brief строками `tix ctx`.
+// Text prints the Brief as the lines of `tix ctx`.
 func (b Brief) Text() string {
 	head := "project " + b.Project
 	if b.Rules != "" {
@@ -215,8 +215,8 @@ func (b Brief) Text() string {
 	return strings.Join(lines, "\n")
 }
 
-// rowLine печатает "<колонка> id title | detail  claim" не длиннее maxLine рун.
-// Лишнее отрезается от title и detail, claim остаётся.
+// rowLine prints "<column> id title | detail  claim" no longer than maxLine runes.
+// The excess is cut from title and detail, claim stays.
 func rowLine(pad string, r Row) string {
 	tail := ""
 	if r.Claim != "" {

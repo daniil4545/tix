@@ -1,4 +1,4 @@
-// Package config читает и печатает .tix/config.toml.
+// Package config reads and prints .tix/config.toml.
 package config
 
 import (
@@ -14,21 +14,21 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Column - колонка с ролью.
+// Column - a column with a role.
 type Column struct{ Name, Role string }
 
-// Config - содержимое config.toml: колонки и папка=проект.
+// Config - the content of config.toml: columns and folder=project.
 type Config struct {
 	Columns  []Column
 	Projects map[string]string
 }
 
-// roles - пять ролей колонок (спека 2.5).
+// roles - the five column roles (spec 2.5).
 var roles = map[string]bool{"inbox": true, "ready": true, "active": true, "waiting": true, "closed": true}
 
 var reLine = regexp.MustCompile(`^toml: line (\d+)[^:]*: `)
 
-// file - вид config.toml на диске. Чужие разделы (adapters и другие) пропускаются.
+// file - the shape of config.toml on disk. Foreign sections (adapters and others) are skipped.
 type file struct {
 	Column   []fileColumn      `toml:"column"`
 	Projects map[string]string `toml:"projects"`
@@ -39,7 +39,7 @@ type fileColumn struct {
 	Role string `toml:"role,omitempty"`
 }
 
-// Default возвращает конфиг для первой записи.
+// Default returns the config for the first write.
 func Default() *Config {
 	return &Config{
 		Columns: []Column{
@@ -50,9 +50,9 @@ func Default() *Config {
 	}
 }
 
-// Load читает файл. Нет файла - Default. Ошибка несёт путь и строку.
+// Load reads the file. No file - Default. The error carries the path and line.
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // путь задаёт ядро, не ввод
+	data, err := os.ReadFile(path) //nolint:gosec // the core sets the path, not input
 	if errors.Is(err, os.ErrNotExist) {
 		return Default(), nil
 	}
@@ -66,7 +66,7 @@ func Load(path string) (*Config, error) {
 		if errors.As(err, &perr) {
 			line, msg = perr.Position.Line, perr.Message
 		} else if m := reLine.FindStringSubmatch(msg); m != nil {
-			// ошибка типа значения: "toml: line 2 (last key ...): <причина>"
+			// value type error: "toml: line 2 (last key ...): <reason>"
 			line, _ = strconv.Atoi(m[1])
 			msg = msg[len(m[0]):]
 		}
@@ -105,7 +105,7 @@ func build(path, text string, f file) (*Config, error) {
 	return c, nil
 }
 
-// fail строит ошибку со строкой последнего упоминания needle в тексте.
+// fail builds an error with the line of the last mention of needle in the text.
 func fail(path, text, needle, format string, args ...any) error {
 	line := 1
 	for i, ln := range strings.Split(text, "\n") {
@@ -116,7 +116,7 @@ func fail(path, text, needle, format string, args ...any) error {
 	return fmt.Errorf("%s:%d: %s", path, line, fmt.Sprintf(format, args...))
 }
 
-// Render печатает config.toml.
+// Render prints config.toml.
 func (c *Config) Render() []byte {
 	f := file{Projects: c.Projects}
 	for _, col := range c.Columns {
@@ -126,12 +126,12 @@ func (c *Config) Render() []byte {
 	enc := toml.NewEncoder(&b)
 	enc.Indent = ""
 	if err := enc.Encode(f); err != nil {
-		panic(fmt.Sprintf("config: render: %v", err)) // типы файла фиксированы
+		panic(fmt.Sprintf("config: render: %v", err)) // the file types are fixed
 	}
 	return b.Bytes()
 }
 
-// ByRole возвращает первую колонку с ролью role.
+// ByRole returns the first column with role role.
 func (c *Config) ByRole(role string) (Column, bool) {
 	for _, col := range c.Columns {
 		if col.Role == role {
@@ -141,8 +141,8 @@ func (c *Config) ByRole(role string) (Column, bool) {
 	return Column{}, false
 }
 
-// Resolve возвращает имя колонки по имени или по роли: имя колонки важнее роли.
-// Нет ни того, ни другого - name как есть, ошибку даст проверка колонки.
+// Resolve returns a column name by name or by role: the column name wins over the role.
+// Neither found - name as is, the column check gives the error.
 func (c *Config) Resolve(name string) string {
 	if name == "" || slices.ContainsFunc(c.Columns, func(col Column) bool { return col.Name == name }) {
 		return name
@@ -153,7 +153,7 @@ func (c *Config) Resolve(name string) string {
 	return name
 }
 
-// Roles печатает колонки с ролями: "idea=inbox todo=ready ...". Колонки без роли пропущены.
+// Roles prints columns with roles: "idea=inbox todo=ready ...". Columns without a role are skipped.
 func (c *Config) Roles() string {
 	parts := make([]string, 0, len(c.Columns))
 	for _, col := range c.Columns {
@@ -164,7 +164,7 @@ func (c *Config) Roles() string {
 	return strings.Join(parts, " ")
 }
 
-// RoleOf возвращает роль колонки. Пусто: колонки нет или у неё нет роли.
+// RoleOf returns the column role. Empty: no such column or it has no role.
 func (c *Config) RoleOf(column string) string {
 	for _, col := range c.Columns {
 		if col.Name == column {

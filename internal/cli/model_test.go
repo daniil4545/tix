@@ -13,14 +13,14 @@ import (
 	"github.com/daniil4545/tix/internal/cli"
 )
 
-// Модель в истории: docs/plans/mvp-finish.md, раздел 6.
+// The model in history.
 
-// tripwire падает, если кто-то читает stdin.
+// tripwire fails if anyone reads stdin.
 type tripwire struct{ t *testing.T }
 
 func (w tripwire) Read([]byte) (int, error) {
 	w.t.Helper()
-	w.t.Error("stdin прочитан, а флага --hook нет")
+	w.t.Error("stdin was read, but there is no --hook flag")
 	return 0, os.ErrClosed
 }
 
@@ -60,13 +60,13 @@ func TestCtxHook_Stdin_WritesModelOnlyWhenSafe(t *testing.T) {
 			b.extra = map[string]string{"CLAUDE_ENV_FILE": b.envFile()}
 			r := b.tix(c.stdin, "ctx", "--hook")
 			if r.code != 0 {
-				t.Fatalf("ctx --hook %q: код %d, stderr %q", c.stdin, r.code, r.err)
+				t.Fatalf("ctx --hook %q: code %d, stderr %q", c.stdin, r.code, r.err)
 			}
 			if got := b.envFileText(); got != c.want {
-				t.Errorf("CLAUDE_ENV_FILE после %q = %q, ждали %q", c.stdin, got, c.want)
+				t.Errorf("CLAUDE_ENV_FILE after %q = %q, want %q", c.stdin, got, c.want)
 			}
 			if !strings.Contains(r.out, msgNoTasks) {
-				t.Errorf("ctx --hook не напечатал обычный ctx: %q", r.out)
+				t.Errorf("ctx --hook did not print the plain ctx: %q", r.out)
 			}
 		})
 	}
@@ -81,7 +81,7 @@ func TestCtxHook_Repeated_AppendsToExistingFile(t *testing.T) {
 	b.ok(`{"model":"m1"}`, "ctx", "--hook")
 	b.ok(`{"model":"m2"}`, "ctx", "--hook")
 	if got, want := b.envFileText(), "export A=1\nexport TIX_MODEL='m1'\nexport TIX_MODEL='m2'\n"; got != want {
-		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
+		t.Errorf("CLAUDE_ENV_FILE = %q, want %q", got, want)
 	}
 }
 
@@ -89,10 +89,10 @@ func TestCtxHook_NoEnvFile_PrintsCtxWithoutWriting(t *testing.T) {
 	b := newBox(t)
 	r := b.ok(`{"model":"m1"}`, "ctx", "--hook")
 	if !strings.Contains(r.out, msgNoTasks) {
-		t.Errorf("вывод ctx = %q", r.out)
+		t.Errorf("ctx output = %q", r.out)
 	}
 	if got := b.envFileText(); got != "" {
-		t.Errorf("файл создан без CLAUDE_ENV_FILE: %q", got)
+		t.Errorf("file created without CLAUDE_ENV_FILE: %q", got)
 	}
 }
 
@@ -107,10 +107,10 @@ func TestCtx_WithoutHook_DoesNotReadStdin(t *testing.T) {
 		Getenv: func(k string) string { return vars[k] },
 	})
 	if code != 0 {
-		t.Fatalf("ctx без --hook: код %d, stderr %q", code, e.String())
+		t.Fatalf("ctx without --hook: code %d, stderr %q", code, e.String())
 	}
 	if got := b.envFileText(); got != "" {
-		t.Errorf("ctx без --hook записал env-файл: %q", got)
+		t.Errorf("ctx without --hook wrote the env file: %q", got)
 	}
 }
 
@@ -132,10 +132,10 @@ func TestCommit_ModelTrailer(t *testing.T) {
 			msg := b.git("log", "-1", "--format=%B")
 			has := strings.Contains(msg, "\nModel: "+c.model+"\n") || strings.HasPrefix(msg, "Model: "+c.model)
 			if c.want && !has {
-				t.Errorf("в коммите нет трейлера Model: %s\n%s", c.model, msg)
+				t.Errorf("commit has no Model trailer: %s\n%s", c.model, msg)
 			}
 			if !c.want && strings.Contains(msg, "Model:") {
-				t.Errorf("трейлер Model не должен писаться при %q:\n%s", c.model, msg)
+				t.Errorf("Model trailer must not be written for %q:\n%s", c.model, msg)
 			}
 		})
 	}
@@ -148,10 +148,10 @@ func TestCtxHook_StdinNeverClosed_PrintsCtxWithoutModel(t *testing.T) {
 	b := newBox(t)
 	r := runWith(t, b, pr, "ctx", "--hook")
 	if r.code != 0 || !strings.Contains(r.out, msgNoTasks) {
-		t.Fatalf("ctx --hook с незакрытым stdin: код %d, out %q, err %q", r.code, r.out, r.err)
+		t.Fatalf("ctx --hook with unclosed stdin: code %d, out %q, err %q", r.code, r.out, r.err)
 	}
 	if got := b.envFileText(); got != "" {
-		t.Errorf("модель записана без ввода: %q", got)
+		t.Errorf("model written without input: %q", got)
 	}
 }
 
@@ -163,10 +163,10 @@ func TestCtxHook_StdinNeverClosed_CompleteObjectStillRead(t *testing.T) {
 	b := newBox(t)
 	r := runWith(t, b, pr, "ctx", "--hook")
 	if r.code != 0 {
-		t.Fatalf("код %d, err %q", r.code, r.err)
+		t.Fatalf("code %d, err %q", r.code, r.err)
 	}
 	if got, want := b.envFileText(), "export TIX_MODEL='m1'\n"; got != want {
-		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
+		t.Errorf("CLAUDE_ENV_FILE = %q, want %q", got, want)
 	}
 }
 
@@ -178,11 +178,11 @@ func TestCtxHook_EnvFileWithoutFinalNewline_KeepsForeignLine(t *testing.T) {
 	}
 	b.ok(`{"model":"m1"}`, "ctx", "--hook")
 	if got, want := b.envFileText(), "export A=1\nexport TIX_MODEL='m1'\n"; got != want {
-		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
+		t.Errorf("CLAUDE_ENV_FILE = %q, want %q", got, want)
 	}
 }
 
-// runWith запускает tix с произвольным stdin и CLAUDE_ENV_FILE.
+// runWith runs tix with arbitrary stdin and CLAUDE_ENV_FILE.
 func runWith(t *testing.T, b *box, stdin io.Reader, args ...string) res {
 	t.Helper()
 	var o, e bytes.Buffer

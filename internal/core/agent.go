@@ -16,7 +16,7 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// Ошибки рабочего цикла агента.
+// Errors of the agent cycle.
 var (
 	ErrClaimed    = errors.New("claimed by another actor")
 	ErrNoIdentity = errors.New("no identity")
@@ -24,7 +24,7 @@ var (
 	ErrNoRemote   = errors.New("no remote")
 )
 
-// kindErr - ошибка с готовым текстом ответа; errors.Is находит в ней kind.
+// kindErr - an error with a ready reply text; errors.Is finds kind in it.
 type kindErr struct {
 	kind error
 	msg  string
@@ -37,30 +37,30 @@ func rule(format string, args ...any) error {
 	return &kindErr{kind: ErrRule, msg: fmt.Sprintf(format, args...)}
 }
 
-// TakeMode - режим Take.
+// TakeMode - the mode of Take.
 type TakeMode int
 
-// Режимы Take.
+// Take modes.
 const (
 	Take TakeMode = iota
 	Steal
 	Release
 )
 
-// Place - позиция в колонке: First - в начало, After - после задачи; пусто - в конец.
+// Place - the position in a column: First - to the start, After - after a task; empty - to the end.
 type Place struct {
 	First bool
 	After string
 }
 
-// MoveOpts - параметры Move. Message - значение -m, Force - закрыть с неотмеченными.
+// MoveOpts - parameters of Move. Message - the value of -m, Force - close with unchecked criteria.
 type MoveOpts struct {
 	Place   Place
 	Message string
 	Force   bool
 }
 
-// Field - пара имя-значение для Set.
+// Field - a name-value pair for Set.
 type Field struct{ Name, Value string }
 
 const (
@@ -72,7 +72,7 @@ const (
 	allowedFields = "title waiting due tags ask external abstract summary"
 )
 
-// loadConfig читает config.toml заново: под локом конфиг мог измениться рукой.
+// loadConfig reads config.toml again: under the lock the config could have been changed by hand.
 func (s *Store) loadConfig() (*config.Config, error) {
 	return config.Load(filepath.Join(s.root, tixDir, configFile))
 }
@@ -82,7 +82,7 @@ func (s *Store) claimed(id string, c task.Claim) error {
 		ident.Short(c.Actor), c.Until.Format("15:04"), id)}
 }
 
-// Take берёт задачу, отдаёт или перехватывает claim. actor "" или "unknown": ErrNoIdentity.
+// Take takes a task, hands out or steals a claim. actor "" or "unknown": ErrNoIdentity.
 func (s *Store) Take(id string, mode TakeMode, actor string) (Result, error) {
 	if actor == "" || actor == unknownActor {
 		return Result{}, fmt.Errorf("%w; pass --as agent:id", ErrNoIdentity)
@@ -164,7 +164,7 @@ func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool,
 	return fmt.Sprintf("%s  @%s until %s", transition(from, active.Name), ident.Short(c.Actor), c.Until.Format("15:04")), nil
 }
 
-// transition печатает "from > to"; перенос в ту же колонку - просто её имя.
+// transition prints "from > to"; a move into the same column is just its name.
 func transition(from, to string) string {
 	if from == to {
 		return to
@@ -172,7 +172,7 @@ func transition(from, to string) string {
 	return from + " > " + to
 }
 
-// Move переносит задачу в колонку по правилам ролей.
+// Move moves a task into a column by the role rules.
 func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -226,7 +226,7 @@ func (s *Store) move(tx *txEnv, t *task.Task, cfg *config.Config, column string,
 	return transition(from, column), nil
 }
 
-// moveRoles проверяет, что обе колонки есть и с ролью, и что -m уместен.
+// moveRoles checks that both columns exist and have a role, and that -m is appropriate.
 func moveRoles(cfg *config.Config, from, column, msg string) (fromRole, toRole string, err error) {
 	if !slices.ContainsFunc(cfg.Columns, func(c config.Column) bool { return c.Name == column }) {
 		return "", "", rule("unknown column %q; columns: %s", column, cfg.Roles())
@@ -243,7 +243,7 @@ func moveRoles(cfg *config.Config, from, column, msg string) (fromRole, toRole s
 	return cfg.RoleOf(from), toRole, nil
 }
 
-// leave применяет переход между разными колонками: проверки входа, поля и claim.
+// leave applies a transition between different columns: entry checks, fields and claim.
 func (s *Store) leave(t *task.Task, fromRole, toRole, msg string, o MoveOpts, actor string, op *opInfo) error {
 	forced, err := s.enter(t, toRole, msg, o, actor)
 	if err != nil {
@@ -266,8 +266,8 @@ func (s *Store) leave(t *task.Task, fromRole, toRole, msg string, o MoveOpts, ac
 	return nil
 }
 
-// enter проверяет вход в колонку роли toRole и пишет её поля (waiting, комментарий Result).
-// forced: закрытие обошло неотмеченные критерии.
+// enter checks the entry into a column of role toRole and writes its fields (waiting, the Result comment).
+// forced: the closing bypassed unchecked criteria.
 func (s *Store) enter(t *task.Task, toRole, msg string, o MoveOpts, actor string) (bool, error) {
 	switch toRole {
 	case roleReady:
@@ -294,7 +294,7 @@ func (s *Store) enter(t *task.Task, toRole, msg string, o MoveOpts, actor string
 	return false, nil
 }
 
-// closeChecks - проверки закрытия (спека 2.5). forced: неотмеченные обойдены через --force.
+// closeChecks - closing checks. forced: unchecked criteria bypassed through --force.
 func closeChecks(t *task.Task, msg string, force bool) (bool, error) {
 	if force && msg == "" {
 		return false, rule("--force needs -m result")
@@ -322,7 +322,7 @@ func closeChecks(t *task.Task, msg string, force bool) (bool, error) {
 	return true, nil
 }
 
-// Set меняет поля задачи.
+// Set changes task fields.
 func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -383,7 +383,7 @@ func setField(t *task.Task, role string, f Field) error {
 	return t.SetField(f.Name, f.Value)
 }
 
-// Check отмечает критерии с номерами nums.
+// Check marks criteria with numbers nums.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -416,7 +416,7 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	return res, err
 }
 
-// Backup коммитит чужие правки под локом и отправляет HEAD в origin без лока.
+// Backup commits foreign edits under the lock and sends HEAD to origin without the lock.
 func (s *Store) Backup(ctx context.Context) (Result, error) {
 	err := s.withLock(false, func(tx *txEnv) error {
 		if err := s.syncExternal(tx); err != nil {

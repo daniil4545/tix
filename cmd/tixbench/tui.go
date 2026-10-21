@@ -5,10 +5,10 @@ import (
 	"strings"
 )
 
-// tuiOneshotEnv: tix без аргументов рисует первый кадр доски в stdout и выходит (замер без терминала).
+// tuiOneshotEnv: tix without arguments draws the first board frame to stdout and exits (a measurement without a terminal).
 const tuiOneshotEnv = "TIX_TUI_ONESHOT=1"
 
-// tuiBenches - замер открытия доски: цель раздела 7 плана З4, до 100 мс на 1000 задач.
+// tuiBenches - the board open measurement: the goal is up to 100 ms on 1000 tasks.
 func tuiBenches() []bench {
 	return []bench{{
 		name: "tui open", targetMS: 100, env: []string{tuiOneshotEnv},

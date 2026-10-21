@@ -1,4 +1,4 @@
-// Package actor - личность автора записи: разбор источников и проверка имени.
+// Package actor - identity of a record author: source parsing and name validation.
 package actor
 
 import (
@@ -8,15 +8,15 @@ import (
 	"unicode"
 )
 
-// Unknown - имя записи, когда личность не найдена.
+// Unknown - the record name when no identity is found.
 const Unknown = "unknown"
 
-// shortID - сколько знаков id остаётся в Short.
+// shortID - how many id characters Short keeps.
 const shortID = 8
 
-// Resolve определяет личность по порядку 2.4 спеки: флаг, окружение агента,
-// TIX_ACTOR. Формы агента: "claude:<id>", "codex:<id>". known=false: личность
-// не найдена, name равен "unknown".
+// Resolve determines the identity in the order of spec 2.4: flag, agent environment,
+// TIX_ACTOR. Agent forms: "claude:<id>", "codex:<id>". known=false: no identity
+// found, name equals "unknown".
 func Resolve(flag string, getenv func(string) string) (name string, known bool) {
 	switch {
 	case flag != "":
@@ -34,8 +34,8 @@ func Resolve(flag string, getenv func(string) string) (name string, known bool) 
 	return name, true
 }
 
-// Valid проверяет введённое имя (`--as`, `TIX_ACTOR`): без пробелов, `|`, `-->`
-// и переводов строки. `unknown` допустим.
+// Valid checks an entered name (`--as`, `TIX_ACTOR`): no spaces, `|`, `-->`
+// or line breaks. `unknown` is allowed.
 func Valid(name string) error {
 	if name == "" {
 		return errors.New("actor name is empty")
@@ -51,20 +51,20 @@ func Valid(name string) error {
 	return nil
 }
 
-// maxModel - предел длины имени модели.
+// maxModel - the limit on model name length.
 const maxModel = 100
 
-// modelRe - допустимые знаки имени модели. Значение уходит в `export` для shell и в
-// трейлер коммита: кавычки, пробелы, точка с запятой, $, обратный апостроф и переводы строк не проходят.
+// modelRe - allowed characters of a model name. The value goes to `export` for the shell and to
+// the commit trailer: quotes, spaces, semicolons, $, backticks and line breaks do not pass.
 var modelRe = regexp.MustCompile(`^[A-Za-z0-9._:/\[\]-]+$`)
 
-// ValidModel проверяет имя модели для трейлера Model и для CLAUDE_ENV_FILE.
+// ValidModel checks the model name for the Model trailer and for CLAUDE_ENV_FILE.
 func ValidModel(name string) bool {
 	return len(name) <= maxModel && modelRe.MatchString(name)
 }
 
-// Short сокращает имя до "kind:" и 8 знаков id. У id с префиксом "ses_" (OpenCode) префикс
-// отбрасывается и берутся последние 8 знаков: начало id у сессий почти совпадает.
+// Short shortens the name to "kind:" and 8 id characters. For an id with the "ses_" prefix (OpenCode) the prefix
+// is dropped and the last 8 characters are taken: the starts of session ids almost coincide.
 func Short(name string) string {
 	kind, id, ok := strings.Cut(name, ":")
 	if !ok {

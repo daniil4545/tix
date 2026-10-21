@@ -14,18 +14,18 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// queueSize - ёмкость очереди записи; полная очередь отвечает queue full (Р44).
+// queueSize - the write queue capacity; a full queue answers queue full (D44).
 const queueSize = 16
 
 var errQueueFull = errors.New("queue full")
 
-// job - одна запись в ядро. reply получает результат от work.
+// job - one write to the core. reply gets the result from work.
 type job struct {
 	run   func() (core.Result, error)
 	reply chan opDone
 }
 
-// opDone - итог записи. edit не nil, если запись шла из редактора.
+// opDone - the write outcome. edit is not nil if the write came from the editor.
 type opDone struct {
 	id    string
 	label string
@@ -34,8 +34,8 @@ type opDone struct {
 	edit  *editSession
 }
 
-// work - единственный писатель в ядро: операции идут по одной в порядке нажатий.
-// Горутину запускает New, она живёт до конца ctx.
+// work - the only writer to the core: operations go one by one in key press order.
+// New starts the goroutine, it lives until ctx ends.
 func (m *Model) work() {
 	for {
 		select {
@@ -58,8 +58,8 @@ func (m *Model) runJob(run func() (core.Result, error)) (out opDone) {
 	return opDone{res: res, err: err}
 }
 
-// submit ставит запись в очередь; экран не ждёт лок ядра. label - текст успеха, если ядро
-// не вернуло своего.
+// submit queues a write; the screen does not wait for the core lock. label - the success text if the core
+// did not return its own.
 func (m *Model) submit(id, label string, edit *editSession, run func() (core.Result, error)) tea.Cmd {
 	return func() tea.Msg {
 		reply := make(chan opDone, 1)
@@ -78,7 +78,7 @@ func (m *Model) submit(id, label string, edit *editSession, run func() (core.Res
 	}
 }
 
-// opResult показывает итог записи и перечитывает доску.
+// opResult shows the write outcome and rereads the board.
 func (m *Model) opResult(msg opDone) tea.Cmd {
 	if msg.edit != nil {
 		return m.editResult(msg)
@@ -100,7 +100,7 @@ func (m *Model) report(msg opDone) {
 	}
 }
 
-// errText - короткий текст ошибки ядра для строки состояния.
+// errText - a short core error text for the status line.
 func errText(err error) string {
 	switch {
 	case errors.Is(err, core.ErrLocked):
@@ -116,7 +116,7 @@ func firstLine(s string) string {
 	return line
 }
 
-// checkStatus отказывает, если задачу перенесли, пока была открыта строка ввода.
+// checkStatus refuses if the task was moved while the input line was open.
 func (m *Model) checkStatus(id, status string) error {
 	cur, _, err := m.d.Store.Get(id)
 	if err != nil {
@@ -128,9 +128,9 @@ func (m *Model) checkStatus(id, status string) error {
 	return nil
 }
 
-// moveTo переносит задачу в колонку target одной записью Move; opts.Place - место в колонке.
-// В waiting и closed ядро требует причину, её спрашивает строка ввода; перестановка внутри
-// колонки причины не требует. Общий шаг для перетаскивания и захвата.
+// moveTo moves the task to column target with one Move write; opts.Place - the place in the column.
+// For waiting and closed the core requires a reason, the input line asks for it; a reorder inside
+// a column needs no reason. A shared step for drag and grab.
 func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd {
 	if !m.configured(t.Status) {
 		m.setStatus(t.ID+": column "+t.Status+" is not in config", true)
@@ -178,7 +178,7 @@ func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd 
 	return move(opts)
 }
 
-// reorder сдвигает текущую задачу в своей колонке: dir 1 вниз, -1 вверх. На краю - ничего.
+// reorder moves the current task in its column: dir 1 down, -1 up. At the edge - nothing.
 func (m *Model) reorder(dir int) tea.Cmd {
 	t := m.selected()
 	if t == nil {
@@ -205,7 +205,7 @@ func (m *Model) reorder(dir int) tea.Cmd {
 	})
 }
 
-// startComment спрашивает текст и пишет комментарий от имени человека.
+// startComment asks for the text and writes a comment as a human.
 func (m *Model) startComment() tea.Cmd {
 	t := m.current()
 	if t == nil {
@@ -219,7 +219,7 @@ func (m *Model) startComment() tea.Cmd {
 	return nil
 }
 
-// countCriteria возвращает число критериев и неотмеченных среди них.
+// countCriteria returns the number of criteria and unchecked ones among them.
 func countCriteria(t *task.Task) (total, open int) {
 	for _, c := range t.Criteria() {
 		total++

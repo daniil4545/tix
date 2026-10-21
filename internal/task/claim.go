@@ -5,19 +5,19 @@ import (
 	"time"
 )
 
-// claimLayout - срок захвата в файле: локальное время до минут.
+// claimLayout - the claim deadline in the file: local time down to minutes.
 const claimLayout = "2006-01-02T15:04"
 
-// claimSep отделяет актора от срока в поле claim.
+// claimSep separates the actor from the deadline in the claim field.
 const claimSep = " until "
 
-// Claim - захват задачи: кто и до какого времени.
+// Claim - a task claim: who and until when.
 type Claim struct {
 	Actor string
 	Until time.Time
 }
 
-// ClaimInfo разбирает поле claim "<actor> until 2006-01-02T15:04". Пусто или битое: false.
+// ClaimInfo parses the claim field "<actor> until 2006-01-02T15:04". Empty or broken: false.
 func (t *Task) ClaimInfo() (Claim, bool) {
 	i := strings.LastIndex(t.Claim, claimSep)
 	if i <= 0 {
@@ -30,12 +30,12 @@ func (t *Task) ClaimInfo() (Claim, bool) {
 	return Claim{Actor: t.Claim[:i], Until: until}, true
 }
 
-// SetClaim пишет поле claim.
+// SetClaim writes the claim field.
 func (t *Task) SetClaim(c Claim) {
 	t.Claim = c.Actor + claimSep + c.Until.In(time.Local).Format(claimLayout)
 }
 
-// ClearClaim очищает поле claim.
+// ClearClaim clears the claim field.
 func (t *Task) ClearClaim() {
 	t.Claim = ""
 }

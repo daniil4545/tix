@@ -11,20 +11,20 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// doubleClick - окно второго клика по той же карточке (часы модели).
+// doubleClick - the window of the second click on the same card (the model clock).
 const doubleClick = 400 * time.Millisecond
 
-// press - нажатие левой кнопки на карточке: id задачи, запомненный при нажатии.
+// press - a left button press on a card: the task id remembered at the press.
 type press struct{ id string }
 
-// click - последний клик по карточке для двойного клика.
+// click - the last click on a card, for the double click.
 type click struct {
 	id string
 	at time.Time
 }
 
-// mouse разбирает мышь. Режим мыши включён на доске и в карточке (View). При строке ввода
-// левый клик уходит в inputClick, остальное игнорируется; при захвате мышь игнорируется.
+// mouse handles the mouse. Mouse mode is on in the board and in the card (View). With an input line
+// a left click goes to inputClick, the rest is ignored; during a grab the mouse is ignored.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	if m.input != nil {
@@ -44,7 +44,7 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 			return m.mouseClick(mouse)
 		}
 	case tea.MouseReleaseMsg:
-		// X10 сообщает отпускание без кнопки; правая и средняя не переносят.
+		// X10 reports a release without a button; right and middle do not drag.
 		if mouse.Button == tea.MouseLeft || mouse.Button == tea.MouseNone {
 			return m.mouseRelease(mouse)
 		}
@@ -54,14 +54,14 @@ func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	return nil
 }
 
-// layout - доска так, как она нарисована сейчас: по ней считается попадание.
+// layout - the board as drawn right now: hit testing is computed from it.
 func (m *Model) layout() view.Board {
 	b := m.board
 	b.W, b.H = m.w, m.h
 	return b
 }
 
-// selectAt ставит курсор на карточку (col, row) доски.
+// selectAt puts the cursor on the card (col, row) of the board.
 func (m *Model) selectAt(col, row int) {
 	m.board.Col, m.board.Row = col, row
 	m.clampRow()
@@ -69,9 +69,9 @@ func (m *Model) selectAt(col, row int) {
 	m.fitWindow()
 }
 
-// mouseClick: клик по карточке выбирает её; второй за doubleClick по той же задаче открывает.
-// Нажатие запоминается для переноса. Кнопка подсказки равна клавише, "+" в имени колонки -
-// новая задача в ней. Клик мимо карточек - ничего; в карточке задачи - cardClick.
+// mouseClick: a click on a card selects it; a second one within doubleClick on the same task opens it.
+// The press is remembered for a drag. A hint button equals its key, "+" in a column name -
+// a new task in it. A click off the cards does nothing; in a task card - cardClick.
 func (m *Model) mouseClick(e tea.Mouse) tea.Cmd {
 	m.press = nil
 	if m.showing {
@@ -105,8 +105,8 @@ func (m *Model) mouseClick(e tea.Mouse) tea.Cmd {
 	return nil
 }
 
-// mouseRelease переносит задачу, нажатую мышью, в колонку под курсором: через тот же moveTo,
-// что у клавиши m (проверки, строка причины). Над той же колонкой и вне колонок - ничего.
+// mouseRelease moves the task pressed by the mouse to the column under the cursor: through the same moveTo
+// as the m key (checks, the reason line). Over the same column and outside columns - nothing.
 func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	p := m.press
 	m.press = nil
@@ -124,7 +124,7 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 		return nil
 	}
 	target := m.board.Cols[hit.Col].Name
-	// Отпускание над своей колонкой - вторая половина клика: память о клике остаётся для двойного.
+	// A release over its own column is the second half of a click: the click memory stays for a double click.
 	if target == t.Status || (target == unknownColumn && !m.configured(t.Status)) {
 		return nil
 	}
@@ -136,12 +136,12 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	return m.moveTo(t, target, core.MoveOpts{})
 }
 
-// configured: колонка описана в config.toml.
+// configured: the column is described in config.toml.
 func (m *Model) configured(name string) bool {
 	return slices.ContainsFunc(m.cfg.Columns, func(c config.Column) bool { return c.Name == name })
 }
 
-// selectTask ставит курсор на задачу id; false, если на доске её нет (фильтр проекта).
+// selectTask puts the cursor on task id; false if it is not on the board (project filter).
 func (m *Model) selectTask(id string) bool {
 	for c, ts := range m.colTasks {
 		for r, t := range ts {
@@ -154,8 +154,8 @@ func (m *Model) selectTask(id string) bool {
 	return false
 }
 
-// mouseWheel: в карточке задачи - шаг по истории, как j и k; на доске - выбор колонки под
-// курсором (как h и l до неё), затем шаг на одну карточку, как j и k.
+// mouseWheel: in a task card - a step over history, like j and k; on the board - choose the column under
+// the cursor (as h and l before it), then a step by one card, like j and k.
 func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	var dir int
 	switch e.Button {

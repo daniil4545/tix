@@ -1,4 +1,4 @@
-// Package cli разбирает команды tix и печатает ответ.
+// Package cli parses tix commands and prints the reply.
 package cli
 
 import (
@@ -18,7 +18,7 @@ import (
 	"github.com/daniil4545/tix/internal/project"
 )
 
-// Env - окружение запуска: потоки, переменные, рабочая папка.
+// Env - the run environment: streams, variables, working folder.
 type Env struct {
 	Stdin          io.Reader
 	Stdout, Stderr io.Writer
@@ -33,7 +33,7 @@ const (
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
-// Коды выхода раздела 5 плана З2.
+// Exit codes.
 const (
 	exitOther    = 1
 	exitBusy     = 2
@@ -45,20 +45,20 @@ const (
 
 var idPattern = regexp.MustCompile(`^T-[0-9]+$`)
 
-// inputError - неверный ввод: флаг, id, число аргументов. Код выхода 6.
+// inputError - invalid input: flag, id, argument count. Exit code 6.
 type inputError struct{ msg string }
 
 func (e *inputError) Error() string { return e.msg }
 
 func inputf(format string, v ...any) error { return &inputError{msg: fmt.Sprintf(format, v...)} }
 
-// ruleError - отказ по правилу вне ядра. Код выхода 5.
+// ruleError - a refusal by a rule outside the core. Exit code 5.
 type ruleError struct{ msg string }
 
 func (e *ruleError) Error() string        { return e.msg }
 func (e *ruleError) Is(target error) bool { return target == core.ErrRule }
 
-// exitCode переводит ошибку в код выхода по errors.Is.
+// exitCode maps an error to an exit code via errors.Is.
 func exitCode(err error) int {
 	var in *inputError
 	switch {
@@ -76,7 +76,7 @@ func exitCode(err error) int {
 	return exitOther
 }
 
-// idError привязывает ошибку к задаче: stderr `err T-12: причина`.
+// idError ties an error to a task: stderr `err T-12: reason`.
 type idError struct {
 	ID  string
 	Err error
@@ -85,17 +85,17 @@ type idError struct {
 func (e *idError) Error() string { return e.Err.Error() }
 func (e *idError) Unwrap() error { return e.Err }
 
-// app - один запуск tix.
+// app - one tix run.
 type app struct {
 	env   Env
 	cmd   string
 	log   *slog.Logger
 	store *core.Store
 	root  string
-	who   string // личность последней записи; пусто, пока команда не разобрала автора
+	who   string // identity of the last write; empty until the command parsed the author
 }
 
-// Run выполняет команду и возвращает код выхода. Ловит панику.
+// Run executes a command and returns the exit code. Catches panics.
 func Run(ctx context.Context, args []string, env Env) (code int) {
 	a := &app{env: env, log: slog.New(slog.DiscardHandler)}
 	defer func() {
@@ -114,7 +114,7 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 	return 0
 }
 
-// writeCmds - команды, после успеха которых агент оставляет адрес своей вкладки (спека 4a).
+// writeCmds - commands after whose success the agent leaves the address of its tab.
 var writeCmds = map[string]bool{
 	"new": true, "edit": true, "comment": true, "note": true, "rm": true,
 	"take": true, "move": true, "set": true, "check": true, "done": true,
@@ -164,17 +164,17 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 	return inputf("unknown command %s; %s", a.cmd, usage)
 }
 
-// out печатает строку ответа в stdout.
+// out prints a reply line to stdout.
 func (a *app) out(format string, v ...any) {
 	_, _ = fmt.Fprintf(a.env.Stdout, format+"\n", v...)
 }
 
-// warn печатает предупреждение в stderr.
+// warn prints a warning to stderr.
 func (a *app) warn(format string, v ...any) {
 	_, _ = fmt.Fprintf(a.env.Stderr, "warn "+format+"\n", v...)
 }
 
-// fail печатает `err [id: ]причина` без вывода git и пишет в лог.
+// fail prints `err [id: ]reason` without git output and writes to the log.
 func (a *app) fail(err error) {
 	reason := firstLine(err.Error())
 	var ie *idError
@@ -192,10 +192,10 @@ func firstLine(s string) string {
 	return line
 }
 
-// rootDir: TIX_HOME, иначе ~/tasks.
+// rootDir: TIX_HOME, else ~/tasks.
 func (a *app) rootDir() (string, error) { return rootDir(a.env) }
 
-// open открывает базу; лог пишется в .tix/log, если папка уже есть.
+// open opens the store; the log goes to .tix/log if the folder exists.
 func (a *app) open() error {
 	store, log, root, _, err := OpenStore(a.env)
 	if log != nil {
@@ -206,12 +206,12 @@ func (a *app) open() error {
 	return err
 }
 
-// detectProject возвращает проект рабочей папки, если она внутри проекта.
+// detectProject returns the project of the working folder if it is inside a project.
 func (a *app) detectProject() (string, bool) {
 	return project.Detect(a.env.Cwd, a.root, a.store.Config())
 }
 
-// normID разворачивает короткий id: `12` равно `T-12` (Р48).
+// normID expands a short id: `12` equals `T-12` (D48).
 func normID(s string) (string, error) {
 	if s != "" && strings.Trim(s, "0123456789") == "" {
 		s = "T-" + s
@@ -222,7 +222,7 @@ func normID(s string) (string, error) {
 	return s, nil
 }
 
-// taskID проверяет номер задачи в первом аргументе.
+// taskID checks the task number in the first argument.
 func taskID(args []string) (string, error) {
 	if len(args) == 0 {
 		return "", inputf("task id required, for example T-12")
@@ -230,8 +230,8 @@ func taskID(args []string) (string, error) {
 	return normID(args[0])
 }
 
-// lazyLog открывает .tix/log при первой записи и только если папка есть:
-// писать лог не должно создавать базу.
+// lazyLog opens .tix/log on first write and only if the folder exists:
+// writing the log must not create the store.
 type lazyLog struct {
 	dir  string
 	file *os.File
@@ -239,14 +239,14 @@ type lazyLog struct {
 
 func (l *lazyLog) Write(p []byte) (int, error) {
 	if l.file == nil {
-		// Путь задаёт владелец через TIX_HOME: обхода границы доверия нет.
+		// The path is set by the owner via TIX_HOME: no trust boundary is crossed.
 		info, err := os.Stat(l.dir) //nolint:gosec
 		if err != nil || !info.IsDir() {
 			return len(p), nil
 		}
 		f, err := os.OpenFile(filepath.Join(l.dir, "log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec
 		if err != nil {
-			return len(p), nil //nolint:nilerr // лог не должен ронять команду
+			return len(p), nil //nolint:nilerr // the log must not fail the command
 		}
 		l.file = f
 	}

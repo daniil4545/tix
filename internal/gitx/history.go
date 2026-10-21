@@ -7,29 +7,29 @@ import (
 	"time"
 )
 
-// logLimit - потолок числа коммитов одной задачи: без -n git читает всю историю,
-// на 100 тыс. коммитов это секунды (docs/api/git.md, раздел 5).
+// logLimit - the ceiling on the number of commits of one task: without -n git reads the whole history,
+// at 100 thousand commits that takes seconds (docs/api/git.md, section 5).
 const logLimit = 500
 
-// logRecordFields - число полей записи log: хеш, время автора, тема, значение трейлера Actor.
+// logRecordFields - the number of log record fields: hash, author time, subject, the value of the Actor trailer.
 const logRecordFields = 4
 
-// noteLimit - сколько последних коммитов просматривает Notes: пульс доски читает их одним вызовом git.
+// noteLimit - how many latest commits Notes scans: the board pulse reads them with one git call.
 const noteLimit = 300
 
-// logIDRe - id задачи для --grep: без метасимволов регулярного выражения.
+// logIDRe - a task id for --grep: without regular expression metacharacters.
 var logIDRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
 
-// noteSubjectRe - тема коммита note: "<id>: note <текст>".
+// noteSubjectRe - the subject of a note commit: "<id>: note <text>".
 var noteSubjectRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9]*-[0-9]+): note (.+)$`)
 
-// Note - последняя заметка задачи: время автора и текст.
+// Note - the latest note of a task: author time and text.
 type Note struct {
 	At   time.Time
 	Text string
 }
 
-// Commit - запись истории одной задачи: хеш, время автора, тема и значение трейлера Actor.
+// Commit - a history record of one task: hash, author time, subject and the value of the Actor trailer.
 type Commit struct {
 	Hash    string
 	At      time.Time
@@ -37,9 +37,9 @@ type Commit struct {
 	Actor   string
 }
 
-// Log возвращает до logLimit коммитов задачи id от новых к старым; нет коммитов - пусто.
-// Один процесс git: выбор по строке "<id>: " в начале строки сообщения (коммит external edit
-// несёт несколько id), трейлер Actor читает сам git.
+// Log returns up to logLimit commits of task id from new to old; no commits - empty.
+// One git process: selection by the line "<id>: " at the start of a message line (an external edit commit
+// carries several ids), the Actor trailer is read by git itself.
 func (r Repo) Log(id string) ([]Commit, error) {
 	if !logIDRe.MatchString(id) {
 		return nil, fmt.Errorf("git log: bad id %q", id)
@@ -51,7 +51,7 @@ func (r Repo) Log(id string) ([]Commit, error) {
 		return nil, err
 	}
 	if res.code != 0 {
-		// Пустой репозиторий: у ветки нет коммитов, это не отказ.
+		// An empty repository: the branch has no commits, this is not a failure.
 		if strings.Contains(string(res.errOut), "does not have any commits") {
 			return nil, nil
 		}
@@ -60,7 +60,7 @@ func (r Repo) Log(id string) ([]Commit, error) {
 	return parseLog(res.out)
 }
 
-// parseLog разбирает вывод -z: записи через NUL, поля через 0x1f.
+// parseLog parses the -z output: records separated by NUL, fields by 0x1f.
 func parseLog(out []byte) ([]Commit, error) {
 	var commits []Commit
 	for _, rec := range strings.Split(string(out), "\x00") {
@@ -81,14 +81,14 @@ func parseLog(out []byte) ([]Commit, error) {
 	return commits, nil
 }
 
-// firstLine берёт первое значение трейлера: git печатает по строке на значение.
+// firstLine takes the first trailer value: git prints one line per value.
 func firstLine(s string) string {
 	s, _, _ = strings.Cut(strings.TrimSpace(s), "\n")
 	return strings.TrimSpace(s)
 }
 
-// Notes возвращает по id задачи самую новую заметку среди последних noteLimit коммитов note.
-// Один процесс git на все задачи; нет коммитов - пустой результат.
+// Notes returns, by task id, the newest note among the latest noteLimit note commits.
+// One git process for all tasks; no commits - an empty result.
 func (r Repo) Notes() (map[string]Note, error) {
 	res, err := r.run(nil, true, "log", "-n", fmt.Sprint(noteLimit), "-z", "--extended-regexp",
 		"--grep=^[A-Za-z][A-Za-z0-9]*-[0-9]+: note ",
@@ -105,8 +105,8 @@ func (r Repo) Notes() (map[string]Note, error) {
 	return parseNotes(res.out)
 }
 
-// parseNotes разбирает вывод -z от новых к старым: у задачи остаётся первая встреченная заметка.
-// Коммит, выбранный по другой строке сообщения (external edit), темой не подходит и пропускается.
+// parseNotes parses the -z output from new to old: a task keeps the first note it meets.
+// A commit selected by another message line (an external edit) does not match by subject and is skipped.
 func parseNotes(out []byte) (map[string]Note, error) {
 	notes := map[string]Note{}
 	for _, rec := range strings.Split(string(out), "\x00") {

@@ -8,14 +8,14 @@ import (
 	"strings"
 )
 
-// Служебная папка прежнего имени проекта. Имя остаётся только здесь: миграция базы.
+// Service folder of the former project name. The name stays only here: store migration.
 const legacyDir = ".tracker"
 
-// migrateLegacyDir переименовывает .tracker в .tix, если .tix ещё нет, и переводит
-// .gitignore базы на .tix. .gitignore правится первым: оборванный шаг не оставит файлы
-// .tix/lock и .tix/log неигнорируемыми. Гонка двух процессов безопасна: проигравший
-// видит .tix. Обе папки сразу (старый бинарь после миграции) - .tracker не трогается,
-// .gitignore получает недостающие строки .tix. Правки коммитит следующая запись ядра.
+// migrateLegacyDir renames .tracker to .tix if .tix does not exist yet, and moves the store
+// .gitignore to .tix. .gitignore is edited first: an interrupted step will not leave the files
+// .tix/lock and .tix/log unignored. A race of two processes is safe: the loser
+// sees .tix. Both folders at once (an old binary after migration) - .tracker is not touched,
+// .gitignore gets the missing .tix lines. The edits are committed by the next core write.
 func migrateLegacyDir(root string) error {
 	oldDir := filepath.Join(root, legacyDir)
 	newDir := filepath.Join(root, tixDir)
@@ -42,13 +42,13 @@ func migrateLegacyDir(root string) error {
 	return nil
 }
 
-// migrateGitignore дописывает в .gitignore базы недостающие служебные строки .tix/ из
-// gitignore ядра; replace ещё меняет строки .tracker/... и /.tracker/... на .tix. Нет файла -
-// ничего не делает: файл создаст подготовка базы. Временный файл лежит в .tracker/tmp:
-// после переноса это .tix/tmp, его чистит ядро.
+// migrateGitignore appends to the store .gitignore the missing service lines .tix/ from the
+// core gitignore; replace also changes the lines .tracker/... and /.tracker/... to .tix. No file -
+// does nothing: the file will be created by store preparation. The temp file lies in .tracker/tmp:
+// after the move it is .tix/tmp, the core cleans it.
 func migrateGitignore(root string, replace bool) error {
 	path := filepath.Join(root, ".gitignore")
-	data, err := os.ReadFile(path) //nolint:gosec // путь внутри базы, заданной владельцем
+	data, err := os.ReadFile(path) //nolint:gosec // path inside the store, set by the owner
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -99,6 +99,6 @@ func migrateGitignore(root string, replace bool) error {
 		_ = os.Remove(tmp.Name())
 		return fmt.Errorf("migrate %s: %w", path, err)
 	}
-	_ = os.Remove(dir) // пустая папка следа не оставляет; занятую ядро создаст и почистит само
+	_ = os.Remove(dir) // an empty folder leaves no trace; a busy one will be created and cleaned by the core itself
 	return nil
 }

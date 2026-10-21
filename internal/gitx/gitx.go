@@ -1,4 +1,4 @@
-// Package gitx - единственное место с os/exec: вызовы git.
+// Package gitx - the only place with os/exec: git calls.
 package gitx
 
 import (
@@ -17,37 +17,37 @@ import (
 )
 
 const (
-	gitTimeout    = 30 * time.Second // зависший git не держит лок вечно
+	gitTimeout    = 30 * time.Second // a hung git does not hold the lock forever
 	xcrunTimeout  = 10 * time.Second
 	cacheDirName  = "tix"
 	cacheFileName = "git-path"
 )
 
-// revRe - допустимый blob id: защита от опций вместо id в cat-file.
+// revRe - an allowed blob id: protection against options instead of an id in cat-file.
 var revRe = regexp.MustCompile(`^[0-9a-f]{4,64}$`)
 
-// ErrBusy - в .git лежит свежий lock-файл: git другого процесса ещё работает.
+// ErrBusy - a fresh lock file lies in .git: git of another process is still working.
 var ErrBusy = errors.New("git is busy")
 
-// staleLockAge - lock-файл старше этого возраста считается висящим (след убитого git).
+// staleLockAge - a lock file older than this age counts as dangling (a trace of a killed git).
 const staleLockAge = 10 * time.Second
 
-// Error - отказ git. Error() даёт короткую фразу без текста git: она идёт в ответ
-// пользователю. Полный текст stderr - в Stderr и Detail, он идёт только в лог.
+// Error - a git refusal. Error() gives a short phrase without git text: it goes into the answer
+// to the user. The full stderr text is in Stderr and Detail, it goes to the log only.
 type Error struct {
-	Op     string // подкоманда git
-	Code   int    // код выхода, 0 - git не запустился
-	Stderr string // вывод git или текст ошибки запуска
+	Op     string // git subcommand
+	Code   int    // exit code, 0 - git did not start
+	Stderr string // git output or the start error text
 }
 
 func (e *Error) Error() string { return "git " + e.Op + " failed" }
 
-// Detail - полный текст отказа для лога.
+// Detail - the full refusal text for the log.
 func (e *Error) Detail() string {
 	return fmt.Sprintf("git %s: exit %d: %s", e.Op, e.Code, strings.TrimSpace(e.Stderr))
 }
 
-// Detail возвращает текст ошибки для лога: с выводом git, если он в цепочке.
+// Detail returns the error text for the log: with git output, if it is in the chain.
 func Detail(err error) string {
 	var ge *Error
 	if errors.As(err, &ge) {
@@ -56,23 +56,23 @@ func Detail(err error) string {
 	return err.Error()
 }
 
-// Repo - репозиторий задач и путь к бинарю git.
+// Repo - the task repository and the path to the git binary.
 type Repo struct{ Dir, Bin string }
 
-// Change - строка git status: путь и код состояния XY (два знака).
-// Переименование из -z приходит двумя путями: целевой несёт код записи,
-// исходный - код "D ". С --no-renames записи R и C не возникают.
+// Change - a git status line: the path and the XY state code (two characters).
+// A rename from -z comes as two paths: the target carries the write code,
+// the source carries the code "D ". With --no-renames, R and C entries do not appear.
 type Change struct{ Path, Code string }
 
-// result - итог запуска git: вывод и код выхода.
+// result - the outcome of a git run: output and exit code.
 type result struct {
 	out, errOut []byte
 	code        int
 }
 
-// Resolve находит путь к git: override (TIX_GIT), кеш, xcrun на darwin.
-// На darwin /usr/bin/git - заглушка xcode-select (+5,5 мс на вызов), поэтому
-// путь к настоящему git ищется один раз и кешируется в os.UserCacheDir().
+// Resolve finds the path to git: override (TIX_GIT), cache, xcrun on darwin.
+// On darwin /usr/bin/git is an xcode-select stub (+5.5 ms per call), so
+// the path to the real git is looked up once and cached in os.UserCacheDir().
 func Resolve(override string) (string, error) {
 	if override != "" {
 		p, err := exec.LookPath(override)
@@ -114,7 +114,7 @@ func absIfPath(p string) string {
 	return p
 }
 
-// findDarwinGit спрашивает xcrun; нет xcrun или он упал - git из PATH.
+// findDarwinGit asks xcrun; no xcrun or it failed - git from PATH.
 func findDarwinGit() (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), xcrunTimeout)
 	defer cancel()
@@ -136,12 +136,12 @@ func cachePath() string {
 	return filepath.Join(dir, cacheDirName, cacheFileName)
 }
 
-// readCache возвращает путь из кеша, если файл git ещё на месте (ENOENT - заново).
+// readCache returns the path from the cache if the git file is still there (ENOENT - look up again).
 func readCache(cache string) string {
 	if cache == "" {
 		return ""
 	}
-	data, err := os.ReadFile(cache) //nolint:gosec // путь кеша строится из UserCacheDir
+	data, err := os.ReadFile(cache) //nolint:gosec // the cache path is built from UserCacheDir
 	if err != nil {
 		return ""
 	}
@@ -156,11 +156,11 @@ func usable(p string) bool {
 	if p == "" || !filepath.IsAbs(p) {
 		return false
 	}
-	fi, err := os.Stat(p) //nolint:gosec // путь из кеша или xcrun, только проверка
+	fi, err := os.Stat(p) //nolint:gosec // path from the cache or xcrun, check only
 	return err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0
 }
 
-// writeCache пишет кеш через temp и rename; ошибка не критична: путь уже найден.
+// writeCache writes the cache through temp and rename; an error is not critical: the path is already found.
 func writeCache(cache, p string) {
 	if cache == "" {
 		return
@@ -180,8 +180,8 @@ func writeCache(cache, p string) {
 	}
 }
 
-// env возвращает окружение git: без переменных, что перенаправляют репозиторий,
-// и с потолком поиска .git на Dir (без него запись ушла бы в чужой репозиторий выше).
+// env returns the git environment: without the variables that redirect the repository,
+// and with a ceiling for the .git search at Dir (without it a write would go to a foreign repository above).
 func (r Repo) env() []string {
 	skip := []string{"GIT_DIR=", "GIT_WORK_TREE=", "GIT_INDEX_FILE=", "GIT_OBJECT_DIRECTORY=", "GIT_COMMON_DIR=", "GIT_CEILING_DIRECTORIES="}
 	base := os.Environ()
@@ -205,7 +205,7 @@ func (r Repo) env() []string {
 	return env
 }
 
-// command собирает вызов git с флагами 2.1; reader добавляет --no-optional-locks.
+// command builds a git call with the flags of 2.1; reader adds --no-optional-locks.
 func (r Repo) command(ctx context.Context, reader bool, args ...string) *exec.Cmd {
 	full := []string{
 		"-c", "commit.gpgsign=false",
@@ -224,14 +224,14 @@ func (r Repo) command(ctx context.Context, reader bool, args ...string) *exec.Cm
 	if bin == "" {
 		bin = "git"
 	}
-	cmd := exec.CommandContext(ctx, bin, full...) //nolint:gosec // бинарь git задаёт Resolve или TIX_GIT
+	cmd := exec.CommandContext(ctx, bin, full...) //nolint:gosec // the git binary comes from Resolve or TIX_GIT
 	cmd.Dir = r.Dir
 	cmd.Env = r.env()
 	cmd.WaitDelay = 2 * time.Second
 	return cmd
 }
 
-// run запускает git и ждёт до gitTimeout.
+// run runs git and waits up to gitTimeout.
 func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
@@ -254,7 +254,7 @@ func (r Repo) run(stdin []byte, reader bool, args ...string) (result, error) {
 	return res, nil
 }
 
-// must запускает git и считает любой ненулевой код ошибкой.
+// must runs git and treats any non-zero code as an error.
 func (r Repo) must(stdin []byte, reader bool, args ...string) ([]byte, error) {
 	res, err := r.run(stdin, reader, args...)
 	if err != nil {
@@ -266,7 +266,7 @@ func (r Repo) must(stdin []byte, reader bool, args ...string) ([]byte, error) {
 	return res.out, nil
 }
 
-// Init создаёт репозиторий (и папку, если её нет).
+// Init creates a repository (and the folder, if missing).
 func (r Repo) Init() error {
 	if err := os.MkdirAll(r.Dir, 0o750); err != nil {
 		return &Error{Op: "init", Stderr: err.Error()}
@@ -275,7 +275,7 @@ func (r Repo) Init() error {
 	return err
 }
 
-// Status читает изменения: --porcelain -z --untracked-files=all.
+// Status reads changes: --porcelain -z --untracked-files=all.
 func (r Repo) Status() ([]Change, error) {
 	out, err := r.must(nil, true, "status", "--porcelain", "-z", "--untracked-files=all", "--no-renames")
 	if err != nil {
@@ -284,7 +284,7 @@ func (r Repo) Status() ([]Change, error) {
 	return parseStatus(out), nil
 }
 
-// parseStatus разбирает вывод -z: "XY путь\0"; у R и C следом идёт исходный путь.
+// parseStatus parses the -z output: "XY path\0"; R and C are followed by the source path.
 func parseStatus(out []byte) []Change {
 	var changes []Change
 	parts := strings.Split(string(out), "\x00")
@@ -305,14 +305,14 @@ func parseStatus(out []byte) []Change {
 	return changes
 }
 
-// Trailer - строка "Key: Value" в конце сообщения коммита (git commit --trailer).
-// Пустое значение - трейлер не пишется.
+// Trailer - a "Key: Value" line at the end of a commit message (git commit --trailer).
+// An empty value - the trailer is not written.
 type Trailer struct{ Key, Value string }
 
-// trailerKeyRe - ключ трейлера: токен без пробелов и двоеточия.
+// trailerKeyRe - a trailer key: a token without spaces and colons.
 var trailerKeyRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9-]*$`)
 
-// messageArgs собирает аргументы сообщения: тема, затем трейлеры. Actor идёт первым.
+// messageArgs builds the message arguments: subject, then trailers. Actor goes first.
 func messageArgs(subject, actor string, trailers []Trailer) ([]string, error) {
 	args := []string{"-m", subject}
 	all := trailers
@@ -331,11 +331,11 @@ func messageArgs(subject, actor string, trailers []Trailer) ([]string, error) {
 	return args, nil
 }
 
-// Commit делает add -A -- paths и commit --only -- paths, возвращает хеш.
-// Пустой список путей - commit --allow-empty --only (индекс не забирается).
-// Путь, которого нет ни в дереве, ни в индексе, - ошибка.
-// Быстрый путь: commit --only сам индексирует правку отслеживаемого файла, без
-// отдельного add (-5 мс). Новый файл git так не берёт: тогда add -A и повтор.
+// Commit does add -A -- paths and commit --only -- paths, returns the hash.
+// An empty path list - commit --allow-empty --only (the index is not taken).
+// A path that is neither in the tree nor in the index is an error.
+// Fast path: commit --only indexes an edit of a tracked file itself, without
+// a separate add (-5 ms). git does not take a new file this way: then add -A and retry.
 func (r Repo) Commit(paths []string, subject, actor string, trailers ...Trailer) (string, error) {
 	msg, err := messageArgs(subject, actor, trailers)
 	if err != nil {
@@ -366,19 +366,19 @@ func (r Repo) Commit(paths []string, subject, actor string, trailers ...Trailer)
 	return r.head()
 }
 
-// File - путь операции и байты, которые записало ядро. Data nil - путь удалён.
+// File - an operation path and the bytes the core wrote. Data nil - the path is deleted.
 type File struct {
 	Path string
 	Data []byte
 }
 
-// zeroID - id для строки удаления в update-index --index-info: важен только формат.
+// zeroID - the id for a delete line in update-index --index-info: only the format matters.
 const zeroID = "0000000000000000000000000000000000000000"
 
-// CommitFiles коммитит ровно байты ядра: hash-object -w на файл, update-index
-// --index-info, commit индекса. Файл из дерева в коммит не идёт: чужая запись после
-// rename остаётся правкой дерева и уходит следующим коммитом external edit.
-// Пустой список - пустой коммит, как Commit(nil, ...).
+// CommitFiles commits exactly the core bytes: hash-object -w per file, update-index
+// --index-info, commit of the index. A file from the tree does not go into the commit: a foreign write after
+// rename stays a tree edit and goes with the next external edit commit.
+// An empty list - an empty commit, like Commit(nil, ...).
 func (r Repo) CommitFiles(files []File, subject, actor string, trailers ...Trailer) (string, error) {
 	if len(files) == 0 {
 		return r.Commit(nil, subject, actor, trailers...)
@@ -408,7 +408,7 @@ func (r Repo) CommitFiles(files []File, subject, actor string, trailers ...Trail
 	return r.head()
 }
 
-// fileMode - режим записи индекса по биту исполнения файла в дереве.
+// fileMode - the index entry mode by the execute bit of the file in the tree.
 func (r Repo) fileMode(path string) string {
 	if fi, err := os.Lstat(filepath.Join(r.Dir, filepath.FromSlash(path))); err == nil && fi.Mode()&0o111 != 0 {
 		return "100755"
@@ -416,7 +416,7 @@ func (r Repo) fileMode(path string) string {
 	return "100644"
 }
 
-// head читает хеш HEAD из файлов refs (loose ref); иначе rev-parse.
+// head reads the HEAD hash from the refs files (loose ref); otherwise rev-parse.
 func (r Repo) head() (string, error) {
 	if id := r.looseHead(); id != "" {
 		return id, nil
@@ -430,7 +430,7 @@ func (r Repo) head() (string, error) {
 
 func (r Repo) looseHead() string {
 	gitDir := filepath.Join(r.Dir, ".git")
-	data, err := os.ReadFile(filepath.Join(gitDir, "HEAD")) //nolint:gosec // путь внутри репозитория
+	data, err := os.ReadFile(filepath.Join(gitDir, "HEAD")) //nolint:gosec // path inside the repository
 	if err != nil {
 		return ""
 	}
@@ -438,7 +438,7 @@ func (r Repo) looseHead() string {
 	if !ok || strings.Contains(ref, "..") {
 		return ""
 	}
-	h, err := os.ReadFile(filepath.Join(gitDir, filepath.FromSlash(ref))) //nolint:gosec // см. выше
+	h, err := os.ReadFile(filepath.Join(gitDir, filepath.FromSlash(ref))) //nolint:gosec // see above
 	if err != nil {
 		return ""
 	}
@@ -449,8 +449,8 @@ func (r Repo) looseHead() string {
 	return id
 }
 
-// stage индексирует пути операции. Есть в дереве - add -A; нет (удалён) -
-// rm --cached: add -A на путь, которого нет ни в дереве, ни в индексе, падает.
+// stage indexes the operation paths. In the tree - add -A; not there (deleted) -
+// rm --cached: add -A on a path that is neither in the tree nor in the index fails.
 func (r Repo) stage(paths []string) error {
 	var present, gone []string
 	for _, p := range paths {
@@ -477,7 +477,7 @@ func (r Repo) stage(paths []string) error {
 	return nil
 }
 
-// HashObject пишет blob в git (hash-object -w) и возвращает его id.
+// HashObject writes a blob to git (hash-object -w) and returns its id.
 func (r Repo) HashObject(data []byte) (string, error) {
 	out, err := r.must(data, false, "hash-object", "-w", "--stdin")
 	if err != nil {
@@ -486,7 +486,7 @@ func (r Repo) HashObject(data []byte) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// Blob читает blob по id.
+// Blob reads a blob by id.
 func (r Repo) Blob(rev string) ([]byte, error) {
 	if !revRe.MatchString(rev) {
 		return nil, fmt.Errorf("git cat-file: bad id %q", rev)
@@ -494,7 +494,7 @@ func (r Repo) Blob(rev string) ([]byte, error) {
 	return r.must(nil, true, "cat-file", "blob", rev)
 }
 
-// MergeFile сливает три версии через git merge-file. conflict: в out остались маркеры.
+// MergeFile merges three versions through git merge-file. conflict: markers remain in out.
 func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, err error) {
 	dir, err := os.MkdirTemp("", "tixmerge-")
 	if err != nil {
@@ -523,11 +523,11 @@ func (r Repo) MergeFile(ours, base, theirs []byte) (out []byte, conflict bool, e
 	}
 }
 
-// DropGitLocks удаляет висящие lock-файлы git после убитого процесса: .git/*.lock
-// (index.lock, HEAD.lock, packed-refs.lock) и .git/refs/**/*.lock. Висящий - с mtime
-// старше staleLockAge. Свежий lock может держать живой git (Obsidian Git, терминал):
-// его не трогаем, а при нём ничего не удаляем и отвечаем ErrBusy.
-// Вызывать под нашим локом. Возвращает пути (относительно .git) удалённых файлов.
+// DropGitLocks removes dangling git lock files after a killed process: .git/*.lock
+// (index.lock, HEAD.lock, packed-refs.lock) and .git/refs/**/*.lock. Dangling - with mtime
+// older than staleLockAge. A fresh lock may be held by a live git (Obsidian Git, a terminal):
+// we do not touch it, and with it present we delete nothing and answer ErrBusy.
+// Call under our lock. Returns the paths (relative to .git) of the removed files.
 func (r Repo) DropGitLocks() ([]string, error) {
 	gitDir := filepath.Join(r.Dir, ".git")
 	top, err := filepath.Glob(filepath.Join(gitDir, "*.lock"))
@@ -553,7 +553,7 @@ func (r Repo) DropGitLocks() ([]string, error) {
 	for _, p := range locks {
 		info, err := os.Lstat(p)
 		if errors.Is(err, os.ErrNotExist) {
-			continue // git снял lock сам
+			continue // git released the lock itself
 		}
 		if err != nil {
 			return nil, fmt.Errorf("stat %s: %w", p, err)

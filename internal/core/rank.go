@@ -8,18 +8,18 @@ import (
 	"github.com/daniil4545/tix/internal/task"
 )
 
-// minRankGap - зазор между соседними рангами, меньше которого колонка перенумеруется.
+// minRankGap - the gap between neighbor ranks below which the column is renumbered.
 const minRankGap = 1e-6
 
-// placement - итог place: ранг задачи и, при тесном зазоре, новые ранги соседей.
+// placement - the result of place: the task rank and, on a tight gap, the new ranks of neighbors.
 type placement struct {
 	rank       float64
-	keep       bool // задача уже на месте: ранг не меняется
+	keep       bool // the task is already in place: the rank does not change
 	neighbours []pendingWrite
 }
 
-// columnTasks возвращает задачи колонки без skipID по возрастанию ранга. Битые файлы
-// на порядок не влияют.
+// columnTasks returns the column tasks without skipID in ascending rank order. Broken files
+// do not affect the order.
 func (s *Store) columnTasks(column, skipID string) []*task.Task {
 	all, _ := s.List()
 	var col []*task.Task
@@ -37,8 +37,8 @@ func (s *Store) columnTasks(column, skipID string) []*task.Task {
 	return col
 }
 
-// place считает ранг задачи t в колонке column: без Place - в конец (в своей колонке
-// задача остаётся на месте), First - в начало, After - после соседа.
+// place computes the rank of task t in column column: without Place - to the end (in its own column
+// the task stays in place), First - to the start, After - after a neighbor.
 func (s *Store) place(t *task.Task, column string, p Place) (placement, error) {
 	col := s.columnTasks(column, t.ID)
 	same := t.Status == column
@@ -88,8 +88,8 @@ func (s *Store) placeAfter(t *task.Task, col []*task.Task, column string, same b
 	return s.renumber(t, col, i)
 }
 
-// renumber выдаёт колонке ранги 1..n с задачей t после col[at]; соседи с новым рангом
-// уходят в pending (один коммит операции).
+// renumber gives the column ranks 1..n with task t after col[at]; neighbors with a new rank
+// go to pending (one operation commit).
 func (s *Store) renumber(t *task.Task, col []*task.Task, at int) (placement, error) {
 	out := placement{}
 	n := 0
@@ -102,7 +102,7 @@ func (s *Store) renumber(t *task.Task, col []*task.Task, at int) (placement, err
 		if c.Rank == float64(n) {
 			return nil
 		}
-		data, err := os.ReadFile(c.Path) //nolint:gosec // путь строит ядро
+		data, err := os.ReadFile(c.Path) //nolint:gosec // the path is built by the core
 		if err != nil {
 			return fmt.Errorf("read %s: %w", c.Path, err)
 		}

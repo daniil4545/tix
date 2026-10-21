@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
-// probe оборачивает модель и хранит последний кадр: текст экрана без разбора потока терминала.
+// probe wraps the model and keeps the last frame: the screen text without parsing the terminal stream.
 type probe struct {
 	tea.Model
 	mu     *sync.Mutex
@@ -75,7 +75,7 @@ type env struct {
 	screen string
 }
 
-// newEnv создаёт базу во временной папке; config - содержимое config.toml, пусто - колонки по умолчанию.
+// newEnv creates a store in a temp folder; config - the config.toml content, empty - default columns.
 func newEnv(t *testing.T, config string) *env {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "tasks")
@@ -108,7 +108,7 @@ func (e *env) create(title, project, column string) string {
 	return r.ID
 }
 
-// body задаёт тело задачи целиком.
+// body sets the whole task body.
 func (e *env) body(id, body string) {
 	e.t.Helper()
 	_, rev, err := e.store.Get(id)
@@ -144,12 +144,12 @@ func (e *env) until(what string, cond func() bool) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	e.t.Fatalf("не дождались: %s\nэкран:\n%s", what, e.text())
+	e.t.Fatalf("did not wait for: %s\nscreen:\n%s", what, e.text())
 }
 
 func (e *env) screenHas(subs ...string) {
 	e.t.Helper()
-	e.until(fmt.Sprint("на экране ", subs), func() bool {
+	e.until(fmt.Sprint("on screen ", subs), func() bool {
 		s := e.text()
 		for _, sub := range subs {
 			if !strings.Contains(s, sub) {

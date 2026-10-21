@@ -1,4 +1,4 @@
-// Package view рисует доску и карточку строкой; без IO и без состояния.
+// Package view draws the board and the card as a string; no IO and no state.
 package view
 
 import (
@@ -10,25 +10,25 @@ import (
 	"github.com/daniil4545/tix/internal/history"
 )
 
-// Row - строка колонки доски. Третья строка карточки (пульс) - первое из: вопрос Ask (жёлтый),
-// заметка Note (готовая строка "<возраст> <текст>", пусто вне колонки active), Summary.
+// Row - a board column line. The third card line (the pulse) is the first of: the Ask question (yellow),
+// the Note note (a ready line "<age> <text>", empty outside the active column), Summary.
 type Row struct {
 	ID, Project, Title, Summary, Meta string
 	Ask, Note                         string
-	Star                              bool // звёздочка в первой строке; ненулевой Ask включает её сам
-	Grabbed                           bool // карточка захвачена: подсветка и маркер "=" вместо ">"
+	Star                              bool // a star in the first line; a non-zero Ask turns it on itself
+	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
 }
 
-// UnknownColumn - имя колонки для задач со статусом, которого нет в config.toml.
+// UnknownColumn - the column name for tasks with a status that is not in config.toml.
 const UnknownColumn = "?"
 
-// Col - колонка доски.
+// Col - a board column.
 type Col struct {
 	Name string
 	Rows []Row
 }
 
-// Board - всё, что нужно для кадра доски. W, H <= 0: размер не ограничен.
+// Board - everything needed for a board frame. W, H <= 0: the size is not limited.
 type Board struct {
 	Project  string
 	Total    int
@@ -37,24 +37,24 @@ type Board struct {
 	W, H     int
 	Status   string
 	IsErr    bool
-	ByDue    bool // колонки отсортированы по сроку, не по rank
-	// FirstCol и RowTop - прежнее положение окон (первая показанная колонка и верхняя карточка
-	// выбранной колонки). Нули дают окна по курсору; окно сдвигается, только когда курсор вышел.
+	ByDue    bool // columns are sorted by due, not by rank
+	// FirstCol and RowTop - the previous window position (the first shown column and the top card
+	// of the selected column). Zeros give cursor windows; the window shifts only when the cursor left.
 	FirstCol, RowTop int
 }
 
-// Card - всё, что нужно для кадра карточки. Scroll - смещение тела в строках; кадр
-// сдвигает его сам, чтобы строка Cursor (индекс в History) была видна. W, H <= 0: размер не ограничен.
+// Card - everything needed for a card frame. Scroll - the body offset in lines; the frame
+// shifts it itself so that the Cursor line (an index in History) is visible. W, H <= 0: the size is not limited.
 type Card struct {
 	ID, Title, Column, Fields, Ask, Abstract, Summary, Details, Checks string
 	History                                                            []history.Entry
 	Cursor, Scroll, W, H                                               int
-	CritAt                                                             []int // строки-критерии в Details (индексы по "\n"); Cursor считает их перед историей
+	CritAt                                                             []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
 	Status                                                             string
 	IsErr                                                              bool
 }
 
-// Цвета макета: основной - цвет терминала, приглушённый, акцент, жёлтый (нужно действие), оранжевый (ошибка).
+// Layout colors: main - the terminal color, dim, accent, yellow (action needed), orange (error).
 var (
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#69756F"))
 	accentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#7FD1C3"))
@@ -65,7 +65,7 @@ var (
 	grabStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#E9CF6A")).Foreground(lipgloss.Color("#111416"))
 )
 
-// RenderInput рисует строку ввода: приглашение, текст и курсор. Длинный текст показывается хвостом.
+// RenderInput draws the input line: the prompt, the text and the cursor. A long text is shown by its tail.
 func RenderInput(prompt, text string, w int) string {
 	prompt = clean(prompt)
 	text = clean(text)
@@ -76,7 +76,7 @@ func RenderInput(prompt, text string, w int) string {
 	return accentStyle.Render(prompt) + " " + text + selStyle.Render(" ")
 }
 
-// statusLine рисует строку состояния; пустая заменяется подсказкой клавиш.
+// statusLine draws the status line; an empty one is replaced by the key hint.
 func statusLine(status, hint string, isErr bool, w int) string {
 	if status == "" {
 		return dimStyle.Render(truncate(hint, w))
@@ -88,7 +88,7 @@ func statusLine(status, hint string, isErr bool, w int) string {
 	return status
 }
 
-// clean заменяет управляющие знаки пробелами: текст задач приходит из файлов и не должен двигать курсор терминала.
+// clean replaces control characters with spaces: task text comes from files and must not move the terminal cursor.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
@@ -98,7 +98,7 @@ func clean(s string) string {
 	}, s)
 }
 
-// truncate обрезает строку до n колонок; n <= 0 - без обрезки.
+// truncate cuts a string to n columns; n <= 0 - no cut.
 func truncate(s string, n int) string {
 	if n <= 0 || lipgloss.Width(s) <= n {
 		return s
@@ -107,7 +107,7 @@ func truncate(s string, n int) string {
 	return head
 }
 
-// tail оставляет последние n колонок строки.
+// tail keeps the last n columns of a string.
 func tail(s string, n int) string {
 	r := []rune(s)
 	for len(r) > 0 && lipgloss.Width(string(r)) > n {
@@ -116,7 +116,7 @@ func tail(s string, n int) string {
 	return string(r)
 }
 
-// cut делит строку на голову шириной до n колонок и остаток; хотя бы один знак уходит в голову.
+// cut splits a string into a head up to n columns wide and the rest; at least one character goes to the head.
 func cut(s string, n int) (head, rest string) {
 	used := 0
 	for i, r := range s {
@@ -129,13 +129,13 @@ func cut(s string, n int) (head, rest string) {
 	return s, ""
 }
 
-// fit обрезает строку до n колонок и добивает пробелами.
+// fit cuts a string to n columns and pads it with spaces.
 func fit(s string, n int) string {
 	s = truncate(s, n)
 	return s + strings.Repeat(" ", max(n-lipgloss.Width(s), 0))
 }
 
-// wrap переносит текст по словам в строки шириной до w; w <= 0 - без переноса.
+// wrap wraps text by words into lines up to w wide; w <= 0 - no wrap.
 func wrap(text string, w int) []string {
 	var out []string
 	for _, line := range strings.Split(text, "\n") {
@@ -175,12 +175,12 @@ func wrapLine(line string, w int) []string {
 	return append(out, cur)
 }
 
-// ruleLine рисует приглушённую линию из дефисов.
+// ruleLine draws a dim line of hyphens.
 func ruleLine(n int) string {
 	return dimStyle.Render(strings.Repeat("-", max(n, 0)))
 }
 
-// joinEnds ставит left слева и right справа в строке шириной w; не влезло - только left.
+// joinEnds puts left on the left and right on the right in a line w wide; if it does not fit - only left.
 func joinEnds(left, right string, w int) string {
 	gap := w - lipgloss.Width(left) - lipgloss.Width(right)
 	if w <= 0 || right == "" {

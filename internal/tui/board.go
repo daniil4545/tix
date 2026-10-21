@@ -15,17 +15,17 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// unknownColumn - колонка для задач, чей статус не описан в config.toml (в конце доски).
+// unknownColumn - the column for tasks whose status is not described in config.toml (at the end of the board).
 const unknownColumn = view.UnknownColumn
 
-// apply принимает свежий список задач и перестраивает доску, выбор держится на id.
+// apply takes a fresh task list and rebuilds the board, the selection is kept by id.
 func (m *Model) apply(tasks []*task.Task, skipped int) {
 	m.tasks, m.skipped = tasks, skipped
 	m.dropGone()
 	m.rebuild()
 }
 
-// dropGone снимает захват, если захваченной задачи нет на доске или её перенесли с начала захвата.
+// dropGone cancels the grab if the grabbed task is not on the board or was moved since the grab began.
 func (m *Model) dropGone() {
 	if m.grab == nil {
 		return
@@ -41,7 +41,7 @@ func (m *Model) dropGone() {
 	}
 }
 
-// rebuild строит колонки по фильтру проекта и ставит курсор на selID.
+// rebuild builds the columns by the project filter and puts the cursor on selID.
 func (m *Model) rebuild() {
 	names := make([]string, 0, len(m.cfg.Columns)+1)
 	for _, c := range m.cfg.Columns {
@@ -88,8 +88,8 @@ func (m *Model) rebuild() {
 	m.fitWindow()
 }
 
-// fitWindow сдвигает окна колонок и карточек, только если курсор вышел за них, и запоминает
-// их в доске. Окно другой колонки начинается сверху, как её рисуют, пока она не выбрана.
+// fitWindow shifts the column and card windows only if the cursor left them, and stores
+// them in the board. The window of another column starts at the top, as drawn, until it is selected.
 func (m *Model) fitWindow() {
 	if m.board.Col != m.winCol {
 		m.board.RowTop, m.winCol = 0, m.board.Col
@@ -97,7 +97,7 @@ func (m *Model) fitWindow() {
 	m.board.FirstCol, m.board.RowTop = view.FitWindow(m.layout())
 }
 
-// sortTasks сортирует колонку по rank; byDue: сначала задачи со сроком по дате, затем без срока по rank.
+// sortTasks sorts a column by rank; byDue: first tasks with a due date by date, then without due by rank.
 func sortTasks(ts []*task.Task, byDue bool) {
 	sort.SliceStable(ts, func(i, j int) bool {
 		if byDue {
@@ -117,19 +117,19 @@ func sortTasks(ts []*task.Task, byDue bool) {
 	})
 }
 
-// dueDate - срок задачи датой; пустой или нечитаемый срок - false.
+// dueDate - the task due date as a date; an empty or unreadable due is false.
 func dueDate(t *task.Task) (time.Time, bool) {
 	d, err := time.Parse(time.DateOnly, t.Due)
 	return d, err == nil
 }
 
-// toggleOrder переключает порядок всех колонок: по rank или по сроку.
+// toggleOrder switches the order of all columns: by rank or by due.
 func (m *Model) toggleOrder() {
 	m.board.ByDue = !m.board.ByDue
 	m.rebuild()
 }
 
-// reorderKey - J, K: в порядке по сроку ручной порядок выключен.
+// reorderKey - J, K: in due order the manual order is off.
 func (m *Model) reorderKey(dir int) tea.Cmd {
 	if m.board.ByDue {
 		m.setStatus("order by due: J K off", false)
@@ -138,7 +138,7 @@ func (m *Model) reorderKey(dir int) tea.Cmd {
 	return m.reorder(dir)
 }
 
-// restoreSelection ищет selID в колонках; нет - остаётся позиция, зажатая в границы.
+// restoreSelection looks for selID in the columns; if absent, the position stays, clamped to the bounds.
 func (m *Model) restoreSelection() {
 	for c, ts := range m.colTasks {
 		if i := slices.IndexFunc(ts, func(t *task.Task) bool { return t.ID == m.selID }); i >= 0 {
@@ -159,7 +159,7 @@ func (m *Model) clampRow() {
 	m.board.Row = min(max(m.board.Row, 0), max(len(m.colTasks[m.board.Col])-1, 0))
 }
 
-// syncSelID запоминает id под курсором.
+// syncSelID remembers the id under the cursor.
 func (m *Model) syncSelID() {
 	m.selID = ""
 	if t := m.selected(); t != nil {
@@ -167,7 +167,7 @@ func (m *Model) syncSelID() {
 	}
 }
 
-// selected - задача под курсором доски; nil в пустой колонке.
+// selected - the task under the board cursor; nil in an empty column.
 func (m *Model) selected() *task.Task {
 	if m.board.Col >= len(m.colTasks) || m.board.Row >= len(m.colTasks[m.board.Col]) {
 		return nil
@@ -175,7 +175,7 @@ func (m *Model) selected() *task.Task {
 	return m.colTasks[m.board.Col][m.board.Row]
 }
 
-// current - задача, над которой работают клавиши: открытая карточка или строка под курсором.
+// current - the task the keys act on: the open card or the row under the cursor.
 func (m *Model) current() *task.Task {
 	if m.showing {
 		return m.byID(m.card.id)
@@ -212,7 +212,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	return out
 }
 
-// meta - краткая строка доски: критерии, срок, живой claim.
+// meta - the short board line: criteria, due, live claim.
 func meta(t *task.Task, now time.Time) string {
 	var parts []string
 	if crit := t.Criteria(); len(crit) > 0 {
@@ -237,7 +237,7 @@ func checks(crit []task.Criterion) string {
 	return fmt.Sprintf("%d/%d", done, len(crit))
 }
 
-// dueText: дата вида 2026-10-28 печатается как 28.10, прочее - как есть.
+// dueText: a date like 2026-10-28 is printed as 28.10, anything else as is.
 func dueText(due string) string {
 	d, err := time.Parse(time.DateOnly, due)
 	if err != nil {
@@ -246,7 +246,7 @@ func dueText(due string) string {
 	return d.Format("02.01")
 }
 
-// cycleProject переключает фильтр по кругу: все, затем проекты по алфавиту.
+// cycleProject switches the filter in a circle: all, then projects alphabetically.
 func (m *Model) cycleProject() {
 	seen := map[string]bool{}
 	var list []string
@@ -263,7 +263,7 @@ func (m *Model) cycleProject() {
 	m.rebuild()
 }
 
-// moveCursor сдвигает курсор доски: dc колонок, dr строк.
+// moveCursor moves the board cursor: dc columns, dr rows.
 func (m *Model) moveCursor(dc, dr int) {
 	if len(m.colTasks) == 0 {
 		return
