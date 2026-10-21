@@ -19,7 +19,7 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## Open
 
-- Branch `z5-publish` (tree `../tracker-z5`, `d635570`) is superseded by `main`; deleting it is the user's call.
+- Branch `z2-rank-cache` (`be562f9`) is kept for T-5: rank cache without tests and review.
 - Codex: approve the new `tix` hooks in `/hooks`.
 - Known race: the reply `a` may erase a new `ask` of the agent in a window of milliseconds; conditional write - v0.2.
 - The model in the `Model:` trailer is only for Claude Code; `/model` in the middle of a session and subagents - v0.2.
