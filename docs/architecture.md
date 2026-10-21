@@ -237,11 +237,10 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
 | Columns and roles | `.tix/config.toml`, `internal/config` | the code finds columns by role, names are not hardcoded |
-| `RULES.md` text | `internal/assets/RULES.md` | existing stores are not updated |
+| `RULES.md` text | `internal/assets/RULES.md` | move the old `assets.RulesHash` into `previousRules`: stores with an untouched copy get the new text |
 
 ## 10. Limits and open items
 
-- `RULES.md` is not updated in existing stores: an edit of the embedded text does not reach them.
+- `RULES.md` of a store gets the new text only while it is an untouched copy of an earlier version; an edited copy keeps the old rules.
 - `kill -9` during a column renumbering can leave it partly renumbered (a known failure, accepted in S2).
 - There is no background backup. Push to a real remote is not covered by autotests; no remote is set up for `~/tasks`.
-- TUI (S4), agent skill and hooks (S3), publication (S5) are not done: `docs/backlog.md`.

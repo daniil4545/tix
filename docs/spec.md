@@ -101,7 +101,8 @@ flowchart TD
       (`TIX_LOCK_TIMEOUT` in tests).
    2. `git status`: edits that bypass the core (Obsidian, manual, a failed previous commit) are committed
       with a message that has the line `T-12: external edit` for each id, `Actor: external`; a file without an id
-      (`RULES.md`, `config.toml`, `Untitled.md`) gets the line `external edit: <path>`.
+      (`RULES.md`, `config.toml`, `Untitled.md`) gets the line `external edit: <path>`. A `RULES.md` that is an
+      untouched copy of an earlier version gets the current text, committed by the same operation.
    3. A point operation (field, move, order, checkbox, comment, delete) is applied to the
       current version without a base. `edit` replaces only the body before `## Comments` and carries the base
       `rev`; if it is stale - `git merge-file`.
@@ -312,7 +313,7 @@ Agent rights: creates, moves from `inbox` to `ready`, closes, deletes, changes t
 
 ## 10. Requirements traceability
 
-There is no customer brief; the requirements are the decisions D1-D62, the tasks are `docs/backlog.md`.
+There is no customer brief; the requirements are the decisions D1-D62, the tasks are in tix, project `tracker`.
 
 ## 11. Text samples
 
@@ -327,7 +328,7 @@ scheduled assistant does.
 
 ## 13. Slicing
 
-`docs/backlog.md`.
+Tasks in tix, project `tracker` (`tix list --project tracker`). The MVP slices S1-S5 are closed.
 
 ## 14. Access and readiness
 
