@@ -6,7 +6,7 @@ Markdown tasks under git for AI coding agents, each edit linked to its session.
 [![release](https://img.shields.io/github/v/release/daniil4545/tix)](https://github.com/daniil4545/tix/releases)
 [![license](https://img.shields.io/github/license/daniil4545/tix)](LICENSE)
 
-![demo](assets/demo.gif)
+![The tix board: tasks of two projects, two agents at work, a question waiting for you](assets/board.png)
 
 `tix` keeps tasks as markdown files in one folder, `~/tasks`, under git. Agents
 (Claude Code, Codex) work through the `tix` command. You watch and steer the
@@ -102,6 +102,11 @@ project shop   rules: ~/tasks/RULES.md
 todo T-1 Add retry to the sync job | 0/1
 next T-1
 ```
+
+The same flow in motion: an agent takes a task and logs a step, then the board
+and the task card with its history.
+
+![demo](assets/demo.gif)
 
 ## Commands
 
