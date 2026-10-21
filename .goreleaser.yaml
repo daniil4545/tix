@@ -1,0 +1,43 @@
+version: 2
+
+project_name: tix
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/tix
+    binary: tix
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: SHA256SUMS.txt
+  algorithm: sha256
+
+# Release notes come from CHANGELOG.md through --release-notes.
+# Do not set changelog.disable: true, it cancels that flag.
+
+release:
+  header: |
+    ## Install
+
+        go install github.com/daniil4545/tix/cmd/tix@latest
+
+    Or take the archive for your system below (`darwin` or `linux`, `arm64` or
+    `amd64`), check it against `SHA256SUMS.txt` and put `tix` on your PATH.
+  footer: |
+    Full description, agent setup and limits:
+    https://github.com/daniil4545/tix#readme

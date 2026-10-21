@@ -1,0 +1,75 @@
+package view_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/daniil4545/tix/internal/tui/view"
+)
+
+// cardRow looks for a frame line with a substring: the line number and the substring column.
+func cardRow(t *testing.T, c view.Card, sub string) (x, y int) {
+	t.Helper()
+	for y, ln := range strings.Split(plain(view.RenderCard(c)), "\n") {
+		if i := strings.Index(ln, sub); i >= 0 {
+			return i, y
+		}
+	}
+	t.Fatalf("%q is not in the frame", sub)
+	return 0, 0
+}
+
+func critCard() view.Card {
+	c := card()
+	c.Details = "intro\n- [ ] first\n- [x] second"
+	c.CritAt = []int{1, 2}
+	c.Ask = "which one?"
+	return c
+}
+
+func TestHitCard_RowsAndButtons(t *testing.T) {
+	c := critCard()
+	cases := []struct {
+		sub  string
+		want view.CardHit
+	}{
+		{"* needs you:", view.CardHit{Kind: view.CardAsk}},
+		{"- [ ] first", view.CardHit{Kind: view.CardCriterion, Index: 0}},
+		{"- [x] second", view.CardHit{Kind: view.CardCriterion, Index: 1}},
+		{"intro", view.CardHit{}},
+		{"c comment", view.CardHit{Kind: view.CardAction, Key: "c"}},
+		{"del delete", view.CardHit{Kind: view.CardAction, Key: "del"}},
+		{"j k history", view.CardHit{}},
+	}
+	for _, tc := range cases {
+		x, y := cardRow(t, c, tc.sub)
+		if got := view.HitCard(c, x, y); got != tc.want {
+			t.Errorf("HitCard at %q = %+v, expected %+v", tc.sub, got, tc.want)
+		}
+	}
+}
+
+// A criterion scrolled out is not clickable; a cut button too.
+func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
+	c := critCard()
+	c.H = 12
+	c.Cursor = 5 // the history entry at the end: the body is scrolled
+	x, y := cardRow(t, c, "c comment")
+	if got := view.HitCard(c, x, y); got.Kind != view.CardAction {
+		t.Fatalf("button c comment: %+v", got)
+	}
+	c.W = 20 // the actions line is cut: g session does not fit whole
+	last := strings.Count(view.RenderCard(c), "\n")
+	clickable := 0
+	for x := 0; x < c.W; x++ {
+		if got := view.HitCard(c, x, last); got.Kind == view.CardAction {
+			clickable++
+		}
+		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "g" {
+			t.Errorf("the cut button g is clickable at column %d", x)
+		}
+	}
+	if clickable == 0 {
+		t.Error("no button is clickable in the cut line: the check is empty")
+	}
+}

@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {"matcher": "startup", "hooks": [{"type": "command", "command": "echo foreign-codex-start"}]}
+    ],
+    "Stop": [
+      {"hooks": [{"type": "command", "command": "echo foreign-stop"}]}
+    ]
+  }
+}

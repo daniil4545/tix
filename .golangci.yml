@@ -1,0 +1,41 @@
+version: "2"
+
+# Numeric limits are enforced by the linter, not by the agent's memory.
+linters:
+  enable:
+    - funlen # function longer than 100 lines
+    - nestif # deeply nested if
+    - gocognit # cognitive complexity of a function
+    - errorlint # error comparison and type assertion without errors.Is/As
+    - noctx # HTTP and SQL without context: the call cannot be cancelled on timeout
+    - bodyclose # unclosed HTTP response body
+    - sqlclosecheck
+    - rowserrcheck
+    - gosec # unsafe patterns: SQL from strings, weak crypto, file permissions, exec
+  settings:
+    funlen:
+      lines: 100
+      statements: -1
+    nestif:
+      min-complexity: 4
+    gocognit:
+      min-complexity: 20
+    staticcheck:
+      checks:
+        - all
+        # ST - comment and name style; off by project choice
+        - -ST1000
+        - -ST1003
+        - -ST1016
+        - -ST1020
+        - -ST1021
+        - -ST1022
+        - -ST1023
+  exclusions:
+    rules:
+      # a scenario table makes a test function long; that is not complexity
+      - path: _test\.go
+        linters:
+          - funlen
+          - errcheck
+          - gosec

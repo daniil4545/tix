@@ -1,0 +1,25 @@
+---
+name: tix
+description: Use when the user mentions tasks, tickets, ideas, "what next" or "write this down", or when you start, progress or finish work in a project that has tasks. Drives the tix task tracker (tasks live in ~/tasks).
+---
+
+# tix task tracker
+
+Run `tix ctx` first (the session hook may already have printed it). It lists tasks in `active`, `waiting`, `ready` and the next one.
+
+## Work cycle
+
+1. `tix take T-12` - claim a task (3 hours, renewed by your writes).
+2. `tix note T-12 "decided X because Y"` - log a decision, question, finding or stage change; not every command.
+3. `tix check T-12 1 2` - tick done criteria by number.
+4. `tix set T-12 summary="..."` - short result for the human.
+5. `tix done T-12 -m "result"` - close; unchecked criteria need `--force`.
+
+Remaining or new scope is a new task: `tix new`. Blocked on the human: `tix move T-12 waiting -m "reason"`.
+
+## Rules
+
+- Run `tix` as a single command. No `;`, `&&`, `|`, `cd` (Codex sandbox).
+- Outside a project (home session in `~/tasks`), an idea is `tix new "title"`: it goes to `inbox`, project `personal`.
+- Errors name the fix; follow it. Do not edit files in `~/tasks` by hand.
+- Details: `~/tasks/RULES.md`.
