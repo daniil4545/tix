@@ -92,6 +92,7 @@ type app struct {
 	log   *slog.Logger
 	store *core.Store
 	root  string
+	who   string // личность последней записи; пусто, пока команда не разобрала автора
 }
 
 // Run выполняет команду и возвращает код выхода. Ловит панику.
@@ -107,7 +108,16 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 		a.fail(err)
 		return exitCode(err)
 	}
+	if writeCmds[a.cmd] {
+		a.recordFocus()
+	}
 	return 0
+}
+
+// writeCmds - команды, после успеха которых агент оставляет адрес своей вкладки (спека 4a).
+var writeCmds = map[string]bool{
+	"new": true, "edit": true, "comment": true, "note": true, "rm": true,
+	"take": true, "move": true, "set": true, "check": true, "done": true,
 }
 
 func (a *app) dispatch(ctx context.Context, args []string) error {

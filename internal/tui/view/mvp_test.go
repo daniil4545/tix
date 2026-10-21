@@ -14,7 +14,7 @@ import (
 const (
 	yellowFg = "38;2;233;207;106" // #E9CF6A
 	selBg    = "48;2;127;209;195" // #7FD1C3, подсветка выбранной строки
-	hintHead = "h l column  j k card  enter open"
+	hintHead = "arrows select  space grab  enter open"
 )
 
 // frameLines рисует доску и режет кадр на строки (текст без цвета).
@@ -62,7 +62,7 @@ func TestRenderBoard_NarrowWidth_HintTruncatedNotWrapped(t *testing.T) {
 	out := view.RenderBoard(b)
 	fits(t, "доска 40x12", out, 40, 12)
 	ls := frameLines(b)
-	if last := ls[len(ls)-1]; !strings.HasPrefix(last, "h l column") {
+	if last := ls[len(ls)-1]; !strings.HasPrefix(last, "arrows select") {
 		t.Errorf("на ширине 40 подсказка пропала: %q", last)
 	}
 }

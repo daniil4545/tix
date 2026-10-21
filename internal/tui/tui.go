@@ -85,7 +85,10 @@ type Model struct {
 
 	card    cardState
 	showing bool // карточка открыта
+	help    bool // открыт экран справки
 	input   *prompt
+	acts    cardActs // действия карточки: выбор поля
+	grab    *grab    // захват карточки на доске; nil вне захвата
 
 	notes map[string]gitx.Note // последние заметки задач для пульса; nil, пока git не ответил
 	now   func() time.Time     // часы модели: мета, пульс, двойной клик
@@ -155,9 +158,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) View() tea.View {
 	defer m.logPanic()
 	var frame string
-	if m.showing {
+	switch {
+	case m.help:
+		frame = view.RenderHelp(m.w, m.h)
+	case m.showing:
 		frame = view.RenderCard(m.cardView())
-	} else {
+	default:
 		frame = view.RenderBoard(m.boardView())
 	}
 	if m.input != nil {

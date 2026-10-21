@@ -1,6 +1,6 @@
 tracker  project: alpha  4 tasks                                                                                                  
 --------------------------------------------------------------------------------------------------------------------------------
-idea 0                    todo 2                    doing 1                   blocked 1                 done 0                  
+idea 0                 +  todo 2                 +  doing 1                +  blocked 1              +  done 0                 +
 ------------------------  ------------------------  ------------------------  ------------------------  ------------------------
                           >T-7 alpha                 T-12 beta                 T-15 beta                                        
                            Fix login                 Report on calls           GPU access                                       
@@ -11,4 +11,4 @@ idea 0                    todo 2                    doing 1                   bl
                                                                                                                                 
 --------------------------------------------------------------------------------------------------------------------------------
 ok T-7 todo > doing
-h l column  j k card  enter open  m M move  J K order  o order by due  p project  e edit  c comment  q quit
+arrows select  space grab  enter open  n new  a answer  e edit  c comment  o order  p project  ? help  q quit

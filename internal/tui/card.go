@@ -21,7 +21,9 @@ type cardState struct {
 	entries []history.Entry
 	rows    []shown
 	mtime   time.Time
-	cursor  int
+	cursor  int             // строки критериев, затем записи истории
+	moved   bool            // пользователь двигал курсор: первая загрузка истории его не сдвигает
+	nCrit   int             // число критериев перед историей; обновляется при открытии и в cardView
 	open    map[string]bool // раскрытые серии "N edits"
 	loaded  bool            // история пришла хотя бы раз
 }
@@ -47,7 +49,7 @@ func (m *Model) openCard() tea.Cmd {
 		return nil
 	}
 	m.showing = true
-	m.card = cardState{id: t.ID, open: map[string]bool{}}
+	m.card = cardState{id: t.ID, open: map[string]bool{}, nCrit: len(selectableCriteria(t))}
 	return m.historyCmd(t)
 }
 
@@ -71,11 +73,11 @@ func (m *Model) historyCmd(t *task.Task) tea.Cmd {
 func (c *cardState) set(msg historyMsg) {
 	c.entries, c.mtime = msg.entries, msg.mtime
 	c.rebuild()
-	if !c.loaded {
-		c.cursor = max(len(c.rows)-1, 0)
+	if !c.loaded && !c.moved {
+		c.cursor = c.nCrit + max(len(c.rows)-1, 0)
 	}
 	c.loaded = true
-	c.cursor = min(c.cursor, max(len(c.rows)-1, 0))
+	c.cursor = min(c.cursor, c.last())
 }
 
 func (m *Model) setHistoryMsg(msg historyMsg) {
@@ -117,23 +119,29 @@ func (c *cardState) changed() time.Time {
 	return c.entries[len(c.entries)-1].At
 }
 
-// step двигает курсор по истории.
+// last - индекс последней выбираемой строки: критерии и история.
+func (c *cardState) last() int { return max(c.nCrit+len(c.rows)-1, 0) }
+
+// step двигает курсор по критериям и истории.
 func (c *cardState) step(d int) {
-	c.cursor = min(max(c.cursor+d, 0), max(len(c.rows)-1, 0))
+	c.moved = true
+	c.cursor = min(max(c.cursor+d, 0), c.last())
 }
 
-// toggle раскрывает серию правок под курсором или сворачивает раскрытую.
+// toggle раскрывает серию правок под курсором или сворачивает раскрытую. Строка критерия
+// не серия: её переключает cardEnter.
 func (c *cardState) toggle() {
-	if c.cursor >= len(c.rows) || c.rows[c.cursor].group < 0 {
+	row := c.cursor - c.nCrit
+	if row < 0 || row >= len(c.rows) || c.rows[row].group < 0 {
 		return
 	}
-	g := c.rows[c.cursor].group
+	g := c.rows[row].group
 	key := groupKey(c.entries[g])
 	c.open[key] = !c.open[key]
 	c.rebuild()
 	for i, r := range c.rows {
 		if r.group == g {
-			c.cursor = i
+			c.cursor = c.nCrit + i
 			return
 		}
 	}
@@ -141,6 +149,10 @@ func (c *cardState) toggle() {
 
 // cardView собирает кадр карточки из текущего файла задачи.
 func (m *Model) cardView() view.Card {
+	if t := m.byID(m.card.id); t != nil {
+		m.card.nCrit = len(selectableCriteria(t))
+	}
+	m.card.cursor = min(m.card.cursor, m.card.last())
 	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, W: m.w, H: m.h}
 	c.Status, c.IsErr = m.statusText()
 	c.History = make([]history.Entry, len(m.card.rows))
@@ -157,6 +169,7 @@ func (m *Model) cardView() view.Card {
 	c.Details = section(t.Body, "Details")
 	if crit := t.Criteria(); len(crit) > 0 {
 		c.Checks = checks(crit)
+		c.CritAt = selectableCriteria(t)
 	}
 	return c
 }
@@ -202,4 +215,19 @@ func section(body, name string) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
+// criterionRows - индексы строк-критериев в тексте раздела Details. Число строк должно совпасть
+// с числом критериев задачи, иначе выбор критериев выключен: раздел и ядро прочли разное.
+func criterionRows(details string, want int) []int {
+	at := task.CriterionRows(details)
+	if len(at) != want {
+		return nil
+	}
+	return at
+}
+
+// selectableCriteria - строки критериев задачи в тексте Details, которые выбирает курсор.
+func selectableCriteria(t *task.Task) []int {
+	return criterionRows(section(t.Body, "Details"), len(t.Criteria()))
 }

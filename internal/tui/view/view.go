@@ -16,7 +16,11 @@ type Row struct {
 	ID, Project, Title, Summary, Meta string
 	Ask, Note                         string
 	Star                              bool // звёздочка в первой строке; ненулевой Ask включает её сам
+	Grabbed                           bool // карточка захвачена: подсветка и маркер "=" вместо ">"
 }
+
+// UnknownColumn - имя колонки для задач со статусом, которого нет в config.toml.
+const UnknownColumn = "?"
 
 // Col - колонка доски.
 type Col struct {
@@ -45,6 +49,7 @@ type Card struct {
 	ID, Title, Column, Fields, Ask, Abstract, Summary, Details, Checks string
 	History                                                            []history.Entry
 	Cursor, Scroll, W, H                                               int
+	CritAt                                                             []int // строки-критерии в Details (индексы по "\n"); Cursor считает их перед историей
 	Status                                                             string
 	IsErr                                                              bool
 }
@@ -57,6 +62,7 @@ var (
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8A06A"))
 	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#111416"))
 	selAskStyle = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#E9CF6A"))
+	grabStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#E9CF6A")).Foreground(lipgloss.Color("#111416"))
 )
 
 // RenderInput рисует строку ввода: приглашение, текст и курсор. Длинный текст показывается хвостом.

@@ -82,7 +82,7 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		e.create("Alpha", "p", "work")
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key("m")
+		e.key(" ", "l", " ")
 		e.screenHas("waiting for:")
 		e.tm.Type("vendor reply")
 		e.key("enter")
@@ -94,7 +94,7 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		n := e.gitOut("rev-list", "--count", "HEAD")
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key("m")
+		e.key(" ", "l", " ")
 		e.screenHas("waiting for:")
 		e.key("esc")
 		e.until("строка ввода закрыта", func() bool { return !strings.Contains(e.text(), "waiting for:") })
@@ -110,7 +110,7 @@ func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 		}
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key("m")
+		e.key(" ", "l", " ")
 		e.until("задача в wait", func() bool { st, _, _, _ := e.get("T-1"); return st == "wait" })
 	})
 }
@@ -120,7 +120,7 @@ func TestMove_AgentMovedDuringPrompt_HumanMoveRefused(t *testing.T) {
 	e.create("Alpha", "p", "work")
 	e.start("", 140, 30)
 	e.screenHas("Alpha")
-	e.key("m")
+	e.key(" ", "l", " ")
 	e.screenHas("waiting for:")
 	if _, err := e.store.Move("T-1", "fin", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
 		t.Fatal(err)
@@ -142,7 +142,7 @@ func TestMove_RuleViolation_ShownInStatusLine(t *testing.T) {
 	}
 	e.start("", 140, 30)
 	e.screenHas("Alpha")
-	e.key("m")
+	e.key(" ", "l", " ")
 	e.screenHas(err.Error())
 	if st, _, _, _ := e.get("T-1"); st != "idea" {
 		t.Errorf("статус %s после отказа", st)
@@ -164,7 +164,7 @@ func TestMove_ToClosed_CriteriaCases(t *testing.T) {
 			e.body("T-1", c.body)
 			e.start("", 140, 30)
 			e.screenHas("Alpha")
-			e.key("m")
+			e.key(" ", "l", " ")
 			if c.reply != "" {
 				e.screenHas("close reason:")
 				e.tm.Type(c.reply)

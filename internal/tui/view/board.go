@@ -10,10 +10,45 @@ import (
 const (
 	colWidth   = 24
 	colGap     = 2
-	cardLines  = 5 // ID и проект, название, сводка, мета, пустая
-	boardFrame = 7 // шапка, линия, имена колонок, линии колонок, линия, состояние, подсказка
-	boardHint  = "h l column  j k card  enter open  m M move  J K order  o order by due  p project  e edit  c comment  q quit"
+	cardLines  = 5   // ID и проект, название, сводка, мета, пустая
+	boardFrame = 7   // шапка, линия, имена колонок, линии колонок, линия, состояние, подсказка
+	plusMark   = "+" // последний знак ячейки имени колонки: кнопка новой задачи
 )
+
+// hintItem - пара подсказки: клавиша и слово. Кнопка - любая пара, кроме arrows.
+type hintItem struct{ key, word string }
+
+var boardHints = []hintItem{
+	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"}, {"a", "answer"},
+	{"e", "edit"}, {"c", "comment"}, {"o", "order"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
+}
+
+// hintSpan - место пары в строке подсказки: знаки [x0, x1).
+type hintSpan struct {
+	key    string
+	x0, x1 int
+}
+
+// boardHint и hintSpans строятся один раз из boardHints: рисование и попадание мыши берут одну раскладку.
+var boardHint, hintSpans = layoutHints(boardHints)
+
+func layoutHints(items []hintItem) (string, []hintSpan) {
+	var sb strings.Builder
+	spans := make([]hintSpan, 0, len(items))
+	for i, it := range items {
+		if i > 0 {
+			sb.WriteString("  ")
+		}
+		x0 := lipgloss.Width(sb.String())
+		sb.WriteString(it.key + " " + it.word)
+		span := hintSpan{key: it.key, x0: x0, x1: lipgloss.Width(sb.String())}
+		if it.key == "arrows" {
+			span.key = ""
+		}
+		spans = append(spans, span)
+	}
+	return sb.String(), spans
+}
 
 // RenderBoard рисует доску: колонки по 24 знака, окно колонок за курсором.
 func RenderBoard(b Board) string {
@@ -124,7 +159,12 @@ func boardHeader(b Board, first, last int) string {
 func columnNames(b Board, first, last int) string {
 	names := make([]string, 0, last-first)
 	for i := first; i < last; i++ {
-		name := fit(fmt.Sprintf("%s %d", clean(b.Cols[i].Name), len(b.Cols[i].Rows)), colWidth)
+		name := fmt.Sprintf("%s %d", clean(b.Cols[i].Name), len(b.Cols[i].Rows))
+		if b.Cols[i].Name == UnknownColumn {
+			name = fit(name, colWidth)
+		} else {
+			name = fit(name, colWidth-2) + " " + plusMark
+		}
 		if i == b.Col {
 			name = accentStyle.Render(name)
 		}
@@ -170,7 +210,10 @@ func columnCells(b Board, index, bodyHeight int) []string {
 func rowCells(row Row, selected bool) []string {
 	star := row.Star || strings.TrimSpace(row.Ask) != ""
 	marker := " "
-	if selected {
+	switch {
+	case row.Grabbed:
+		marker = "="
+	case selected:
 		marker = ">"
 	}
 	head := marker + clean(row.ID+" "+row.Project)
@@ -179,20 +222,24 @@ func rowCells(row Row, selected bool) []string {
 	meta := " " + clean(row.Meta)
 	blank := strings.Repeat(" ", colWidth)
 
-	if selected {
-		first := selStyle.Render(fit(head, colWidth))
-		if star {
-			first = selStyle.Render(fit(head, colWidth-2)+" ") + selAskStyle.Render("*")
+	if selected || row.Grabbed {
+		sel, selAsk := selStyle, selAskStyle
+		if row.Grabbed {
+			sel, selAsk = grabStyle, grabStyle
 		}
-		pulse := selStyle
+		first := sel.Render(fit(head, colWidth))
+		if star {
+			first = sel.Render(fit(head, colWidth-2)+" ") + selAsk.Render("*")
+		}
+		pulse := sel
 		if strings.TrimSpace(row.Ask) != "" {
-			pulse = selAskStyle
+			pulse = selAsk
 		}
 		return []string{
 			first,
-			selStyle.Render(fit(title, colWidth)),
+			sel.Render(fit(title, colWidth)),
 			pulse.Render(fit(summary, colWidth)),
-			selStyle.Render(fit(meta, colWidth)),
+			sel.Render(fit(meta, colWidth)),
 			blank,
 		}
 	}

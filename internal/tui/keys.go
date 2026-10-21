@@ -24,14 +24,25 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.input != nil {
 		return m.inputKey(msg)
 	}
+	return m.dispatch(msg.String())
+}
+
+// dispatch выполняет клавишу k; клик по кнопке подсказки вызывает его с именем той же клавиши.
+func (m *Model) dispatch(k string) tea.Cmd {
+	if m.grab != nil {
+		return m.grabKey(k)
+	}
+	if m.help {
+		return m.helpKey(k)
+	}
 	m.setStatus("", false)
-	if k := msg.String(); k == "q" || k == "ctrl+c" {
+	if k == "q" || k == "ctrl+c" {
 		return tea.Quit
 	}
 	if m.showing {
-		return m.cardKey(msg.String())
+		return m.cardKey(k)
 	}
-	return m.boardKey(msg.String())
+	return m.boardKey(k)
 }
 
 func (m *Model) boardKey(k string) tea.Cmd {
@@ -54,6 +65,18 @@ func (m *Model) boardKey(k string) tea.Cmd {
 		m.cycleProject()
 	case "enter":
 		return m.openCard()
+	case "space":
+		m.startGrab()
+	case "n":
+		return m.startNew(m.board.Col)
+	case "a":
+		return m.startAnswer()
+	case "g":
+		return m.startFocus()
+	case "delete", "backspace":
+		return m.startDelete()
+	case "?":
+		m.help = true
 	default:
 		return m.taskKey(k)
 	}
@@ -69,9 +92,50 @@ func (m *Model) cardKey(k string) tea.Cmd {
 	case "k", "up":
 		m.card.step(-1)
 	case "enter":
-		m.card.toggle()
+		return m.cardEnter()
+	case "left", "h":
+		return m.siblingCard(-1)
+	case "right", "l":
+		return m.siblingCard(1)
+	case "a":
+		return m.startAnswer()
+	case "f":
+		return m.startField()
+	case "g":
+		return m.startFocus()
+	case "delete", "backspace":
+		return m.startDelete()
+	case "?":
+		m.help = true
 	default:
 		return m.taskKey(k)
+	}
+	return nil
+}
+
+// siblingCard открывает предыдущую (dir -1) или следующую задачу той же колонки; на краю - ничего.
+func (m *Model) siblingCard(dir int) tea.Cmd {
+	for _, ts := range m.colTasks {
+		for i, t := range ts {
+			if t.ID != m.card.id {
+				continue
+			}
+			if i+dir < 0 || i+dir >= len(ts) || !m.selectTask(ts[i+dir].ID) {
+				return nil
+			}
+			return m.openCard()
+		}
+	}
+	return nil
+}
+
+// helpKey: справка закрывается esc или ?; q и ctrl+c выходят, прочее игнорируется.
+func (m *Model) helpKey(k string) tea.Cmd {
+	switch k {
+	case "esc", "?":
+		m.help = false
+	case "q", "ctrl+c":
+		return tea.Quit
 	}
 	return nil
 }
@@ -79,10 +143,6 @@ func (m *Model) cardKey(k string) tea.Cmd {
 // taskKey - клавиши, общие для доски и карточки: действие над текущей задачей.
 func (m *Model) taskKey(k string) tea.Cmd {
 	switch k {
-	case "m":
-		return m.startMove(1)
-	case "M":
-		return m.startMove(-1)
 	case "e":
 		return m.startEdit()
 	case "c":
@@ -113,6 +173,8 @@ func (m *Model) event(msg tea.Msg) tea.Cmd {
 		m.setNotes(msg)
 	case opDone:
 		return m.opResult(msg)
+	case taskCreated:
+		return m.created(msg)
 	case historyMsg:
 		m.setHistoryMsg(msg)
 	case editReady:

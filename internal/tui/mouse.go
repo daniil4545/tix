@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"tracker/internal/config"
+	"tracker/internal/core"
 	"tracker/internal/tui/view"
 )
 
@@ -22,14 +23,21 @@ type click struct {
 	at time.Time
 }
 
-// mouse разбирает мышь. Режим мыши включён на доске и в карточке (View); строка ввода
-// получает только клавиши, поэтому при ней мышь игнорируется.
+// mouse разбирает мышь. Режим мыши включён на доске и в карточке (View). При строке ввода
+// левый клик уходит в inputClick, остальное игнорируется; при захвате мышь игнорируется.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
+	mouse := msg.Mouse()
 	if m.input != nil {
+		m.press = nil
+		if _, ok := msg.(tea.MouseClickMsg); ok && mouse.Button == tea.MouseLeft {
+			return m.inputClick(mouse.X, mouse.Y)
+		}
+		return nil
+	}
+	if m.grab != nil || m.help {
 		m.press = nil
 		return nil
 	}
-	mouse := msg.Mouse()
 	switch msg.(type) {
 	case tea.MouseClickMsg:
 		if mouse.Button == tea.MouseLeft {
@@ -62,13 +70,21 @@ func (m *Model) selectAt(col, row int) {
 }
 
 // mouseClick: клик по карточке выбирает её; второй за doubleClick по той же задаче открывает.
-// Нажатие запоминается для переноса. Клик мимо карточек и клик в карточке задачи - ничего.
+// Нажатие запоминается для переноса. Кнопка подсказки равна клавише, "+" в имени колонки -
+// новая задача в ней. Клик мимо карточек - ничего; в карточке задачи - cardClick.
 func (m *Model) mouseClick(e tea.Mouse) tea.Cmd {
 	m.press = nil
 	if m.showing {
-		return nil
+		return m.cardClick(e.X, e.Y)
+	}
+	if key, ok := view.HitHint(m.layout(), e.X, e.Y); ok {
+		return m.dispatch(key)
 	}
 	hit := view.HitBoard(m.layout(), e.X, e.Y)
+	if hit.Plus {
+		m.setStatus("", false)
+		return m.startNew(hit.Col)
+	}
 	if hit.Row < 0 {
 		return nil
 	}
@@ -89,7 +105,7 @@ func (m *Model) mouseClick(e tea.Mouse) tea.Cmd {
 	return nil
 }
 
-// mouseRelease переносит задачу, нажатую мышью, в колонку под курсором: через тот же startMove,
+// mouseRelease переносит задачу, нажатую мышью, в колонку под курсором: через тот же moveTo,
 // что у клавиши m (проверки, строка причины). Над той же колонкой и вне колонок - ничего.
 func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	p := m.press
@@ -114,14 +130,10 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	}
 	m.lastClick = click{}
 	m.setStatus("", false)
-	switch {
-	case target == unknownColumn:
-		m.setStatus(t.ID+": unknown column", true)
-		return nil
-	case !m.selectTask(t.ID):
+	if !m.selectTask(t.ID) {
 		return nil
 	}
-	return m.startMove(hit.Col - m.board.Col)
+	return m.moveTo(t, target, core.MoveOpts{})
 }
 
 // configured: колонка описана в config.toml.

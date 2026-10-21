@@ -4,10 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
+	"tracker/internal/config"
 	"tracker/internal/core"
 	"tracker/internal/task"
 )
@@ -126,53 +128,54 @@ func (m *Model) checkStatus(id, status string) error {
 	return nil
 }
 
-// startMove переносит текущую задачу в соседнюю колонку: dir 1 вправо, -1 влево.
-// В waiting и closed ядро требует причину, её спрашивает строка ввода.
-func (m *Model) startMove(dir int) tea.Cmd {
-	t := m.current()
-	if t == nil {
-		return nil
-	}
-	cols := m.cfg.Columns
-	from := -1
-	for i, c := range cols {
-		if c.Name == t.Status {
-			from = i
-		}
-	}
-	if from < 0 {
+// moveTo переносит задачу в колонку target одной записью Move; opts.Place - место в колонке.
+// В waiting и closed ядро требует причину, её спрашивает строка ввода; перестановка внутри
+// колонки причины не требует. Общий шаг для перетаскивания и захвата.
+func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd {
+	if !m.configured(t.Status) {
 		m.setStatus(t.ID+": column "+t.Status+" is not in config", true)
 		return nil
 	}
-	to := from + dir
-	if to < 0 || to >= len(cols) {
+	i := slices.IndexFunc(m.cfg.Columns, func(c config.Column) bool { return c.Name == target })
+	if i < 0 {
+		m.setStatus(t.ID+": unknown column", true)
 		return nil
 	}
-	target := cols[to]
-	move := func(opts core.MoveOpts) tea.Cmd {
-		return m.submit(t.ID, t.Status+" > "+target.Name, nil, func() (core.Result, error) {
-			if err := m.checkStatus(t.ID, t.Status); err != nil {
+	col, from, label := m.cfg.Columns[i], t.Status, "moved"
+	if target != from {
+		label = from + " > " + target
+	}
+	move := func(o core.MoveOpts) tea.Cmd {
+		return m.submit(t.ID, label, nil, func() (core.Result, error) {
+			if err := m.checkStatus(t.ID, from); err != nil {
 				return core.Result{}, err
 			}
-			return m.d.Store.Move(t.ID, target.Name, opts, m.d.Actor)
+			return m.d.Store.Move(t.ID, target, o, m.d.Actor)
 		})
 	}
-	switch target.Role {
+	if target == from {
+		return move(opts)
+	}
+	ask := func(prompt string, force bool) tea.Cmd {
+		m.ask(prompt, func(text string) tea.Cmd {
+			o := opts
+			o.Message, o.Force = text, force
+			return move(o)
+		})
+		return nil
+	}
+	switch col.Role {
 	case "waiting":
 		if strings.TrimSpace(t.Waiting) == "" {
-			m.ask("waiting for:", func(text string) tea.Cmd { return move(core.MoveOpts{Message: text}) })
-			return nil
+			return ask("waiting for:", false)
 		}
 	case "closed":
 		total, open := countCriteria(t)
 		if total == 0 || open > 0 {
-			m.ask("close reason:", func(text string) tea.Cmd {
-				return move(core.MoveOpts{Message: text, Force: open > 0})
-			})
-			return nil
+			return ask("close reason:", open > 0)
 		}
 	}
-	return move(core.MoveOpts{})
+	return move(opts)
 }
 
 // reorder сдвигает текущую задачу в своей колонке: dir 1 вниз, -1 вверх. На краю - ничего.

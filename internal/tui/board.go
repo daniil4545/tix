@@ -16,12 +16,29 @@ import (
 )
 
 // unknownColumn - колонка для задач, чей статус не описан в config.toml (в конце доски).
-const unknownColumn = "?"
+const unknownColumn = view.UnknownColumn
 
 // apply принимает свежий список задач и перестраивает доску, выбор держится на id.
 func (m *Model) apply(tasks []*task.Task, skipped int) {
 	m.tasks, m.skipped = tasks, skipped
+	m.dropGone()
 	m.rebuild()
+}
+
+// dropGone снимает захват, если захваченной задачи нет на доске или её перенесли с начала захвата.
+func (m *Model) dropGone() {
+	if m.grab == nil {
+		return
+	}
+	t := m.byID(m.grab.id)
+	switch {
+	case t == nil || (m.project != "" && t.Project != m.project):
+		m.setStatus(m.grab.id+" removed", true)
+		m.grab = nil
+	case t.Status != m.grab.status:
+		m.setStatus(m.grab.id+" moved meanwhile, grab cancelled", true)
+		m.grab = nil
+	}
 }
 
 // rebuild строит колонки по фильтру проекта и ставит курсор на selID.
@@ -40,6 +57,9 @@ func (m *Model) rebuild() {
 		if !slices.Contains(names, col) {
 			col = unknownColumn
 		}
+		if g := m.grab; g != nil && g.id == t.ID {
+			g.held, g.baseCol = t, col
+		}
 		byCol[col] = append(byCol[col], t)
 		total++
 	}
@@ -49,9 +69,17 @@ func (m *Model) rebuild() {
 	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row, ByDue: m.board.ByDue,
 		FirstCol: m.board.FirstCol, RowTop: m.board.RowTop}
 	m.colTasks = m.colTasks[:0]
+	target := ""
+	if m.grab != nil {
+		m.grab.col = min(max(m.grab.col, 0), len(names)-1)
+		target = names[m.grab.col]
+	}
 	for _, name := range names {
 		ts := byCol[name]
 		sortTasks(ts, m.board.ByDue)
+		if m.grab != nil {
+			ts = m.grab.place(name, ts, target, m.board.ByDue)
+		}
 		m.colTasks = append(m.colTasks, ts)
 		b.Cols = append(b.Cols, view.Col{Name: name, Rows: m.rows(ts)})
 	}
@@ -178,6 +206,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 		out[i] = view.Row{
 			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
 			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Note: m.note(t, now),
+			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}
 	return out

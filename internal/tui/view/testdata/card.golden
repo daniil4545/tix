@@ -16,4 +16,5 @@ history
   01.10 12:00  daniil           comment
                                 use a dash for empty values
 ----------------------------------------------------------------------------------------------------
-e editor  c comment  m M move  j k history  enter unfold  esc back
+
+e edit  c comment  a answer  f field  g session  del delete  j k history  esc back

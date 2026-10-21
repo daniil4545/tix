@@ -814,7 +814,7 @@ func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 	e.create("Bravo", "work")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
-	e.key("m") // Alpha -> wait: строка причины
+	e.key(" ", "l", " ") // Alpha -> wait: строка причины
 	e.screenHas("waiting for:")
 	before := e.commits()
 	e.click(3, mvY(1)) // клик по Bravo

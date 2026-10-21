@@ -46,6 +46,7 @@ func (a *app) actorOf(p *parsed) (string, error) {
 	if err := actor.Valid(name); err != nil {
 		return "", inputf("bad actor %q: %s", name, firstLine(err.Error()))
 	}
+	a.who = name
 	return name, nil
 }
 
