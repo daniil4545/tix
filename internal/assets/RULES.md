@@ -5,13 +5,22 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tk`. Ru
 ## Cycle
 
 1. `tk take T-12`: the task moves to the active column and you hold it for 3 hours.
-2. Work. Log each step with `tk note T-12 "text"`. Any other write of yours to the task extends the hold; `note` does not.
+2. Work. Log progress with `tk note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
 3. `tk check T-12 1 2`: mark finished criteria.
-4. `tk set T-12 summary="what is next"`: the first line of the summary shows on the board.
+4. `tk set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
 5. `tk comment T-12 "text"`: comments are only appended.
 6. `tk done T-12 -m "result"`: closes the task and releases it.
 
 When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tk take T-12 --release`.
+
+## Progress
+
+The human reads the task instead of your session. Keep it short and current.
+
+- Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
+- Whoever answers a question in `ask`, you or the human, record it: `tk comment T-12 "Answer: ..."`, then `tk set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
+- New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
+- A task should fit one session. It grew past that: create tasks for the rest, then `tk done T-12 --force -m "rest in T-15, T-16"`.
 
 ## Identity
 

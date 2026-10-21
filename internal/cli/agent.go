@@ -2,6 +2,8 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -21,6 +23,7 @@ const (
 	rulesFile      = "RULES.md"
 	closedRole     = "closed"
 	backupFallback = "origin"
+	hookStdinLimit = 64 << 10
 )
 
 // actorOf возвращает автора записи: --as, затем окружение (actor.Resolve);
@@ -43,6 +46,7 @@ func (a *app) actorOf(p *parsed) (string, error) {
 	if err := actor.Valid(name); err != nil {
 		return "", inputf("bad actor %q: %s", name, firstLine(err.Error()))
 	}
+	a.who = name
 	return name, nil
 }
 
@@ -67,12 +71,15 @@ func target(p *parsed, positional int, usage string) (string, error) {
 }
 
 func (a *app) cmdCtx(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"project": true, "json": false}))
+	p, err := parseArgs(args, withCommon(flagSpec{"project": true, "json": false, "hook": false}))
 	if err != nil {
 		return err
 	}
 	if len(p.pos) > 0 {
 		return inputf("ctx takes no arguments, extra: %s", p.pos[0])
+	}
+	if p.set["hook"] {
+		a.exportModel()
 	}
 	who, err := a.actorOf(p)
 	if err != nil {
@@ -119,6 +126,65 @@ func (a *app) cmdCtx(args []string) error {
 	}
 	a.out("%s", strings.TrimRight(b.Text(), "\n"))
 	return nil
+}
+
+// hookReadTimeout - общий срок чтения stdin хука: раннер мог не закрыть pipe.
+var hookReadTimeout = 2 * time.Second
+
+// readHookModel читает один JSON-объект со stdin (до hookStdinLimit) и отдаёт model.
+// Срок вышел или ввод не JSON - пусто. Горутина чтения при сроке остаётся до конца процесса.
+func readHookModel(r io.Reader) string {
+	done := make(chan string, 1)
+	go func() {
+		var in struct {
+			Model string `json:"model"`
+		}
+		if json.NewDecoder(io.LimitReader(r, hookStdinLimit)).Decode(&in) != nil {
+			done <- ""
+			return
+		}
+		done <- in.Model
+	}()
+	select {
+	case model := <-done:
+		return model
+	case <-time.After(hookReadTimeout):
+		return ""
+	}
+}
+
+// exportModel читает JSON хука SessionStart со stdin и дописывает `export TRACKER_MODEL='<model>'`; кавычки гасят glob в [1m]
+// в CLAUDE_ENV_FILE. Нет файла, пустой или чужой ввод, модель не проходит проверку - молча
+// пропуск: хук не должен ломать сессию. Файл исполняет shell, поэтому значение проверяется.
+func (a *app) exportModel() {
+	path := a.env.Getenv("CLAUDE_ENV_FILE")
+	if path == "" || a.env.Stdin == nil {
+		return
+	}
+	model := readHookModel(a.env.Stdin)
+	if !actor.ValidModel(model) {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // путь задаёт Claude Code
+	if err != nil {
+		a.warn("model not exported: %s", firstLine(err.Error()))
+		return
+	}
+	line := "export TRACKER_MODEL='" + model + "'\n"
+	// Чужая последняя строка без перевода строки слиплась бы с нашей.
+	if st, statErr := f.Stat(); statErr == nil && st.Size() > 0 {
+		last := make([]byte, 1)
+		if _, readErr := f.ReadAt(last, st.Size()-1); readErr == nil && last[0] != '\n' {
+			line = "\n" + line
+		}
+	}
+	_, werr := f.WriteString(line)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		a.warn("model not exported: %s", firstLine(werr.Error()))
+	}
 }
 
 // tilde сокращает домашнюю папку до ~.

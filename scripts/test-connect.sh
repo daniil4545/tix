@@ -85,10 +85,14 @@ link_tools() { # каталог, исключение
   if [ -n "${TK_BIN:-}" ]; then ln -sf "$TK_BIN" "$dir/tk"; else cp "$BASE/tk-stub" "$dir/tk"; fi
 }
 
-# Заглушка tk: знает только `ctx`, любая другая форма вызова - код 64.
+# Заглушка tk: знает `ctx`, `ctx --hook` и `inbox --hook` (пустой ответ), любая другая форма - код 64.
 cat >"$BASE/tk-stub" <<'EOF'
 #!/bin/sh
-if [ "$#" -eq 1 ] && [ "$1" = ctx ]; then
+if [ "$#" -eq 2 ] && [ "$1" = inbox ] && [ "$2" = --hook ]; then
+  cat >/dev/null 2>&1 || true
+  exit 0
+fi
+if { [ "$#" -eq 1 ] && [ "$1" = ctx ]; } || { [ "$#" -eq 2 ] && [ "$1" = ctx ] && [ "$2" = --hook ]; }; then
   cat >/dev/null 2>&1 || true
   echo "tk ctx: stub, 0 tasks"
   exit 0
@@ -144,6 +148,8 @@ same_bytes() { cmp -s "$1" "$2" || fail "${3:-файл изменён}: $1"; }
 must_exist() { [ -e "$1" ] || [ -L "$1" ] || fail "нет $1"; }
 must_absent() { [ ! -e "$1" ] && [ ! -L "$1" ] || fail "остался $1"; }
 baks() { find "$HOME" -name '*.tk-bak-*' | LC_ALL=C sort; }
+# Наши группы хуков во всех событиях; пустые массивы событий после удаления тоже уходят.
+DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tk ctx" or .command == "tk ctx --hook" or .command == "tk inbox --hook") | not))) | with_entries(select(.value | length > 0)))'
 MANIFEST() { echo "$HOME/tasks/.tracker/connect-state.json"; }
 files_in_home() { (cd "$HOME" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort); }
 
@@ -214,10 +220,17 @@ t_apply_clean_writes_exact_paths() {
 
   local s=$HOME/.claude/settings.json
   jq_ok "$s" '.permissions.allow | index("Bash(tk *)") != null' 'Claude: Bash(tk *) в allow'
-  jq_ok "$s" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Claude: группа SessionStart с tk ctx'
+  jq_ok "$s" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx --hook")] | length == 1' 'Claude: группа SessionStart с tk ctx --hook'
   jq_ok "$s" 'keys | sort == ["hooks","permissions"]' 'Claude: лишние ключи в settings.json'
   local h=$HOME/.codex/hooks.json
   jq_ok "$h" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Codex: группа SessionStart с tk ctx'
+  local ev
+  for ev in PostToolUse UserPromptSubmit Stop; do
+    jq_ok "$s" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Claude: хук $ev с tk inbox --hook"
+    jq_ok "$h" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Codex: хук $ev с tk inbox --hook"
+  done
+  jq_ok "$s" '.hooks.PostToolUse[0].matcher == "*"' 'Claude: matcher PostToolUse'
+  jq_ok "$h" '.hooks.Stop | length == 1' 'Codex: в чистом HOME одна группа Stop'
   grep -qF 'prefix_rule(pattern=["tk"], decision="allow")' "$HOME/.codex/rules/tk.rules" || fail "Codex: tk.rules без prefix_rule для tk"
   jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'манифест'
 
@@ -308,12 +321,35 @@ t_existing_tk_permission_survives_undo() {
   jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" '.permissions' 'permissions после undo'
 }
 
-t_existing_own_hook_survives_undo() {
+t_existing_own_hook_upgraded_and_restored() {
   new_home; seed_claude claude-settings-ownhook.json
   apply
-  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук tk ctx продублирован'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'свой хук tk ctx не стал tk ctx --hook'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 0' 'остался старый хук tk ctx'
+  run apply --agent all --now "$NOW2"
+  [ "$RC" -eq 0 ] || fail "повторный apply: код $RC"
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | startswith("tk ctx"))] | length == 1' 'повторный apply продублировал хук'
   undo
-  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'свой хук tk ctx не должен меняться'
+  jq_eq "$HOME/.claude/settings.json" "$ORIG/settings.json" . 'свой хук tk ctx должен вернуться как был'
+}
+
+# Хук, поставленный прежней версией (коннектор с `tk ctx`), обновляется на месте и снимается целиком.
+t_old_installed_hook_upgraded() {
+  new_home
+  local old=$BASE/oldroot cur=$CONNECT
+  rm -rf "$old"; mkdir -p "$old/scripts"
+  cp "$CONNECT" "$old/scripts/connect.sh"; cp -R "$CONN" "$old/connectors"
+  sed -i.bak 's/tk ctx --hook/tk ctx/' "$old/connectors/claude/hooks.json"; rm -f "$old/connectors/claude/hooks.json.bak"
+  CONNECT=$old/scripts/connect.sh apply
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'старый коннектор не поставил tk ctx'
+  CONNECT=$cur
+  apply
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'хук не обновлён на tk ctx --hook'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 0' 'остался старый хук tk ctx'
+  jq_ok "$HOME/.claude/settings.json" '.hooks.SessionStart | length == 1' 'группа SessionStart продублирована'
+  jq_ok "$HOME/.codex/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'Codex: хук должен остаться tk ctx'
+  undo
+  [ -z "$(find "$HOME" -mindepth 1)" ] || fail "после undo остались следы: $(find "$HOME" -mindepth 1 | head -5)"
 }
 
 t_modified_own_files_skipped_without_force() {
@@ -405,7 +441,7 @@ t_symlinked_configs_stay_symlinks() {
     [ "$(mode "$HOME/dotfiles/$name")" = "$want" ] || fail "права цели $name: $(mode "$HOME/dotfiles/$name"), ожидалось $want"
   done
   jq_ok "$HOME/dotfiles/settings.json" '.permissions.allow | index("Bash(tk *)") != null' 'запись ушла в цель симлинка'
-  jq_ok "$HOME/dotfiles/settings.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук Claude ушёл в цель симлинка'
+  jq_ok "$HOME/dotfiles/settings.json" '[.. | objects | select(.command? == "tk ctx --hook")] | length == 1' 'хук Claude ушёл в цель симлинка'
   jq_ok "$HOME/dotfiles/hooks.json" '[.. | objects | select(.command? == "tk ctx")] | length == 1' 'хук Codex ушёл в цель симлинка'
   undo
   for link in .claude/settings.json:settings.json .codex/hooks.json:hooks.json; do
@@ -448,10 +484,10 @@ t_foreign_content_intact() {
   echo 'user backup' >"$HOME/.claude/settings.json.bak"
   apply
   local s=$HOME/.claude/settings.json
-  jq_eq "$s" "$ORIG/settings.json" 'del(.permissions.allow) | del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")))' 'Claude: чужие ключи (кроме allow и нашей группы)'
+  jq_eq "$s" "$ORIG/settings.json" "del(.permissions.allow) | $DROP_OURS" 'Claude: чужие ключи (кроме allow и нашей группы)'
   [ "$(jq -c '.permissions.allow[0:3]' "$s")" = "$(jq -c '.permissions.allow' "$ORIG/settings.json")" ] || fail "порядок чужих allow нарушен: $(jq -c .permissions.allow "$s")"
   jq_ok "$s" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-claude-start"' 'Claude: чужая группа осталась первой'
-  jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" 'del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")))' 'Codex: чужие группы SessionStart и Stop'
+  jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" "$DROP_OURS" 'Codex: чужие группы SessionStart и Stop'
   jq_ok "$HOME/.codex/hooks.json" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-codex-start"' 'Codex: чужая группа осталась первой'
   same_bytes "$HOME/.codex/rules/default.rules" "$ORIG/default.rules" 'default.rules изменён'
   same_bytes "$HOME/.codex/config.toml" "$ORIG/config.toml" 'config.toml изменён'
@@ -526,7 +562,7 @@ t_hook_reads_stdin_and_output_is_short() {
     for w in $MATCHER_WORDS; do
       jq_ok "$HOME/${f#*:}" "[.hooks.SessionStart[].matcher // \"\" | split(\"|\") | index(\"$w\")] | any(. != null)" "$name: matcher SessionStart без $w"
     done
-    while IFS= read -r c; do cmds+=("$name|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")) | .hooks[].command' "$HOME/${f#*:}")
+    while IFS= read -r c; do cmds+=("$name|$c"); done < <(jq -r '.hooks.SessionStart[] | select(any(.hooks[]?; (.command | startswith("tk ctx")))) | .hooks[].command' "$HOME/${f#*:}")
   done
   [ "${#cmds[@]}" -eq 2 ] || fail "найдено хуков tk ctx: ${#cmds[@]}, нужно по одному в Claude и Codex"
   for c in "${cmds[@]}"; do
@@ -536,6 +572,23 @@ t_hook_reads_stdin_and_output_is_short() {
     [ "${#out}" -lt 2000 ] || fail "$name: вывод хука ${#out} знаков, нужно меньше 2000"
     [ -n "$out" ] || fail "$name: хук ничего не вывел в контекст"
   done
+}
+
+# Установленные хуки inbox запускаются как есть: код 0 на входе хука, вывода у заглушки нет.
+t_inbox_hook_commands_run() {
+  new_home
+  apply
+  local f ev c n=0 rc
+  for f in .claude/settings.json .codex/hooks.json; do
+    for ev in PostToolUse UserPromptSubmit Stop; do
+      while IFS= read -r c; do
+        env -i HOME="$HOME" PATH="$TOOLS" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" >/dev/null 2>"$H.err"; rc=$?
+        [ "$rc" -eq 0 ] || fail "$f $ev: '$c' вернул $rc: $(head -3 "$H.err")"
+        n=$((n + 1))
+      done < <(jq -r ".hooks.${ev}[] | select(any(.hooks[]?; .command | startswith(\"tk inbox\"))) | .hooks[].command" "$HOME/$f")
+    done
+  done
+  [ "$n" -eq 6 ] || fail "запущено хуков inbox: $n, нужно 6 (три события у двух агентов)"
 }
 
 t_skill_copies_identical_and_small() {
@@ -565,7 +618,8 @@ TESTS=(
   t_undo_restores_original_json
   t_undo_on_pristine_home_leaves_no_trace
   t_existing_tk_permission_survives_undo
-  t_existing_own_hook_survives_undo
+  t_existing_own_hook_upgraded_and_restored
+  t_old_installed_hook_upgraded
   t_modified_own_files_skipped_without_force
   t_undo_removes_only_manifest_files
   t_undo_without_manifest_says_so
@@ -578,6 +632,7 @@ TESTS=(
   t_missing_tools_err_and_files_intact
   t_broken_or_unexpected_json_err_and_file_intact
   t_hook_reads_stdin_and_output_is_short
+  t_inbox_hook_commands_run
   t_skill_copies_identical_and_small
 )
 [ "$#" -gt 0 ] && TESTS=("$@")

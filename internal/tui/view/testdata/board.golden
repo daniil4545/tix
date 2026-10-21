@@ -1,0 +1,14 @@
+tracker  project: alpha  4 tasks                                                                                                  
+--------------------------------------------------------------------------------------------------------------------------------
+idea 0                 +  todo 2                 +  doing 1                +  blocked 1              +  done 0                 +
+------------------------  ------------------------  ------------------------  ------------------------  ------------------------
+                          >T-7 alpha                 T-12 beta                 T-15 beta                                        
+                           Fix login                 Report on calls           GPU access                                       
+                           see notes                                           waiting for: invoice                             
+                           1/3 28.10                 @claude                                                                    
+                                                                                                                                
+                                                                                                                                
+                                                                                                                                
+--------------------------------------------------------------------------------------------------------------------------------
+ok T-7 todo > doing
+arrows select  space grab  enter open  n new  a answer  e edit  c comment  o order  p project  ? help  q quit

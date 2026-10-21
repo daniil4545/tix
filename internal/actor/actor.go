@@ -3,6 +3,7 @@ package actor
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"unicode"
 )
@@ -48,6 +49,18 @@ func Valid(name string) error {
 		}
 	}
 	return nil
+}
+
+// maxModel - предел длины имени модели.
+const maxModel = 100
+
+// modelRe - допустимые знаки имени модели. Значение уходит в `export` для shell и в
+// трейлер коммита: кавычки, пробелы, точка с запятой, $, обратный апостроф и переводы строк не проходят.
+var modelRe = regexp.MustCompile(`^[A-Za-z0-9._:/\[\]-]+$`)
+
+// ValidModel проверяет имя модели для трейлера Model и для CLAUDE_ENV_FILE.
+func ValidModel(name string) bool {
+	return len(name) <= maxModel && modelRe.MatchString(name)
 }
 
 // Short сокращает имя до "kind:" и 8 знаков id. У id с префиксом "ses_" (OpenCode) префикс

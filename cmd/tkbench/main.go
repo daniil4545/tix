@@ -42,6 +42,7 @@ type bench struct {
 	name     string
 	targetMS float64
 	args     []string
+	env      []string             // добавка к окружению запуска
 	argsOf   func(n int) []string // аргументы прогона n; вместо args, если задана
 	before   func(n int) error    // правка перед каждым прогоном, не входит в время
 	check    func(n int, out string) error
@@ -102,7 +103,7 @@ func run(tk string, tasks, runs, warm int, keep bool) (bool, error) {
 
 	var samples []sample
 	pass := true
-	for _, b := range benches(home, tasks) {
+	for _, b := range append(benches(home, tasks), tuiBenches()...) {
 		s, err := measure(tk, home, b, runs, warm)
 		if err != nil {
 			return false, fmt.Errorf("%s: %w", b.name, err)
@@ -214,7 +215,7 @@ func measure(tk, home string, b bench, runs, warm int) (sample, error) {
 		if b.argsOf != nil {
 			args = b.argsOf(i)
 		}
-		d, out, err := timeRun(tk, home, args)
+		d, out, err := timeRun(tk, home, args, b.env)
 		if err != nil {
 			return sample{}, err
 		}
@@ -266,10 +267,11 @@ func cleanEnv() []string {
 	return env
 }
 
-func timeRun(tk, home string, args []string) (time.Duration, string, error) {
+func timeRun(tk, home string, args, env []string) (time.Duration, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 	defer cancel()
 	cmd := tkCmd(ctx, tk, home, args)
+	cmd.Env = append(cmd.Env, env...)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	start := time.Now()
@@ -300,7 +302,7 @@ func editOutside(path string, n int) error {
 // seed строит базу: первую задачу создаёт сам tk (папка, git, config, .gitignore),
 // остальные пишутся файлами и уходят одним коммитом; затем история из комментариев.
 func seed(tk, home string, tasks int) error {
-	if _, _, err := timeRun(tk, home, []string{"new", "bench seed"}); err != nil {
+	if _, _, err := timeRun(tk, home, []string{"new", "bench seed"}, nil); err != nil {
 		return err
 	}
 	bin, err := gitx.Resolve(os.Getenv("TRACKER_GIT"))

@@ -10,7 +10,7 @@ Run `tk ctx` first (the session hook may already have printed it). It lists task
 ## Work cycle
 
 1. `tk take T-12` - claim a task (3 hours, renewed by your writes).
-2. `tk note T-12 "what I did"` - log a step.
+2. `tk note T-12 "decided X because Y"` - log a decision, question, finding or stage change; not every command.
 3. `tk check T-12 1 2` - tick done criteria by number.
 4. `tk set T-12 summary="..."` - short result for the human.
 5. `tk done T-12 -m "result"` - close; unchecked criteria need `--force`.

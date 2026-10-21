@@ -29,7 +29,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tk ctx|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+	usage              = "tk ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -92,6 +92,7 @@ type app struct {
 	log   *slog.Logger
 	store *core.Store
 	root  string
+	who   string // личность последней записи; пусто, пока команда не разобрала автора
 }
 
 // Run выполняет команду и возвращает код выхода. Ловит панику.
@@ -107,7 +108,16 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 		a.fail(err)
 		return exitCode(err)
 	}
+	if writeCmds[a.cmd] {
+		a.recordFocus()
+	}
 	return 0
+}
+
+// writeCmds - команды, после успеха которых агент оставляет адрес своей вкладки (спека 4a).
+var writeCmds = map[string]bool{
+	"new": true, "edit": true, "comment": true, "note": true, "rm": true,
+	"take": true, "move": true, "set": true, "check": true, "done": true,
 }
 
 func (a *app) dispatch(ctx context.Context, args []string) error {
@@ -136,6 +146,8 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdRemove(args)
 	case "ctx":
 		return a.cmdCtx(args)
+	case "inbox":
+		return a.cmdInbox(args)
 	case "take":
 		return a.cmdTake(args)
 	case "move":
@@ -181,39 +193,16 @@ func firstLine(s string) string {
 }
 
 // rootDir: TRACKER_HOME, иначе ~/tasks.
-func (a *app) rootDir() (string, error) {
-	if dir := a.env.Getenv("TRACKER_HOME"); dir != "" {
-		return dir, nil
-	}
-	home := a.env.Getenv("HOME")
-	if home == "" {
-		var err error
-		if home, err = os.UserHomeDir(); err != nil {
-			return "", fmt.Errorf("home directory unknown, set TRACKER_HOME: %w", err)
-		}
-	}
-	return filepath.Join(home, "tasks"), nil
-}
+func (a *app) rootDir() (string, error) { return rootDir(a.env) }
 
 // open открывает базу; лог пишется в .tracker/log, если папка уже есть.
 func (a *app) open() error {
-	root, err := a.rootDir()
-	if err != nil {
-		return err
-	}
-	timeout := defaultLockTimeout
-	if raw := a.env.Getenv("TRACKER_LOCK_TIMEOUT"); raw != "" {
-		if timeout, err = time.ParseDuration(raw); err != nil || timeout <= 0 {
-			return fmt.Errorf("TRACKER_LOCK_TIMEOUT %q: duration like 5s required", raw)
-		}
+	store, log, root, _, err := OpenStore(a.env)
+	if log != nil {
+		a.log = log
 	}
 	a.root = root
-	a.log = slog.New(slog.NewTextHandler(&lazyLog{dir: filepath.Join(root, ".tracker")}, nil))
-	a.store, err = core.Open(root, core.Options{
-		LockTimeout: timeout,
-		GitBin:      a.env.Getenv("TRACKER_GIT"),
-		Log:         a.log,
-	})
+	a.store = store
 	return err
 }
 

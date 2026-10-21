@@ -29,6 +29,8 @@ DRY=1
 QUIET=0
 BAKED=""
 BAKLIST=""
+CODEX_NEW=0
+HOOK_EVENTS='["SessionStart","PostToolUse","UserPromptSubmit","Stop"]'
 
 die() { printf 'err: %s\n' "$*" >&2; exit 1; }
 warn() { printf 'warn: %s\n' "$*" >&2; }
@@ -204,14 +206,23 @@ ST_ARR='(try (getpath($p)|type) catch "bad") as $t
     elif (getpath($p)|index([$v])) != null then "ok"
     else "add" end'
 ST_HOOK='(try (getpath($p)|type) catch "bad") as $t
+  | ($v.hooks[0].command) as $want
   | if $t=="null" then "add"
     elif $t!="array" then "err: \($p|join(".")) не массив"
-    elif any(getpath($p)[]?; any((.hooks // [])[]?; .command == "tk ctx")) then "ok"
+    elif any(getpath($p)[]?; any((.hooks // [])[]?; .command == $want)) then "ok"
+    elif $want == "tk ctx --hook" and any(getpath($p)[]?; any((.hooks // [])[]?; .command == "tk ctx")) then "upd"
     else "add" end'
 AD_ARR='setpath($p; (getpath($p) // []) + [$v])'
 RM_ARR='if (try (getpath($p)|type) catch "x") == "array" then setpath($p; getpath($p) | map(select(. != $v))) else . end'
 RM_HOOK='if (try (getpath($p)|type) catch "x") == "array" then
-    setpath($p; getpath($p) | map(select((type == "object" and ((.hooks // []) | length) == 1 and .hooks[0].command == "tk ctx") | not)))
+    setpath($p; getpath($p) | map(select((type == "object" and ((.hooks // []) | length) == 1 and (.hooks[0].command == "tk ctx" or .hooks[0].command == "tk ctx --hook" or .hooks[0].command == "tk inbox --hook")) | not)))
+  else . end'
+# Старый хук `tk ctx` становится `tk ctx --hook` (UP_HOOK); снятие возвращает его (DN_HOOK).
+UP_HOOK='setpath($p; getpath($p) | map(if (.hooks | type) == "array"
+    then .hooks |= map(if type == "object" and .command == "tk ctx" then .command = "tk ctx --hook" else . end) else . end))'
+DN_HOOK='if (try (getpath($p)|type) catch "x") == "array" then
+    setpath($p; getpath($p) | map(if (.hooks | type) == "array"
+      then .hooks |= map(if type == "object" and .command == "tk ctx --hook" then .command = "tk ctx" else . end) else . end))
   else . end'
 CREATED='. as $d | [range(1; ($p|length) + 1) as $i | $p[:$i] as $q | select(($d | getpath($q)) == null) | $q]'
 PRUNE='reduce ($c | reverse)[] as $q (.; (try getpath($q) catch null) as $x
@@ -221,15 +232,17 @@ PRUNE='reduce ($c | reverse)[] as $q (.; (try getpath($q) catch null) as $x
 jedit_apply() {
   local pre=$1 file=$2 p=$3 v=$4 st=$5 ad=$6 op=$7 label=$8 fcreated=${9:-}
   local real doc status created entry new key ag
-  case $pre in codex-hook) ag=codex ;; *) ag=claude ;; esac
+  case $pre in codex-hook*) ag=codex ;; *) ag=claude ;; esac
   real=$(resolve "$file")
   doc=$(json_load "$real")
   status=$(jq -r --argjson p "$p" --argjson v "$v" "$st" <<<"$doc") || die "не разобрать $real"
   case $status in
     ok) return 0 ;;
     err*) die "${status#err: } ($real); запись не сделана" ;;
+    upd) pre=${pre}-up; ad=$UP_HOOK; op=hookup; label="$ag: hooks.SessionStart tk ctx -> tk ctx --hook" ;;
   esac
   act "$label: $real"
+  [ "$ag" = codex ] && CODEX_NEW=1
   [ "$DRY" = 1 ] && return 0
   if [ -z "$fcreated" ]; then
     if [ -e "$real" ]; then fcreated=false; else fcreated=true; fi
@@ -322,21 +335,29 @@ check_tools() {
 
 # ---------- агенты ----------
 
+# put_hooks AGENT SRC FILE: по группе на каждое событие источника. Ключ манифеста SessionStart
+# прежний (claude-hook), у остальных событий с именем события.
+put_hooks() {
+  local ag=$1 src=$2 file=$3 ev group pre cmd
+  while IFS= read -r ev; do
+    group=$(jq -ce --arg e "$ev" '.hooks[$e][0]' "$src") || die "нет группы $ev в $src"
+    cmd=$(jq -r '.hooks[0].command' <<<"$group")
+    pre="$ag-hook"
+    [ "$ev" = SessionStart ] || pre="$ag-hook-$ev"
+    jedit_apply "$pre" "$file" "$(jq -nc --arg e "$ev" '["hooks",$e]')" "$group" "$ST_HOOK" "$AD_ARR" hook \
+      "$ag: hooks.$ev += $cmd"
+  done < <(jq -r --argjson ok "$HOOK_EVENTS" '.hooks | keys_unsorted[] | select(. as $e | $ok | index($e))' "$src")
+}
+
 run_claude() {
-  local group
-  group=$(jq -ce '.hooks.SessionStart[0]' "$CLAUDE_HOOKS_SRC") || die "нет группы SessionStart в $CLAUDE_HOOKS_SRC"
-  jedit_apply "claude-hook" "$SETTINGS" '["hooks","SessionStart"]' "$group" "$ST_HOOK" "$AD_ARR" hook \
-    "claude: hooks.SessionStart += tk ctx"
+  put_hooks claude "$CLAUDE_HOOKS_SRC" "$SETTINGS"
   jedit_apply "allow" "$SETTINGS" '["permissions","allow"]' '"Bash(tk *)"' "$ST_ARR" "$AD_ARR" arr \
     "claude: permissions.allow += Bash(tk *)"
   put_skill "$CLAUDE_SKILL" claude
 }
 
 run_codex() {
-  local group
-  group=$(jq -ce '.hooks.SessionStart[0]' "$CODEX_HOOKS_SRC") || die "нет группы SessionStart в $CODEX_HOOKS_SRC"
-  jedit_apply "codex-hook" "$CODEX_HOOKS" '["hooks","SessionStart"]' "$group" "$ST_HOOK" "$AD_ARR" hook \
-    "codex: hooks.SessionStart += tk ctx"
+  put_hooks codex "$CODEX_HOOKS_SRC" "$CODEX_HOOKS"
   put_file "file|$(resolve "$CODEX_RULES")" "$(resolve "$CODEX_RULES")" "$CODEX_RULES_SRC" "codex: правило" codex
   put_skill "$CODEX_SKILL" codex
 }
@@ -409,10 +430,10 @@ undo_entry() { # $1 = JSON записи; 0 - снято, 1 - оставлено
   case $kind in
     json)
       f=$(jq -r .file <<<"$e"); p=$(jq -c .path <<<"$e"); v=$(jq -c .value <<<"$e")
-      jq -e '.path == ["hooks","SessionStart"] or .path == ["permissions","allow"]' <<<"$e" >/dev/null \
+      jq -e --argjson ok "$HOOK_EVENTS" '(.path | length == 2 and .[0] == "hooks" and (.[1] as $x | $ok | index($x) != null)) or .path == ["permissions","allow"]' <<<"$e" >/dev/null \
         || { warn "undo: ключ вне белого списка, пропуск: $p в $f"; return 1; }
       op=$(jq -r .op <<<"$e"); c=$(jq -c .created <<<"$e"); fc=$(jq -r .file_created <<<"$e")
-      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
+      case $op in arr) rm_prog=$RM_ARR ;; hook) rm_prog=$RM_HOOK ;; hookup) rm_prog=$DN_HOOK ;; *) die "манифест: неизвестный op $op" ;; esac
       if [ -e "$f" ]; then
         doc=$(json_load "$f")
         new=$(jq --argjson p "$p" --argjson v "$v" --argjson c "$c" "$rm_prog | $PRUNE" <<<"$doc") \
@@ -484,6 +505,7 @@ case $CMD in
     DRY=0 QUIET=0
     run_agents
     drop_backups
+    [ "$CODEX_NEW" = 0 ] || act "codex: новые хуки могут потребовать доверия: откройте /hooks в Codex и подтвердите tk inbox --hook"
     ;;
   undo)
     DRY=0

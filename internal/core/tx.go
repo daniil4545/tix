@@ -212,7 +212,7 @@ func sortedIDs(ids map[string]bool) []string {
 // commit коммитит байты операции, а не файлы дерева: чужая запись после rename не уходит
 // под actor. Отказ git - Warning в ответе, правка уже в файле.
 func (s *Store) commit(tx *txEnv, res *Result, files []gitx.File, subject, actor string) {
-	h, err := tx.repo.CommitFiles(files, subject, actor, s.codeTrailer())
+	h, err := tx.repo.CommitFiles(files, subject, actor, s.codeTrailer(), modelTrailer())
 	if err != nil {
 		s.log.Warn("commit not recorded", "op", "commit", "id", res.ID, "err", gitx.Detail(err))
 		res.Warning = warnCommit
@@ -318,7 +318,7 @@ func (s *Store) writePending(tx *txEnv) []gitx.File {
 }
 
 // mergeBody возвращает тело для SetBody. База совпала с файлом - новое тело как есть;
-// иначе трёхстороннее слияние тел через git merge-file. Конфликт - ErrConflict.
+// иначе трёхстороннее слияние тел через git merge-file. Конфликт - *ConflictError.
 func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string, error) {
 	if baseRev == curRev {
 		return body, nil
@@ -353,7 +353,7 @@ func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string,
 		return "", err
 	}
 	if conflict {
-		return "", fmt.Errorf("%w: body changed after tk show, reread and retry", ErrConflict)
+		return "", &ConflictError{Rev: curRev, Merged: string(out)}
 	}
 	return string(out), nil
 }
