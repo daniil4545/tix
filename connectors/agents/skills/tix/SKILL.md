@@ -9,7 +9,7 @@ Run `tix ctx` first (the session hook may already have printed it). It lists tas
 
 ## Work cycle
 
-0. Agreed work that no task covers gets one: `tix new "title"` (the project is the folder above `.git`), criteria as `- [ ]` lines under `## Details`: write the body to a file, take `rev` from `tix show T-12 --json`, run `tix edit T-12 --base <rev> < body.md`, then `tix move T-12 ready`. A trivial edit needs no task.
+0. Agreed work with no task gets one: `tix new "title"`; criteria are `- [ ]` lines under `## Details` in a body file, `tix edit T-12 --base <rev> < body.md` (`rev` from `tix show T-12 --json`); then `tix move T-12 ready`. Trivial edits need none.
 1. `tix take T-12` - claim a task (3 hours, renewed by your writes).
 2. `tix note T-12 "decided X because Y"` - log a decision, question, finding or stage change; not every command.
 3. `tix check T-12 1 2` - tick done criteria by number.
