@@ -101,17 +101,20 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	if hit.Col < 0 {
 		return nil
 	}
-	m.lastClick = click{}
-	m.setStatus("", false)
 	t := m.byID(p.id)
 	if t == nil {
+		m.lastClick = click{}
 		m.setStatus(p.id+" removed", true)
 		return nil
 	}
 	target := m.board.Cols[hit.Col].Name
-	switch {
-	case target == t.Status || (target == unknownColumn && !m.configured(t.Status)):
+	// Отпускание над своей колонкой - вторая половина клика: память о клике остаётся для двойного.
+	if target == t.Status || (target == unknownColumn && !m.configured(t.Status)) {
 		return nil
+	}
+	m.lastClick = click{}
+	m.setStatus("", false)
+	switch {
 	case target == unknownColumn:
 		m.setStatus(t.ID+": unknown column", true)
 		return nil

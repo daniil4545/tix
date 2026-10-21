@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -188,5 +189,22 @@ func TestMouse_Drag_TaskMovedMeanwhile_ReleaseOverItsColumnIsNoMove(t *testing.T
 	}
 	if st := e.statusOf(t, "T-1"); st != "c" || strings.Contains(m.status, "T-1") {
 		t.Errorf("T-1: %s, статус %q: ждали задачу на месте и пустой статус", st, m.status)
+	}
+}
+
+// Терминал шлёт клик как нажатие и отпускание; двойной клик - две такие пары подряд.
+func TestMouse_DoubleClick_WithReleases_OpensCard(t *testing.T) {
+	e := mvNewEnv(t, twoColCfg)
+	e.create("Alpha", "b")
+	m := newMouseModel(t, e, 80, 24)
+	now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	m.now = func() time.Time { return now }
+	leftClick(m, mvX(0), mvY(0))
+	leftRelease(m, mvX(0), mvY(0))
+	now = now.Add(150 * time.Millisecond)
+	leftClick(m, mvX(0), mvY(0))
+	leftRelease(m, mvX(0), mvY(0))
+	if !m.showing {
+		t.Fatal("двойной клик с отпусканиями не открыл карточку")
 	}
 }
