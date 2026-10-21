@@ -29,7 +29,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tk ctx|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+	usage              = "tk ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -146,6 +146,8 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdRemove(args)
 	case "ctx":
 		return a.cmdCtx(args)
+	case "inbox":
+		return a.cmdInbox(args)
 	case "take":
 		return a.cmdTake(args)
 	case "move":

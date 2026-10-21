@@ -28,7 +28,7 @@
    T-12 human 11:26: Answer: ...
    ```
    до 8 000 знаков, длинный комментарий обрезается; не влезло - последняя строка `... more: tk show T-12`. Отметка сдвигается на все новые комментарии до печати: доставка не чаще одного раза, Stop не может зациклиться. Не удалось записать отметку - пустой вывод.
-5. Формат по `hook_event_name`: PostToolUse и UserPromptSubmit - `additionalContext`; Stop - `decision: block` с текстом в `reason`. Иное событие или нет stdin - пустой вывод.
+5. Формат по `hook_event_name`: PostToolUse и UserPromptSubmit - `additionalContext`; Stop - `decision: block` с текстом в `reason`. Stop блокирует агента только при новом комментарии автора `human`: комментарии других агентов идут лишь в PostToolUse и UserPromptSubmit, иначе два агента гоняют друг друга по кругу. Иное событие или нет stdin - пустой вывод.
 6. Любая ошибка (нет базы, битый файл, нет личности) - пустой вывод, код 0, строка в `.tracker/log`: хук не ломает работу агента.
 7. Скорость: одно чтение задач (`List`), без git. Хук вызывается на каждый шаг агента.
 8. Коннекторы: Claude Code - PostToolUse (matcher `*`), UserPromptSubmit и Stop с командой `tk inbox --hook`, таймаут 10 с; Codex - те же события в `hooks.json`. `connect.sh` ставит и снимает их, как хук старта; Codex может потребовать доверия к хуку в `/hooks` - сказать в выводе `connect.sh`.

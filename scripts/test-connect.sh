@@ -85,9 +85,13 @@ link_tools() { # каталог, исключение
   if [ -n "${TK_BIN:-}" ]; then ln -sf "$TK_BIN" "$dir/tk"; else cp "$BASE/tk-stub" "$dir/tk"; fi
 }
 
-# Заглушка tk: знает только `ctx` и `ctx --hook`, любая другая форма вызова - код 64.
+# Заглушка tk: знает `ctx`, `ctx --hook` и `inbox --hook` (пустой ответ), любая другая форма - код 64.
 cat >"$BASE/tk-stub" <<'EOF'
 #!/bin/sh
+if [ "$#" -eq 2 ] && [ "$1" = inbox ] && [ "$2" = --hook ]; then
+  cat >/dev/null 2>&1 || true
+  exit 0
+fi
 if { [ "$#" -eq 1 ] && [ "$1" = ctx ]; } || { [ "$#" -eq 2 ] && [ "$1" = ctx ] && [ "$2" = --hook ]; }; then
   cat >/dev/null 2>&1 || true
   echo "tk ctx: stub, 0 tasks"
@@ -144,6 +148,8 @@ same_bytes() { cmp -s "$1" "$2" || fail "${3:-файл изменён}: $1"; }
 must_exist() { [ -e "$1" ] || [ -L "$1" ] || fail "нет $1"; }
 must_absent() { [ ! -e "$1" ] && [ ! -L "$1" ] || fail "остался $1"; }
 baks() { find "$HOME" -name '*.tk-bak-*' | LC_ALL=C sort; }
+# Наши группы хуков во всех событиях; пустые массивы событий после удаления тоже уходят.
+DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tk ctx" or .command == "tk ctx --hook" or .command == "tk inbox --hook") | not))) | with_entries(select(.value | length > 0)))'
 MANIFEST() { echo "$HOME/tasks/.tracker/connect-state.json"; }
 files_in_home() { (cd "$HOME" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort); }
 
@@ -218,6 +224,13 @@ t_apply_clean_writes_exact_paths() {
   jq_ok "$s" 'keys | sort == ["hooks","permissions"]' 'Claude: лишние ключи в settings.json'
   local h=$HOME/.codex/hooks.json
   jq_ok "$h" '[.hooks.SessionStart[] | select(.matcher == "startup|resume|clear|compact") | .hooks[] | select(.command == "tk ctx")] | length == 1' 'Codex: группа SessionStart с tk ctx'
+  local ev
+  for ev in PostToolUse UserPromptSubmit Stop; do
+    jq_ok "$s" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Claude: хук $ev с tk inbox --hook"
+    jq_ok "$h" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tk inbox --hook\" and .timeout == 10)] | length == 1" "Codex: хук $ev с tk inbox --hook"
+  done
+  jq_ok "$s" '.hooks.PostToolUse[0].matcher == "*"' 'Claude: matcher PostToolUse'
+  jq_ok "$h" '.hooks.Stop | length == 1' 'Codex: в чистом HOME одна группа Stop'
   grep -qF 'prefix_rule(pattern=["tk"], decision="allow")' "$HOME/.codex/rules/tk.rules" || fail "Codex: tk.rules без prefix_rule для tk"
   jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'манифест'
 
@@ -471,10 +484,10 @@ t_foreign_content_intact() {
   echo 'user backup' >"$HOME/.claude/settings.json.bak"
   apply
   local s=$HOME/.claude/settings.json
-  jq_eq "$s" "$ORIG/settings.json" 'del(.permissions.allow) | del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx --hook")))' 'Claude: чужие ключи (кроме allow и нашей группы)'
+  jq_eq "$s" "$ORIG/settings.json" "del(.permissions.allow) | $DROP_OURS" 'Claude: чужие ключи (кроме allow и нашей группы)'
   [ "$(jq -c '.permissions.allow[0:3]' "$s")" = "$(jq -c '.permissions.allow' "$ORIG/settings.json")" ] || fail "порядок чужих allow нарушен: $(jq -c .permissions.allow "$s")"
   jq_ok "$s" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-claude-start"' 'Claude: чужая группа осталась первой'
-  jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" 'del(.hooks.SessionStart[] | select(any(.hooks[]?; .command == "tk ctx")))' 'Codex: чужие группы SessionStart и Stop'
+  jq_eq "$HOME/.codex/hooks.json" "$ORIG/hooks.json" "$DROP_OURS" 'Codex: чужие группы SessionStart и Stop'
   jq_ok "$HOME/.codex/hooks.json" '.hooks.SessionStart[0].hooks[0].command == "echo foreign-codex-start"' 'Codex: чужая группа осталась первой'
   same_bytes "$HOME/.codex/rules/default.rules" "$ORIG/default.rules" 'default.rules изменён'
   same_bytes "$HOME/.codex/config.toml" "$ORIG/config.toml" 'config.toml изменён'
@@ -561,6 +574,23 @@ t_hook_reads_stdin_and_output_is_short() {
   done
 }
 
+# Установленные хуки inbox запускаются как есть: код 0 на входе хука, вывода у заглушки нет.
+t_inbox_hook_commands_run() {
+  new_home
+  apply
+  local f ev c n=0 rc
+  for f in .claude/settings.json .codex/hooks.json; do
+    for ev in PostToolUse UserPromptSubmit Stop; do
+      while IFS= read -r c; do
+        env -i HOME="$HOME" PATH="$TOOLS" LANG=C "$TOOLS/sh" -c "$c" <"$FIX/hook-stdin.json" >/dev/null 2>"$H.err"; rc=$?
+        [ "$rc" -eq 0 ] || fail "$f $ev: '$c' вернул $rc: $(head -3 "$H.err")"
+        n=$((n + 1))
+      done < <(jq -r ".hooks.${ev}[] | select(any(.hooks[]?; .command | startswith(\"tk inbox\"))) | .hooks[].command" "$HOME/$f")
+    done
+  done
+  [ "$n" -eq 6 ] || fail "запущено хуков inbox: $n, нужно 6 (три события у двух агентов)"
+}
+
 t_skill_copies_identical_and_small() {
   new_home
   apply
@@ -602,6 +632,7 @@ TESTS=(
   t_missing_tools_err_and_files_intact
   t_broken_or_unexpected_json_err_and_file_intact
   t_hook_reads_stdin_and_output_is_short
+  t_inbox_hook_commands_run
   t_skill_copies_identical_and_small
 )
 [ "$#" -gt 0 ] && TESTS=("$@")

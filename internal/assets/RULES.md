@@ -19,6 +19,7 @@ The human reads the task instead of your session. Keep it short and current.
 
 - Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
 - Whoever answers a question in `ask`, you or the human, record it: `tk comment T-12 "Answer: ..."`, then `tk set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
+- New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
 - A task should fit one session. It grew past that: create tasks for the rest, then `tk done T-12 --force -m "rest in T-15, T-16"`.
 
 ## Identity
