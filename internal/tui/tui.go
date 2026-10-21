@@ -90,6 +90,10 @@ type Model struct {
 	notes map[string]gitx.Note // последние заметки задач для пульса; nil, пока git не ответил
 	now   func() time.Time     // часы модели: мета, пульс, двойной клик
 
+	press     *press // нажатие мыши на карточке; nil вне перетаскивания
+	lastClick click  // последний клик по карточке, для двойного
+	winCol    int    // колонка, которой принадлежит board.RowTop
+
 	status  string
 	isErr   bool
 	w, h    int
@@ -132,8 +136,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
+		m.fitWindow()
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
+	case tea.MouseMsg:
+		return m, m.mouse(msg)
 	case tea.PasteMsg:
 		if m.input != nil {
 			m.input.insert(msg.Content)
@@ -158,6 +165,7 @@ func (m *Model) View() tea.View {
 	}
 	v := tea.NewView(frame)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 

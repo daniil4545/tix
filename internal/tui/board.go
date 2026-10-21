@@ -46,7 +46,8 @@ func (m *Model) rebuild() {
 	if len(byCol[unknownColumn]) > 0 {
 		names = append(names, unknownColumn)
 	}
-	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row, ByDue: m.board.ByDue}
+	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row, ByDue: m.board.ByDue,
+		FirstCol: m.board.FirstCol, RowTop: m.board.RowTop}
 	m.colTasks = m.colTasks[:0]
 	for _, name := range names {
 		ts := byCol[name]
@@ -56,6 +57,16 @@ func (m *Model) rebuild() {
 	}
 	m.board = b
 	m.restoreSelection()
+	m.fitWindow()
+}
+
+// fitWindow сдвигает окна колонок и карточек, только если курсор вышел за них, и запоминает
+// их в доске. Окно другой колонки начинается сверху, как её рисуют, пока она не выбрана.
+func (m *Model) fitWindow() {
+	if m.board.Col != m.winCol {
+		m.board.RowTop, m.winCol = 0, m.board.Col
+	}
+	m.board.FirstCol, m.board.RowTop = view.FitWindow(m.layout())
 }
 
 // sortTasks сортирует колонку по rank; byDue: сначала задачи со сроком по дате, затем без срока по rank.
@@ -232,4 +243,5 @@ func (m *Model) moveCursor(dc, dr int) {
 	m.board.Row += dr
 	m.clampRow()
 	m.syncSelID()
+	m.fitWindow()
 }

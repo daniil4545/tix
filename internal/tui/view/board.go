@@ -17,7 +17,7 @@ const (
 
 // RenderBoard рисует доску: колонки по 24 знака, окно колонок за курсором.
 func RenderBoard(b Board) string {
-	first, last := columnWindow(len(b.Cols), b.Col, b.W)
+	first, last := columnWindow(len(b.Cols), b.Col, b.W, b.FirstCol)
 	shown := last - first
 	width := shown*colWidth + max(shown-1, 0)*colGap
 	if b.W > 0 {
@@ -67,8 +67,9 @@ func boardBodyHeight(h int) int {
 	return max(h-boardFrame, 0)
 }
 
-// columnWindow выбирает показанные колонки [first, last): страница, на которой стоит курсор.
-func columnWindow(count, cursor, w int) (first, last int) {
+// columnWindow выбирает показанные колонки [first, last). Окно липкое: hint - прежняя первая
+// колонка, она остаётся, пока курсор в окне; вышел за него - страница, на которой стоит курсор.
+func columnWindow(count, cursor, w, hint int) (first, last int) {
 	if count == 0 {
 		return 0, 0
 	}
@@ -78,7 +79,22 @@ func columnWindow(count, cursor, w int) (first, last int) {
 	}
 	cursor = min(max(cursor, 0), count-1)
 	first = min(cursor/visible*visible, count-visible)
+	if hint >= 0 && hint <= count-visible && cursor >= hint && cursor < hint+visible {
+		first = hint
+	}
 	return first, first + visible
+}
+
+// FitWindow возвращает окна доски, подогнанные под курсор: первую показанную колонку и верхнюю
+// карточку выбранной колонки. Модель хранит их в Board.FirstCol и Board.RowTop после каждого
+// сдвига курсора: рисование и попадание мыши берут одно состояние, клик окна не двигает.
+func FitWindow(b Board) (firstCol, rowTop int) {
+	if len(b.Cols) == 0 {
+		return 0, 0
+	}
+	firstCol, _ = columnWindow(len(b.Cols), b.Col, b.W, b.FirstCol)
+	rowTop, _ = rowWindow(b, min(max(b.Col, 0), len(b.Cols)-1), boardBodyHeight(b.H))
+	return firstCol, rowTop
 }
 
 func boardHeader(b Board, first, last int) string {
@@ -118,7 +134,8 @@ func columnNames(b Board, first, last int) string {
 }
 
 // rowWindow - карточки колонки index, попавшие в окно по высоте: индексы [offset, end).
-// У выбранной колонки окно идёт за курсором, у прочих стоит сверху. bodyHeight <= 0: все.
+// У выбранной колонки окно липкое: идёт от RowTop и сдвигается, только когда курсор выходит
+// за него; у прочих стоит сверху. bodyHeight <= 0: все.
 func rowWindow(b Board, index, bodyHeight int) (offset, end int) {
 	count := len(b.Cols[index].Rows)
 	if bodyHeight <= 0 {
@@ -126,7 +143,14 @@ func rowWindow(b Board, index, bodyHeight int) (offset, end int) {
 	}
 	capacity := max((bodyHeight+1)/cardLines, 1)
 	if index == b.Col {
-		offset = max(b.Row-capacity+1, 0)
+		offset = min(max(b.RowTop, 0), max(count-capacity, 0))
+		if b.Row < offset {
+			offset = b.Row
+		}
+		if b.Row >= offset+capacity {
+			offset = b.Row - capacity + 1
+		}
+		offset = max(offset, 0)
 	}
 	return offset, min(offset+capacity, count)
 }
@@ -160,10 +184,14 @@ func rowCells(row Row, selected bool) []string {
 		if star {
 			first = selStyle.Render(fit(head, colWidth-2)+" ") + selAskStyle.Render("*")
 		}
+		pulse := selStyle
+		if strings.TrimSpace(row.Ask) != "" {
+			pulse = selAskStyle
+		}
 		return []string{
 			first,
 			selStyle.Render(fit(title, colWidth)),
-			selStyle.Render(fit(summary, colWidth)),
+			pulse.Render(fit(summary, colWidth)),
 			selStyle.Render(fit(meta, colWidth)),
 			blank,
 		}

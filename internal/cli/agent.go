@@ -127,7 +127,32 @@ func (a *app) cmdCtx(args []string) error {
 	return nil
 }
 
-// exportModel читает JSON хука SessionStart со stdin и дописывает `export TRACKER_MODEL=<model>`
+// hookReadTimeout - общий срок чтения stdin хука: раннер мог не закрыть pipe.
+var hookReadTimeout = 2 * time.Second
+
+// readHookModel читает один JSON-объект со stdin (до hookStdinLimit) и отдаёт model.
+// Срок вышел или ввод не JSON - пусто. Горутина чтения при сроке остаётся до конца процесса.
+func readHookModel(r io.Reader) string {
+	done := make(chan string, 1)
+	go func() {
+		var in struct {
+			Model string `json:"model"`
+		}
+		if json.NewDecoder(io.LimitReader(r, hookStdinLimit)).Decode(&in) != nil {
+			done <- ""
+			return
+		}
+		done <- in.Model
+	}()
+	select {
+	case model := <-done:
+		return model
+	case <-time.After(hookReadTimeout):
+		return ""
+	}
+}
+
+// exportModel читает JSON хука SessionStart со stdin и дописывает `export TRACKER_MODEL='<model>'`; кавычки гасят glob в [1m]
 // в CLAUDE_ENV_FILE. Нет файла, пустой или чужой ввод, модель не проходит проверку - молча
 // пропуск: хук не должен ломать сессию. Файл исполняет shell, поэтому значение проверяется.
 func (a *app) exportModel() {
@@ -135,22 +160,24 @@ func (a *app) exportModel() {
 	if path == "" || a.env.Stdin == nil {
 		return
 	}
-	raw, err := io.ReadAll(io.LimitReader(a.env.Stdin, hookStdinLimit))
-	if err != nil {
+	model := readHookModel(a.env.Stdin)
+	if !actor.ValidModel(model) {
 		return
 	}
-	var in struct {
-		Model string `json:"model"`
-	}
-	if json.Unmarshal(raw, &in) != nil || !actor.ValidModel(in.Model) {
-		return
-	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // путь задаёт Claude Code
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // путь задаёт Claude Code
 	if err != nil {
 		a.warn("model not exported: %s", firstLine(err.Error()))
 		return
 	}
-	_, werr := f.WriteString("export TRACKER_MODEL=" + in.Model + "\n")
+	line := "export TRACKER_MODEL='" + model + "'\n"
+	// Чужая последняя строка без перевода строки слиплась бы с нашей.
+	if st, statErr := f.Stat(); statErr == nil && st.Size() > 0 {
+		last := make([]byte, 1)
+		if _, readErr := f.ReadAt(last, st.Size()-1); readErr == nil && last[0] != '\n' {
+			line = "\n" + line
+		}
+	}
+	_, werr := f.WriteString(line)
 	if cerr := f.Close(); werr == nil {
 		werr = cerr
 	}

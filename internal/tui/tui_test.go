@@ -1,7 +1,9 @@
 package tui_test
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -224,6 +226,12 @@ func TestReorder_JK_MovesWithinColumn_EdgesDoNothing(t *testing.T) {
 	step("J", "Bravo,Charlie,Alpha,Delta")
 	step("K", "Bravo,Alpha,Charlie,Delta")
 	step("K", "Alpha,Bravo,Charlie,Delta") // к верху - First
+	// Файл меняется раньше коммита: счётчик читаем, когда запись закоммичена.
+	e.until("запись закоммичена", func() bool {
+		out, err := exec.CommandContext(context.Background(), gitBin, "-C", e.root,
+			"--no-optional-locks", "status", "--porcelain", "--", "T-*.md").Output()
+		return err == nil && len(strings.TrimSpace(string(out))) == 0
+	})
 	n := e.gitOut("rev-list", "--count", "HEAD")
 	e.key("K") // у верха ничего
 	e.key("j", "j", "j", "J")

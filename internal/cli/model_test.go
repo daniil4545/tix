@@ -3,10 +3,12 @@ package cli_test
 import (
 	"bytes"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"tracker/internal/cli"
 )
@@ -38,7 +40,7 @@ func TestCtxHook_Stdin_WritesModelOnlyWhenSafe(t *testing.T) {
 		stdin string
 		want  string
 	}{
-		{"valid", `{"model":"claude-opus-4-8[1m]","source":"startup"}`, "export TRACKER_MODEL=claude-opus-4-8[1m]\n"},
+		{"valid", `{"model":"claude-opus-4-8[1m]","source":"startup"}`, "export TRACKER_MODEL='claude-opus-4-8[1m]'\n"},
 		{"semicolon", `{"model":"a;rm -rf ~"}`, ""},
 		{"command substitution", `{"model":"a$(id)"}`, ""},
 		{"backtick", "{\"model\":\"a`id`\"}", ""},
@@ -78,7 +80,7 @@ func TestCtxHook_Repeated_AppendsToExistingFile(t *testing.T) {
 	}
 	b.ok(`{"model":"m1"}`, "ctx", "--hook")
 	b.ok(`{"model":"m2"}`, "ctx", "--hook")
-	if got, want := b.envFileText(), "export A=1\nexport TRACKER_MODEL=m1\nexport TRACKER_MODEL=m2\n"; got != want {
+	if got, want := b.envFileText(), "export A=1\nexport TRACKER_MODEL='m1'\nexport TRACKER_MODEL='m2'\n"; got != want {
 		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
 	}
 }
@@ -137,4 +139,57 @@ func TestCommit_ModelTrailer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCtxHook_StdinNeverClosed_PrintsCtxWithoutModel(t *testing.T) {
+	defer cli.SetHookReadTimeout(100 * time.Millisecond)()
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+	b := newBox(t)
+	r := runWith(t, b, pr, "ctx", "--hook")
+	if r.code != 0 || !strings.Contains(r.out, msgNoTasks) {
+		t.Fatalf("ctx --hook с незакрытым stdin: код %d, out %q, err %q", r.code, r.out, r.err)
+	}
+	if got := b.envFileText(); got != "" {
+		t.Errorf("модель записана без ввода: %q", got)
+	}
+}
+
+func TestCtxHook_StdinNeverClosed_CompleteObjectStillRead(t *testing.T) {
+	defer cli.SetHookReadTimeout(5 * time.Second)()
+	pr, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+	go func() { _, _ = pw.Write([]byte(`{"model":"m1"}`)) }()
+	b := newBox(t)
+	r := runWith(t, b, pr, "ctx", "--hook")
+	if r.code != 0 {
+		t.Fatalf("код %d, err %q", r.code, r.err)
+	}
+	if got, want := b.envFileText(), "export TRACKER_MODEL='m1'\n"; got != want {
+		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
+	}
+}
+
+func TestCtxHook_EnvFileWithoutFinalNewline_KeepsForeignLine(t *testing.T) {
+	b := newBox(t)
+	b.extra = map[string]string{"CLAUDE_ENV_FILE": b.envFile()}
+	if err := os.WriteFile(b.envFile(), []byte("export A=1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	b.ok(`{"model":"m1"}`, "ctx", "--hook")
+	if got, want := b.envFileText(), "export A=1\nexport TRACKER_MODEL='m1'\n"; got != want {
+		t.Errorf("CLAUDE_ENV_FILE = %q, ждали %q", got, want)
+	}
+}
+
+// runWith запускает tk с произвольным stdin и CLAUDE_ENV_FILE.
+func runWith(t *testing.T, b *box, stdin io.Reader, args ...string) res {
+	t.Helper()
+	var o, e bytes.Buffer
+	vars := map[string]string{"TRACKER_HOME": b.home, "TRACKER_GIT": gitBin, "CLAUDE_ENV_FILE": b.envFile()}
+	code := cli.Run(context.Background(), args, cli.Env{
+		Stdin: stdin, Stdout: &o, Stderr: &e, Cwd: b.cwd,
+		Getenv: func(k string) string { return vars[k] },
+	})
+	return res{o.String(), e.String(), code}
 }
