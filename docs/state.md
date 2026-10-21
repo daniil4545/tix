@@ -7,16 +7,14 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## In progress
 
-- Trial run of v0.1.0 for 2-3 days in normal work (user, from 2026-10-21). Then T-38.
+- Trial run of v0.1.1 in normal work (user, from 2026-10-21): agents now open a tix task by default.
 - T-20 "A reply from the task reaches the agent": in `main`, hooks installed. Step "Acceptance": a live check
   on a new session (this one did not pick up the hooks), approval of the hooks in Codex `/hooks`.
 
 ## Next
 
-1. T-38: embed tix deeper into the work process, after the trial run. The user does not open the board now:
-   agents creating and closing their own tasks is enough. Start from what the trial showed.
-2. T-32: the user decides who owns `~/tasks/RULES.md` (the core writes it only at creation; the live file
-   still says `tk`).
+1. T-39: philosophy of tools (essay and agent rule), a separate session during the trial.
+2. T-44: an `ask` left by a closed session; jumping to its author fails. Decide what happens to the question.
 3. After the MVP: T-27 (clicks on the question line, needs a modifier probe in Warp), T-5, T-7.
 
 ## Open
@@ -43,3 +41,7 @@ repository, one commit on top, push. Never push from this repository (it has no 
   demo and board picture, CI on macOS and Linux, release with 4 archives. CI found a board defect: an edit
   before the watcher start was not shown (fixed, test under CPU load). Checked: `make check`, `test-connect.sh`,
   CI green, downloaded archive passes `SHA256SUMS` and prints `0.1.0`.
+- 2026-10-21. T-38 and T-32, release v0.1.1 (public snapshot `0541ca8`). tix is the default tracker in the
+  global layer (`~/.claude` `4b711c0`: CLAUDE.md, pipeline.md (the tix tracker section), skills spec, finish, grill,
+  commit, templates) and in the tracker and tarn profiles; `docs/backlog.md` moved into T-41 and T-42. The core
+  refreshes an untouched store `RULES.md` (live store refreshed). Checked: `make check`, `test-connect.sh`, CI.
