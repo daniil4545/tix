@@ -1040,6 +1040,7 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 func TestCardActions_ClickEmptySpace_DoesNothing(t *testing.T) {
 	e := acAsked(t, "")
 	e.acOpenCard("Alpha")
+	e.screenHas("seed") // history loads after the card opens: the baseline waits for it
 	e.settle()
 	before, commits := e.text(), e.acCommitCount()
 	e.click(120, 8)
