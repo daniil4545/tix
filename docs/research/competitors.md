@@ -1,64 +1,64 @@
-# Аналоги: wedow/ticket, его форки и beans
+# Analogs: wedow/ticket, its forks and beans
 
-Дата: 20.10.2026. Дополняет `landscape.md`, раздел 2: эти проекты в первую разведку не попали.
-Источники: README, GitHub API и код репозиториев (разбор агентами по файлу и строке). Звёзды и
-даты - на 20.10.2026. Опора для сравнения в README (З5).
+Date: 2026-10-20. Complements `landscape.md`, section 2: these projects did not appear in the first recon.
+Sources: README, GitHub API and the code of the repositories (analyzed by agents down to file and line). Stars and
+dates are as of 2026-10-20. Basis for the comparison in the README (S5).
 
-## Кто есть кто
+## Who is who
 
-| Проект | Звёзды | Язык | Жив | Хранилище | Запись | git | Захват | Старт сессии | TUI | MCP |
+| Project | Stars | Language | Alive | Storage | Write | git | Claim | Session start | TUI | MCP |
 |---|---|---|---|---|---|---|---|---|---|---|
-| wedow/ticket | 912 | bash | заморожен с 03.2026, 42 issue и PR открыты | `.tickets/` в репо | sed, без лока | не коммитит | нет | строка в CLAUDE.md | нет | нет |
-| hmans/beans | 952 | Go | тишина с 04.2026 | `.beans/` в репо | ETag, без лока | не коммитит | нет | хуки SessionStart и PreCompact, плагин Claude | да | нет, GraphQL |
-| EnderRealm/ticket | 0 | Go | активен, v8.8.0 | центральное | flock | автокоммит раз в 5 с | нет | нет | да | да |
-| lawrips/tkt | 3 | Go | push 08.2026, релизов нет | центральное | без лока, без rename | демон раз в 30 с | нет | `agent-setup` пишет в CLAUDE.md | да | 22 инструмента |
-| msampathkumar/ticket | 2 | bash + Python | активен, v0.5.2 | `.tickets/` в репо | mkdir-лок на тикет | не коммитит | `start --claim`, без перехвата | скилл, хука нет | веб | нет |
-| Backlog.md (уже в landscape) | 7078 | TS | активен | в репо | - | - | - | MCP | да | да |
+| wedow/ticket | 912 | bash | frozen since 2026-03, 42 issues and PRs open | `.tickets/` in the repo | sed, no lock | does not commit | no | a line in CLAUDE.md | no | no |
+| hmans/beans | 952 | Go | silent since 2026-04 | `.beans/` in the repo | ETag, no lock | does not commit | no | hooks SessionStart and PreCompact, Claude plugin | yes | no, GraphQL |
+| EnderRealm/ticket | 0 | Go | active, v8.8.0 | central | flock | autocommit every 5 s | no | no | yes | yes |
+| lawrips/tkt | 3 | Go | push 2026-08, no releases | central | no lock, no rename | daemon every 30 s | no | `agent-setup` writes to CLAUDE.md | yes | 22 tools |
+| msampathkumar/ticket | 2 | bash + Python | active, v0.5.2 | `.tickets/` in the repo | mkdir lock per task | does not commit | `start --claim`, no takeover | skill, no hook | web | no |
+| Backlog.md (already in landscape) | 7078 | TS | active | in the repo | - | - | - | MCP | yes | yes |
 
-Малые форки ticket (byronwall, namli, mjakl, skorokithakis) добавляют веб-вид, `tk set`, лок с
-атомарной записью, скилл. Звёзд у каждого не больше 3: спрос распылён, лидера среди форков нет.
+The small forks of ticket (byronwall, namli, mjakl, skorokithakis) add a web view, `tk set`, a lock with
+atomic write, a skill. Each has no more than 3 stars: demand is scattered, there is no leader among the forks.
 
-## Что подтверждает спрос
+## What confirms demand
 
-- Одно хранилище на проекты: issues ticket #15, #12, PR #29; форки EnderRealm и lawrips ушли в
-  центральное хранилище.
-- Задача ждёт человека: #39, PR #49, #50; пользователь josharian сам написал `tk ask`/`tk answer`.
-- Скилл вместо строки в CLAUDE.md: #3, автор обещал 09.01 и не сделал; форки добавили скилл.
-- Несколько агентов параллельно: #33 (параллельные Codex-агенты).
-- Show HN ticket 04.01.2026: 84 очка. Хвалят плоские файлы и простоту; спрашивают, как чистить
-  старые тикеты и зачем хранить их в репо.
+- One store for many projects: ticket issues #15, #12, PR #29; the forks EnderRealm and lawrips moved to
+  a central store.
+- A task waits for a human: #39, PR #49, #50; the user josharian wrote `tk ask`/`tk answer` himself.
+- A skill instead of a line in CLAUDE.md: #3, the author promised it on 2026-01-09 and did not deliver; the forks added a skill.
+- Several agents in parallel: #33 (parallel Codex agents).
+- Show HN ticket 2026-01-04: 84 points. People praise flat files and simplicity; they ask how to clean up
+  old tasks and why store them in the repo.
 
-## Чего нет ни у кого
+## What nobody has
 
-| Наше | Ближайшее у других |
+| Ours | Closest elsewhere |
 |---|---|
-| коммит на каждую правку с `Actor:`: кто, что, когда | автокоммит пачкой раз в 5-30 с (EnderRealm, lawrips) |
-| правка мимо ядра (Obsidian, руками) не теряется: external edit | нет |
-| захват сессией с перехватом `--steal` | `--claim` без перехвата (msampathkumar) |
-| `edit` по старой базе со слиянием `git merge-file` | ETag-отказ (beans), ревизия веба (lawrips) |
-| `ctx` хуком старта у Claude Code и Codex, скилл у трёх агентов | хуки только у beans и только Claude |
-| один бинарь Go с замером скорости в README | Go есть у форков, замеров нет ни у кого |
+| a commit per edit with `Actor:`: who, what, when | autocommit in batches every 5-30 s (EnderRealm, lawrips) |
+| an edit that bypasses the core (Obsidian, by hand) is not lost: external edit | no |
+| claim by session with the takeover `--steal` | `--claim` without takeover (msampathkumar) |
+| `edit` on an old base with the merge `git merge-file` | ETag refusal (beans), web revision (lawrips) |
+| `ctx` by start hook in Claude Code and Codex, skill in three agents | hooks only in beans and only for Claude |
+| one Go binary with a speed measurement in the README | Go exists in the forks, nobody has measurements |
 
-## Что берём (решения пользователя 20.10.2026)
+## What we take (user decisions of 2026-10-20)
 
-- Короткий id `12` (идея ticket, по префиксу) - Р48, З2.
-- Плагин Claude Code для установки (как у beans) - Р49, З3.
-- Установка `go install`, бинари, Homebrew tap, completions (запросы в issues ticket) - Р50, З5.
+- Short id `12` (the idea of ticket, by prefix) - D48, S2.
+- A Claude Code plugin for installation (as in beans) - D49, S3.
+- Install by `go install`, binaries, Homebrew tap, completions (requests in the ticket issues) - D50, S5.
 
-## Кандидаты, решение не принято
+## Candidates, decision not taken
 
-| Идея | Откуда | Куда |
+| Idea | From | Where |
 |---|---|---|
-| хук PreCompact с `tk ctx`: контекст после сжатия окна | beans | З3 |
-| свой код выхода на вид отказа: занято, конфликт, не найдено | msampathkumar (коды 3, 4) | З2 |
-| `doctor`: проверка установки и коннекторов | lawrips | после MVP, с `setup` |
-| в README раздел примеров фраз агенту и предупреждение о смене формата до 1.0 | beans | З5 |
-| правило в `RULES.md`: новую задачу агент заводит после подтверждения человека | namli, скилл | З2 |
-| проверки приёмки командой (`verify`) | EnderRealm | после MVP |
-| проверка в CI, что копии скилла совпадают | msampathkumar | З5 |
+| hook PreCompact with `tk ctx`: context after the window is compacted | beans | S3 |
+| own exit code per kind of refusal: busy, conflict, not found | msampathkumar (codes 3, 4) | S2 |
+| `doctor`: a check of the installation and the connectors | lawrips | after the MVP, with `setup` |
+| a README section with sample phrases to the agent and a warning about format changes before 1.0 | beans | S5 |
+| a rule in `RULES.md`: the agent creates a new task after the human confirms | namli, skill | S2 |
+| acceptance checks by command (`verify`) | EnderRealm | after the MVP |
+| a CI check that the copies of the skill match | msampathkumar | S5 |
 
-## Оформление у них
+## Their presentation
 
-ticket: ни topics, ни бейджей, ни демо, ни бинарей. beans: баннер, 5 бейджей, GoReleaser,
-Homebrew tap, порядок README «цель, предупреждение, возможности, установка в 3 шага, настройка
-агента, примеры». У форков релизов с бинарями почти нет (кроме EnderRealm).
+ticket: no topics, no badges, no demo, no binaries. beans: banner, 5 badges, GoReleaser,
+Homebrew tap, README order "goal, warning, features, install in 3 steps, agent
+setup, examples". The forks have almost no releases with binaries (except EnderRealm).

@@ -1,97 +1,97 @@
-# Решения пользователя: tracker
+# User decisions: tix
 
-Часть глобальной спеки `docs/spec.md` (раздел 12), вынесена по размеру. Номер решения не меняется;
-новое решение дописывается в конец, отменённое помечается, а не удаляется.
+Part of the global spec `docs/spec.md` (section 12), moved out because of size. A decision number does not change;
+a new decision is appended at the end, a cancelled one is marked, not deleted.
 
-Приняты 20.10.2026:
+Accepted on 2026-10-20:
 
-- Р1. Своё, не форк: аналоги привязаны к репозиторию, без внешних трекеров и md-редактора в TUI.
-- Р2. Ассистент с трекером: агент ведёт задачи, человек смотрит.
-- Р3. md-файл на задачу в `~/tasks`, свой git.
-- Р4. Коммит на каждую правку: история, время исполнения, откат, бэкап.
-- Р5. Колонки idea, todo, doing, blocked, done; добавляются и удаляются.
-- Р6. Приоритет - порядок в колонке.
-- Р7. Агент управляет через CLI; правила в `~/tasks/RULES.md`.
-- Р8. Ассистент: роль в `RULES.md`, домашняя сессия в `~/tasks`, работа по расписанию.
-- Р9. Правка в `$EDITOR`, встроенный редактор позже.
-- Р10. Поля по умолчанию - минимум.
-- Р11. Тело и комментарии свободные, шаблоны в `RULES.md`; проверки формата - только 2.5.
-- Р12. История из `git log` и комментариев файла.
-- Р13. Карточку читают пользователь и агенты: технические детали допустимы.
-- Р14. Внешние трекеры подключаются командой трекера, не скиллом.
-- Р15. Go. Отброшено: Rust - код пишет агент, у Go больше готовых частей TUI.
-- Р16. Только локально, личное пользование; в MVP одна машина (Р57).
-- Р17. Агенты Claude Code, Codex, OpenCode; минимум токенов и времени на трекер.
-- Р18. Проект не разрастается, упор на MVP.
-- Р19. Архитектура одобрена; трекеры и агенты - адаптерами и коннекторами.
-- Р20. Колонки настраиваются агентом или вручную; свои поля - после MVP.
-- Р21. Поля MVP: `waiting`, `claim`, `due`, `tags`, `ask`.
-- Р22. Бэкап: push в приватный remote.
-- Р23. Тикет: название, абстракт, сводка, подробности, комментарии.
-- Р24. Пять ролей колонок, одна роль - одна колонка.
-- Р25. Абстракт и сводка - разделы тела; «что дальше» - первая строка сводки.
-- Р26. Отдельного экрана сводки нет.
-- Р27. TUI в стиле ASCII.
-- Р28. История действий: взял, перенёс, заметки «сделал X».
-- Р29-Р32. Внешние трекеры после MVP по `docs/specs/integrations.md`: статус в обе стороны; изменение
-  с обеих сторон - побеждает внешний трекер (Р30); итог при `done` уходит комментарием наружу (Р31);
-  в MVP `external` - ссылка (Р32).
-- Р33. Код пишет агент; приёмка автоматическая.
-- Р34. Тема `ascii` в MVP, `cards` после.
-- Р35. Границы MVP - таблица раздела 1.
-- Р36. `claim` на 3 часа; агент снимает по окончании или продлевает.
-- Р37. `RULES.md`: остаток - в новую задачу; новый объём - новая задача; итог сессии
-  комментарием `Done / Decided / Waiting`.
-- Р38. Нужно действие пользователя - жёлтая звёздочка; `ask` - что нужно.
-- Р39. Захват принадлежит сессии; перехват явный, `take --steal`.
-- Р40. `done` с неотмеченными критериями - отказ; `--force -m` закрывает.
-- Р41. Перенос в `blocked` требует `waiting`.
-- Р42. В MVP набор полей фиксирован, тема зашита в код.
-- Р43. Имя `tracker`, команда `tk` (рабочее).
-- Р44. Эталон скорости, лёгкости и надёжности; числа в разделе 7.
-- Р45. Отменено 21.10 решением Р66.
-- Р46. Интерфейс и формат на английском: ответы CLI и TUI, разделы файла, `RULES.md`; русские
-  строки спеки и макета - образец смысла. Текст задач - на любом языке.
-- Р47. Публичный репозиторий для портфолио: снимок рабочего по `~/.claude/templates/github/design.md`,
-  задача З5 после MVP. Команда остаётся `tk` (конфликт с wedow/ticket принят), имя репозитория - в З5.
-- Р48. Короткий id: `12` равно `T-12` во всех командах.
-- Р49. Коннектор Claude Code - плагин; Codex и OpenCode - скилл в `~/.agents/skills`.
-- Р50. Установка: `go install`, бинари в релизе, Homebrew tap, completions zsh, bash, fish (З5).
-- Р51. `take` только из `ready`, `waiting`, `active`, иначе отказ с подсказкой `move`.
-- Р52. Уход из `waiting` очищает поле `waiting`; причина остаётся в коммите переноса.
-- Р53. macOS и Linux, amd64 и arm64; Windows нет.
-- Р54. Из аналогов (`docs/research/competitors.md`): хук PreCompact с `ctx` (З3), свой код выхода
-  на вид отказа (З2), примеры и предупреждение о формате в README (З5).
-- Р55. `done` задачи без критериев требует `-m`.
-- Р56. Позиция: память агентов между сессиями и проектами; каждая правка ведёт к сессии, которая
-  её сделала (в README так, а не «коммит на правку»). `Actor:` хранит полный id сессии, сокращение только на экране. После MVP -
-  команда открыть сессию правки (`claude --resume`, `codex resume`). Obsidian - дополнение.
-- Р57. После MVP первыми: `blocked_by` и выборка готовых (v0.2), `tk sync` на две машины.
-- Р58. Связь с кодом: коммит тикета из папки проекта несёт трейлер `Code: <проект>@<sha HEAD>`
-  (HEAD читается в Go без git); `RULES.md` велит коммитить код с `T-12` в сообщении и писать
-  в тикет после коммита кода (З2).
-- Р59. Хранилище - чистый git, без своей базы и без go-git. Отброшено: SQLite (нет файлов для
-  агента и Obsidian, историю писать самим), Dolt (тяжёлая зависимость, своя история вместо git),
-  файлы со своим журналом (половина git своими руками). Разбор - `docs/api/git.md`, 20.10.2026.
-- Р60. История карточки: подряд идущие правки одного `Actor` - строка «N правок», `enter` раскрывает;
-  `external` - отдельный автор; переносы, заметки и комментарии видны всегда; коммиты остаются по
-  одному на правку (З4).
-- Р61. `tk sync` синхронизирует две машины; внешние трекеры подтягивают `tk pull` и клавиша `s` в TUI.
-  После MVP.
-- Р62. Lock-файлы git `.git/*.lock` и `refs/**/*.lock` старше 10 с `tk` удаляет; при свежем - ответ
-  `git is busy`, запись не делается (спека 2.1, раздел 3).
-- Р63. Минимум следов: `tk` пишет только в `~/tasks`; подключение агента - скилл, хук старта `tk ctx` и
-  разрешение `tk`, без плагинов и маркетплейсов; служебное - в `~/tasks/.tracker`. OpenCode - после MVP.
-  Решение пользователя 20.10.
-- Р64. Скорость - ориентир и довод для README, а не условие готовности: задачу закрывает зелёный
-  `make check`, `make bench` гоняется перед релизом. Решение пользователя 21.10.
-- Р65. Границы MVP пересобраны 21.10 (раздел 1): сначала корпус и обкатка, функции наращиваются после.
-  В MVP добавлены мышь, пульс на доске, правила хода работы, трейлер `Model:`, английский язык
-  репозитория. Обсуждение и брифинг остаются в чате сессии, тикет - граница между «обсудили» и
-  «делаем». Связи задач - расследование после MVP. Решение пользователя 21.10.
-- Р66. Человеку CLI не нужен: любое действие с задачами делается в TUI, и клавишей, и мышью или
-  тачпадом. Отменяет Р45. Решение пользователя 21.10 после обкатки доски.
-- Р67. Публичное имя - tix: репозиторий daniil4545/tix, модуль github.com/daniil4545/tix, команда tix,
-  Homebrew через свой tap. tk занят wedow/ticket и ещё 3-4 трекерами ниши; тёзка Heliopsy/tix (3 зв.,
-  та же ниша) - принятый риск. Разведки docs/research/name-2026-10-21.md и проверка tix 21.10. Решение
-  пользователя 21.10. Отменяет имя ticket из Р47.
+- D1. Our own, not a fork: the analogs are tied to a repository, have no external trackers and no md editor in the TUI.
+- D2. An assistant with a tracker: the agent manages tasks, the human looks.
+- D3. One md file per task in `~/tasks`, its own git.
+- D4. A commit per edit: history, execution time, rollback, backup.
+- D5. Columns idea, todo, doing, blocked, done; they can be added and removed.
+- D6. Priority is the order in the column.
+- D7. The agent manages through the CLI; the rules are in `~/tasks/RULES.md`.
+- D8. Assistant: the role in `RULES.md`, a home session in `~/tasks`, scheduled work.
+- D9. Editing in `$EDITOR`, a built-in editor later.
+- D10. The default fields are the minimum.
+- D11. Body and comments are free-form, templates are in `RULES.md`; format checks - only 2.5.
+- D12. History comes from `git log` and the comments of the file.
+- D13. The card is read by the user and the agents: technical details are allowed.
+- D14. External trackers are connected by a tracker command, not by a skill.
+- D15. Go. Rejected: Rust - the agent writes the code, Go has more ready parts for a TUI.
+- D16. Local only, personal use; one machine in the MVP (D57).
+- D17. Agents Claude Code, Codex, OpenCode; the minimum of tokens and time spent on the tracker.
+- D18. The project does not grow, the focus is the MVP.
+- D19. The architecture is approved; trackers and agents are adapters and connectors.
+- D20. Columns are configured by the agent or by hand; custom fields - after the MVP.
+- D21. MVP fields: `waiting`, `claim`, `due`, `tags`, `ask`.
+- D22. Backup: push to a private remote.
+- D23. Task: title, abstract, summary, details, comments.
+- D24. Five column roles, one role is one column.
+- D25. Abstract and summary are body sections; "what next" is the first line of the summary.
+- D26. There is no separate summary screen.
+- D27. The TUI is in the ASCII style.
+- D28. Action history: took, moved, notes "did X".
+- D29-D32. External trackers after the MVP per `docs/specs/integrations.md`: status in both directions; a change
+  on both sides - the external tracker wins (D30); the result at `done` goes out as a comment (D31);
+  in the MVP `external` is a link (D32).
+- D33. The agent writes the code; acceptance is automatic.
+- D34. Theme `ascii` in the MVP, `cards` after.
+- D35. The MVP boundaries are the table of section 1.
+- D36. `claim` for 3 hours; the agent drops it when done or extends it.
+- D37. `RULES.md`: the remainder goes to a new task; new scope is a new task; the session result
+  as a comment `Done / Decided / Waiting`.
+- D38. The user's action is needed - a yellow star; `ask` says what is needed.
+- D39. A claim belongs to a session; a takeover is explicit, `take --steal`.
+- D40. `done` with unchecked criteria - refusal; `--force -m` closes.
+- D41. A move to `blocked` requires `waiting`.
+- D42. In the MVP the set of fields is fixed, the theme is built into the code.
+- D43. The name is `tracker`, the command is `tk` (working name). Replaced by D67.
+- D44. A reference standard of speed, lightness and reliability; the numbers are in section 7.
+- D45. Cancelled on 2026-10-21 by decision D66.
+- D46. Interface and format in English: CLI and TUI replies, file sections, `RULES.md`; the Russian
+  strings of the spec and the mockup are a sample of meaning. The text of tasks is in any language.
+- D47. A public repository for a portfolio: a snapshot of the working one per `~/.claude/templates/github/design.md`,
+  task S5 after the MVP. The command stays `tk` (the conflict with wedow/ticket is accepted), the repository name is in S5.
+- D48. Short id: `12` equals `T-12` in all commands.
+- D49. The Claude Code connector is a plugin; Codex and OpenCode - a skill in `~/.agents/skills`.
+- D50. Install: `go install`, binaries in the release, Homebrew tap, completions for zsh, bash, fish (S5).
+- D51. `take` only from `ready`, `waiting`, `active`, otherwise a refusal with the hint `move`.
+- D52. Leaving `waiting` clears the field `waiting`; the reason stays in the commit of the move.
+- D53. macOS and Linux, amd64 and arm64; no Windows.
+- D54. From the analogs (`docs/research/competitors.md`): hook PreCompact with `ctx` (S3), own exit code
+  per kind of refusal (S2), examples and a format warning in the README (S5).
+- D55. `done` of a task without criteria requires `-m`.
+- D56. Position: memory of agents between sessions and projects; each edit leads to the session that made
+  it (in the README worded this way, not as "a commit per edit"). `Actor:` stores the full session id, the short form only on screen. After the MVP -
+  a command to open the session of an edit (`claude --resume`, `codex resume`). Obsidian is an addition.
+- D57. After the MVP first: `blocked_by` and a selection of ready tasks (v0.2), `tix sync` for two machines.
+- D58. Link to code: the commit of a task from a project folder carries the trailer `Code: <project>@<sha HEAD>`
+  (HEAD is read in Go without git); `RULES.md` tells to commit code with `T-12` in the message and to write
+  into the task after the code commit (S2).
+- D59. Storage is plain git, with no database of our own and no go-git. Rejected: SQLite (no files for
+  the agent and Obsidian, history to be written ourselves), Dolt (a heavy dependency, its own history instead of git),
+  files with our own journal (half of git by hand). Analysis - `docs/api/git.md`, 2026-10-20.
+- D60. Card history: consecutive edits by the same `Actor` - one line "N edits", `enter` expands it;
+  `external` is a separate author; moves, notes and comments are always visible; commits stay
+  one per edit (S4).
+- D61. `tix sync` syncs two machines; external trackers are pulled by `tix pull` and the key `s` in the TUI.
+  After the MVP.
+- D62. Git lock files `.git/*.lock` and `refs/**/*.lock` older than 10 s are removed by `tix`; if the file is fresh - the reply is
+  `git is busy`, no write is made (spec 2.1, section 3).
+- D63. Minimum of traces: `tix` writes only to `~/tasks`; connecting an agent is a skill, the start hook `tix ctx` and
+  the permission for `tix`, without plugins and marketplaces; service data goes to `~/tasks/.tix`. OpenCode - after the MVP.
+  User decision 2026-10-20.
+- D64. Speed is a guideline and an argument for the README, not a readiness condition: a task is closed by a green
+  `make check`, `make bench` runs before a release. User decision 2026-10-21.
+- D65. The MVP boundaries were rebuilt on 2026-10-21 (section 1): first a body of real tasks and a trial run, features grow after.
+  Added to the MVP: mouse, pulse on the board, work log rules, the `Model:` trailer, English as the language
+  of the repository. Discussion and briefing stay in the session chat, the task is the boundary between "discussed" and
+  "doing". Task links are an investigation after the MVP. User decision 2026-10-21.
+- D66. The human does not need the CLI: any action on tasks is done in the TUI, both by key and by mouse
+  or touchpad. Cancels D45. User decision 2026-10-21 after the trial run of the board.
+- D67. The public name is tix: repository daniil4545/tix, module github.com/daniil4545/tix, command tix,
+  Homebrew through our own tap. tk is taken by wedow/ticket and 3-4 more trackers of the niche; the namesake Heliopsy/tix (3 stars,
+  same niche) is an accepted risk. Name research and the check of tix on 2026-10-21. User
+  decision 2026-10-21. Cancels the name ticket from D47.

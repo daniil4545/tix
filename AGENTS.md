@@ -1,68 +1,68 @@
-# tix - контекст AI-агентов
+# tix - context for AI agents
 
-## Проект
+## Project
 
-Личный трекер задач в терминале для человека и агентов: задачи - md-файлы в `~/tasks` под git,
-агенты работают через CLI `tix`, человек - через TUI. Решает пользователь. Канон по поведению -
-`docs/spec.md`, задачи - `docs/backlog.md`, планы задач - `docs/plans/`.
+A personal terminal task tracker for humans and agents: tasks are md files in `~/tasks` under git,
+agents work through the `tix` CLI, the human works through the TUI. The user decides. The behavior
+canon is `docs/spec.md`, tasks are in `docs/backlog.md`, task plans in `docs/plans/`.
 
-## Принципы
+## Principles
 
-- Эталон скорости, лёгкости и надёжности (Р44): часть, без которой ничего не сломается, убирается.
-- Код пишет агент, приёмка автоматическая (Р33): готово только при зелёном `make check`. `make bench` - перед релизом и для README, задачу не блокирует (Р64).
+- The reference for speed, lightness and reliability (D44): a part that nothing breaks without is removed.
+- The agent writes the code, acceptance is automatic (D33): done only with a green `make check`. `make bench` runs before a release and for the README, it does not block a task (D64).
 
-## Стек
+## Stack
 
-Go, один бинарь `tix`; Bubble Tea с З4. Версии - в `go.mod`.
+Go, one `tix` binary; Bubble Tea from S4. Versions are in `go.mod`.
 
-## Структура
+## Structure
 
-Зависимости: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `gitx`, `config`, `assets`, `project`, `actor`; `brief` - `task`, `config`, `actor`. Карта и потоки - `docs/architecture.md`.
+Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `gitx`, `config`, `assets`, `project`, `actor`; `brief` - `task`, `config`, `actor`. The map and flows are in `docs/architecture.md`.
 
-| Путь | Роль |
+| Path | Role |
 |---|---|
-| `cmd/tix` | точка входа CLI |
-| `cmd/tixbench` | замер скорости `tix` для `make bench` |
-| `internal/cli` | разбор команд и печать ответа |
-| `internal/core` | единственный путь записи в `~/tasks`: лок, rename, коммит |
-| `internal/task` | разбор и печать файла задачи, без IO |
-| `internal/config` | `.tix/config.toml`: колонки и роли |
-| `internal/actor` | личность записи: источники, проверка имени |
-| `internal/brief` | сборка вывода `tix ctx`, без IO |
-| `internal/assets` | `RULES.md`, встроенный в бинарь |
-| `internal/gitx` | все вызовы git, единственный `os/exec` в `internal` |
-| `internal/project` | проект по рабочей папке и HEAD проекта, без git |
-| `e2e/` | сквозные тесты чёрного ящика |
+| `cmd/tix` | CLI entry point |
+| `cmd/tixbench` | speed benchmark of `tix` for `make bench` |
+| `internal/cli` | command parsing and reply printing |
+| `internal/core` | the only write path into `~/tasks`: lock, rename, commit |
+| `internal/task` | parsing and printing of the task file, no IO |
+| `internal/config` | `.tix/config.toml`: columns and roles |
+| `internal/actor` | write identity: sources, name check |
+| `internal/brief` | building the `tix ctx` output, no IO |
+| `internal/assets` | `RULES.md`, embedded in the binary |
+| `internal/gitx` | all git calls, the only `os/exec` in `internal` |
+| `internal/project` | project by working folder and project HEAD, no git |
+| `e2e/` | end-to-end black-box tests |
 
-## Команды
+## Commands
 
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `make check` | формат, vet, линтер, тесты, сборка; приёмка |
-| `make test-fast` | быстрый ярус (`-short`); `RUN=Имя` - один тест |
-| `make bench` | собирает `bin/tix`, замер скорости на 1000 задач, включая `ctx`, `take`, `move` |
-| `make build` | `go build ./...` и `bin/tix`; `VERSION=1.2.3` задаёт `tix --version` |
+| `make check` | format, vet, linter, tests, build; acceptance |
+| `make test-fast` | fast tier (`-short`); `RUN=Name` - one test |
+| `make bench` | builds `bin/tix`, speed benchmark on 1000 tasks, including `ctx`, `take`, `move` |
+| `make build` | `go build ./...` and `bin/tix`; `VERSION=1.2.3` sets `tix --version` |
 | `make fmt` | `gofmt -l -w .` |
-| `make e2e-agents` | заглушка до З3 |
+| `make e2e-agents` | stub until S3 |
 
 ## Workflow
 
-Профиль проекта для конвейера `~/.claude/docs/pipeline.md`:
+Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 
-| Параметр | Значение |
+| Parameter | Value |
 |---|---|
-| Автономия | агент решает технические вопросы в рамках спеки; план задачи согласует сам, если `spec-reviewer` не принёс вопросов о функции; вопрос о поведении, необратимое и трата лимитов подписок - пользователю |
-| Субагенты | каждая задача ведётся скиллом `orchestrate`: план, `spec-reviewer`, до 5 одновременных агентов (workers и tester), `code-reviewer` тщательный, `skeptic` по `regress` |
-| Трекер | `docs/backlog.md`, план задачи - `docs/plans/<задача>.md` |
-| Шапка субагента | `~/.claude/templates/subagent-brief.md` |
-| Файл находок | `docs/findings.jsonl` |
+| Autonomy | the agent decides technical questions within the spec; it approves the task plan itself if `spec-reviewer` raised no questions about functionality; a question about behavior, anything irreversible and spending subscription limits go to the user |
+| Subagents | every task runs through the `orchestrate` skill: plan, `spec-reviewer`, up to 5 concurrent agents (workers and tester), thorough `code-reviewer`, `skeptic` by `regress` |
+| Tracker | `docs/backlog.md`, the task plan is `docs/plans/<task>.md` |
+| Subagent header | `~/.claude/templates/subagent-brief.md` |
+| Findings file | `docs/findings.jsonl` |
 
-- Ветки: задача идёт в ветке `z<N>-<имя>`, мердж в `main` - на приёмке с подтверждения пользователя.
-- Хостинг и CI: нет, remote не заведён.
+- Branches: a task goes in the branch `z<N>-<name>`, the merge into `main` happens at acceptance with the user's confirmation.
+- Hosting and CI: none, no remote is set up.
 
-## Критические инварианты
+## Critical invariants
 
-- Запись в `~/tasks` только через ядро: лок, временный файл, rename, коммит; полузаписанных файлов нет.
-- Правка, сделанная в обход ядра, не теряется: следующая операция коммитит её как external edit.
-- Файл, который не разбирается, ядро не перезаписывает.
-- Claim ставит только `take`; живой claim другого актора не перехватывается без `--steal`.
+- Writes to `~/tasks` go only through the core: lock, temp file, rename, commit; there are no half-written files.
+- An edit made around the core is not lost: the next operation commits it as an external edit.
+- The core does not overwrite a file that does not parse.
+- Only `take` sets a claim; a live claim of another actor is not taken over without `--steal`.
