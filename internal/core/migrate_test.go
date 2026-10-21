@@ -27,7 +27,7 @@ func TestOpen_LegacyTrackerDir_MigratedToTix(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.git("add", "-A")
-	e.git("commit", "-q", "-m", "legacy layout")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "legacy layout")
 	before := e.count()
 
 	s = e.open(0)
@@ -97,7 +97,7 @@ func legacyBase(t *testing.T, e *env, ign *string) {
 		t.Fatal(err)
 	}
 	e.git("add", "-A")
-	e.git("commit", "-q", "-m", "legacy layout")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "legacy layout")
 }
 
 // Any variant of the former-version .gitignore: after migration the .tix service files do not
