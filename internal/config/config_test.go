@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"tracker/internal/config"
+	"github.com/daniil4545/tix/internal/config"
 )
 
 func guard(t *testing.T) {

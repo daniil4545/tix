@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/cli"
+	"github.com/daniil4545/tix/internal/cli"
 )
 
 // Тесты зоны I поверх сценариев tester: формат отметок, личность Codex, порядок и хвост more,
@@ -23,14 +23,14 @@ func unitInboxBox(t *testing.T, env map[string]string) (b *box, dir string) {
 	t.Helper()
 	b = newBox(t)
 	dir = filepath.Join(b.root, "marks")
-	env["TRACKER_INBOX_DIR"] = dir
+	env["TIX_INBOX_DIR"] = dir
 	b.extra = env
 	return b, dir
 }
 
 func unitInboxRun(t *testing.T, b *box, stdin string) string {
 	t.Helper()
-	r := b.tk(stdin, "inbox", "--hook")
+	r := b.tix(stdin, "inbox", "--hook")
 	if r.code != 0 || r.err != "" {
 		t.Fatalf("inbox --hook: код %d, stderr %q; ждали 0 и тишину", r.code, r.err)
 	}
@@ -80,7 +80,7 @@ func TestInboxUnit_CodexIdentityFromInput(t *testing.T) {
 	b, dir := unitInboxBox(t, map[string]string{"CODEX_THREAD_ID": "x9"})
 	b.ok("", "new", "Work", "--to", "todo")
 	b.ok("", "take", "T-1")
-	b.extra = map[string]string{"TRACKER_INBOX_DIR": dir}
+	b.extra = map[string]string{"TIX_INBOX_DIR": dir}
 	in := unitHookStdin("UserPromptSubmit", "x9", "turn_id", "t1")
 	unitInboxRun(t, b, in)
 	b.ok("", "comment", "T-1", "for codex", "--as", "human")
@@ -133,7 +133,7 @@ func TestInboxUnit_OrderAndMoreListsTasks(t *testing.T) {
 	if i1, i2 := strings.Index(text, "T-1 human"), strings.Index(text, "T-2 human"); i1 < 0 || i2 < i1 {
 		t.Errorf("порядок задач нарушен: %.120q", text)
 	}
-	if len([]rune(text)) > 8000 || !strings.HasSuffix(text, "\n... more: tk show T-3") {
+	if len([]rune(text)) > 8000 || !strings.HasSuffix(text, "\n... more: tix show T-3") {
 		t.Errorf("длина %d, хвост %q", len([]rune(text)), text[max(len(text)-60, 0):])
 	}
 	if out := unitInboxRun(t, b, unitHookStdin("PostToolUse", "u1")); out != "" {
@@ -144,8 +144,8 @@ func TestInboxUnit_OrderAndMoreListsTasks(t *testing.T) {
 // Без --hook команда отказывает как неверный ввод и не ждёт stdin.
 func TestInboxUnit_WithoutHook_InputError(t *testing.T) {
 	b, _ := unitInboxBox(t, map[string]string{"CLAUDE_CODE_SESSION_ID": "u1"})
-	if r := b.tk("", "inbox"); r.code != 6 || r.out != "" {
-		t.Errorf("tk inbox: код %d, stdout %q; ждали 6 и пусто", r.code, r.out)
+	if r := b.tix("", "inbox"); r.code != 6 || r.out != "" {
+		t.Errorf("tix inbox: код %d, stdout %q; ждали 6 и пусто", r.code, r.out)
 	}
 }
 
@@ -203,7 +203,7 @@ func TestInboxUnit_ParallelHooks_DeliverOnce(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			outs[i] = b.tk(unitHookStdin("PostToolUse", "u1"), "inbox", "--hook")
+			outs[i] = b.tix(unitHookStdin("PostToolUse", "u1"), "inbox", "--hook")
 		}()
 	}
 	wg.Wait()
@@ -275,7 +275,7 @@ func TestInboxUnit_NegativeMark_ResetsToCurrent(t *testing.T) {
 	}
 }
 
-// Вход больше потолка 64 КБ: пусто, код 0, строка в .tracker/log.
+// Вход больше потолка 64 КБ: пусто, код 0, строка в .tix/log.
 func TestInboxUnit_InputOverLimit_LoggedEmpty(t *testing.T) {
 	b, _ := unitInboxBox(t, map[string]string{"CLAUDE_CODE_SESSION_ID": "u1"})
 	unitHold(b)
@@ -283,16 +283,16 @@ func TestInboxUnit_InputOverLimit_LoggedEmpty(t *testing.T) {
 	if out := unitInboxRun(t, b, in); out != "" {
 		t.Errorf("вход больше потолка: %q", out)
 	}
-	logData, _ := os.ReadFile(filepath.Join(b.home, ".tracker", "log"))
+	logData, _ := os.ReadFile(filepath.Join(b.home, ".tix", "log"))
 	if !strings.Contains(string(logData), "hook input not read") {
-		t.Errorf("в .tracker/log нет строки о входе: %q", logData)
+		t.Errorf("в .tix/log нет строки о входе: %q", logData)
 	}
 }
 
 // unitRunPipe запускает inbox --hook со stdin из r и ждёт возврата не дольше limit.
 func unitRunPipe(t *testing.T, b *box, r io.Reader, limit time.Duration) (out string, code int) {
 	t.Helper()
-	vars := map[string]string{"TRACKER_HOME": b.home, "TRACKER_GIT": gitBin, "TRACKER_LOCK_TIMEOUT": "2s", "HOME": os.Getenv("HOME")}
+	vars := map[string]string{"TIX_HOME": b.home, "TIX_GIT": gitBin, "TIX_LOCK_TIMEOUT": "2s", "HOME": os.Getenv("HOME")}
 	for k, v := range b.extra {
 		vars[k] = v
 	}

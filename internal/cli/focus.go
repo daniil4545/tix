@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"tracker/internal/actor"
+	"github.com/daniil4545/tix/internal/actor"
 )
 
 const focusEnv = "WARP_FOCUS_URL"

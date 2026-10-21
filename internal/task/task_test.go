@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // Заголовок раздела комментариев: при смене языка формата правится здесь.

@@ -15,7 +15,7 @@ import (
 
 // Рабочий цикл агента, З2: docs/plans/z2-agent-cycle.md, разделы 3 и 8.
 
-// gitIn запускает git в произвольной папке с тем же окружением, что и tk.
+// gitIn запускает git в произвольной папке с тем же окружением, что и tix.
 func (b *box) gitIn(dir string, args ...string) string {
 	b.t.Helper()
 	full := append([]string{"-C", dir, "-c", "user.name=t", "-c", "user.email=t@t"}, args...)
@@ -80,9 +80,9 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 		{[]string{"done", "T-1", "-m", "merged"}, "^ok T-1 doing > done\n$"},
 	}
 	for _, s := range steps {
-		r := b.tk("", s.args...)
+		r := b.tix("", s.args...)
 		if r.code != 0 || !regexp.MustCompile(s.want).MatchString(r.out) {
-			t.Fatalf("tk %v: код %d, stdout %q, stderr %q, ждали %s", s.args, r.code, r.out, r.err, s.want)
+			t.Fatalf("tix %v: код %d, stdout %q, stderr %q, ждали %s", s.args, r.code, r.out, r.err, s.want)
 		}
 	}
 
@@ -130,7 +130,7 @@ func TestScenario_FiveTakesRace_OneWinner(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			codes[i] = b.tk("", "take", "T-1", "--as", fmt.Sprintf("claude:r%d", i)).code
+			codes[i] = b.tix("", "take", "T-1", "--as", fmt.Sprintf("claude:r%d", i)).code
 		}()
 	}
 	wg.Wait()
@@ -192,7 +192,7 @@ func TestScenario_CodeTrailer_InsideOutsideNoCommits(t *testing.T) {
 	}
 
 	b.cwd = empty
-	r := b.tk("", "note", "T-1", "no commits", "--as", "claude:a")
+	r := b.tix("", "note", "T-1", "no commits", "--as", "claude:a")
 	if r.code != 0 {
 		t.Fatalf("проект без коммитов: код %d, stderr %q", r.code, r.err)
 	}
@@ -212,7 +212,7 @@ func TestScenario_Backup_BareExternalEditBrokenRemote(t *testing.T) {
 	b.git("remote", "add", "origin", bare)
 	branch := strings.TrimSpace(b.git("symbolic-ref", "--short", "HEAD"))
 
-	if r := b.tk("", "backup"); r.code != 0 || r.out != "ok backup origin\n" {
+	if r := b.tix("", "backup"); r.code != 0 || r.out != "ok backup origin\n" {
 		t.Fatalf("backup: код %d, stdout %q, stderr %q, ждали `ok backup origin`", r.code, r.out, r.err)
 	}
 	if got, want := b.branchHead(bare, branch), strings.TrimSpace(b.git("rev-parse", "HEAD")); got != want {
@@ -232,12 +232,12 @@ func TestScenario_Backup_BareExternalEditBrokenRemote(t *testing.T) {
 
 	oneErr := regexp.MustCompile(`^err .+\n$`)
 	b.git("remote", "set-url", "origin", filepath.Join(b.root, "no", "such.git"))
-	if r := b.tk("", "backup"); r.code != 1 || r.out != "" || !oneErr.MatchString(r.err) {
+	if r := b.tix("", "backup"); r.code != 1 || r.out != "" || !oneErr.MatchString(r.err) {
 		t.Errorf("битый путь: код %d, stdout %q, stderr %q, ждали код 1 и одну строку err", r.code, r.out, r.err)
 	}
 	b.git("remote", "set-url", "origin", "http://user:pw123@127.0.0.1:1/x.git")
 	start := time.Now()
-	r := b.tk("", "backup")
+	r := b.tix("", "backup")
 	if r.code != 1 || !oneErr.MatchString(r.err) || strings.Contains(r.err, "pw123") {
 		t.Errorf("адрес с паролем: код %d, stderr %q, ждали код 1, одну строку без пароля", r.code, r.err)
 	}
@@ -245,7 +245,7 @@ func TestScenario_Backup_BareExternalEditBrokenRemote(t *testing.T) {
 		t.Errorf("backup ждал %v: нужен таймаут 30 с и без запроса пароля", time.Since(start))
 	}
 
-	nobase := b.runEnv(b.with("TRACKER_HOME="+filepath.Join(b.root, "missing")), "", "backup")
+	nobase := b.runEnv(b.with("TIX_HOME="+filepath.Join(b.root, "missing")), "", "backup")
 	if nobase.code == 0 || !oneErr.MatchString(nobase.err) {
 		t.Errorf("backup без базы: код %d, stderr %q, ждали ошибку одной строкой", nobase.code, nobase.err)
 	}

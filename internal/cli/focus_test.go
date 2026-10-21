@@ -21,12 +21,12 @@ func (b *box) focusFiles() []string {
 	return files
 }
 
-// focusDir - каталог фокуса вне базы (TRACKER_FOCUS_DIR перекрывает os.UserCacheDir()/tk/focus).
+// focusDir - каталог фокуса вне базы (TIX_FOCUS_DIR перекрывает os.UserCacheDir()/tix/focus).
 func (b *box) focusDir() string { return filepath.Join(b.root, "focus") }
 
 // agentEnv - окружение сессии Claude "c1" с адресом вкладки url (пусто - переменной нет).
 func (b *box) agentEnv(url string) map[string]string {
-	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TRACKER_FOCUS_DIR": b.focusDir()}
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_FOCUS_DIR": b.focusDir()}
 	if url != "" {
 		env["WARP_FOCUS_URL"] = url
 	}
@@ -134,7 +134,7 @@ func TestFocus_FileWriteFails_CommandStillSucceeds(t *testing.T) {
 	}
 	before := b.commitCount()
 	b.extra = b.agentEnv(warpURL)
-	r := b.tk("", "note", "T-1", "still works")
+	r := b.tix("", "note", "T-1", "still works")
 	if r.code != 0 {
 		t.Fatalf("note при сбое записи фокуса: код %d, stderr %q, ждали 0", r.code, r.err)
 	}

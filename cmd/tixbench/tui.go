@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-// tuiOneshotEnv: tk без аргументов рисует первый кадр доски в stdout и выходит (замер без терминала).
-const tuiOneshotEnv = "TRACKER_TUI_ONESHOT=1"
+// tuiOneshotEnv: tix без аргументов рисует первый кадр доски в stdout и выходит (замер без терминала).
+const tuiOneshotEnv = "TIX_TUI_ONESHOT=1"
 
 // tuiBenches - замер открытия доски: цель раздела 7 плана З4, до 100 мс на 1000 задач.
 func tuiBenches() []bench {

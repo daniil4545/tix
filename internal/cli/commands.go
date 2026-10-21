@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"tracker/internal/core"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // reply печатает `ok <id> <что>`; -v добавляет хеш коммита.
@@ -32,7 +32,7 @@ func (a *app) reply(p *parsed, res core.Result, id, what string) {
 // wrap привязывает ошибку ядра к задаче и подсказывает, что делать с конфликтом.
 func wrap(id string, err error) error {
 	if errors.Is(err, core.ErrConflict) {
-		err = fmt.Errorf("%w; run tk show %s again", err, id)
+		err = fmt.Errorf("%w; run tix show %s again", err, id)
 	}
 	return &idError{ID: id, Err: err}
 }
@@ -48,7 +48,7 @@ func (a *app) cmdNew(args []string) error {
 	}
 	title := strings.TrimSpace(strings.Join(p.pos, " "))
 	if title == "" {
-		return inputf("title required: tk new <title>")
+		return inputf("title required: tix new <title>")
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -109,7 +109,7 @@ func (a *app) cmdText(args []string) error {
 	}
 	text := strings.TrimSpace(strings.Join(p.pos[1:], " "))
 	if text == "" {
-		return &idError{ID: id, Err: inputf("text required: tk %s %s <text>", a.cmd, id)}
+		return &idError{ID: id, Err: inputf("text required: tix %s %s <text>", a.cmd, id)}
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -164,7 +164,7 @@ func (a *app) cmdEdit(args []string) error {
 		return err
 	}
 	if p.vals["base"] == "" {
-		return &idError{ID: id, Err: inputf("--base <rev> from tk show %s required", id)}
+		return &idError{ID: id, Err: inputf("--base <rev> from tix show %s required", id)}
 	}
 	body, err := a.readBody()
 	if err != nil {

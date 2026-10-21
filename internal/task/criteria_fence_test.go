@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 func bodyTask(body string) *task.Task { return &task.Task{Body: body} }

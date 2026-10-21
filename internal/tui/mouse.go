@@ -6,9 +6,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/config"
-	"tracker/internal/core"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // doubleClick - окно второго клика по той же карточке (часы модели).

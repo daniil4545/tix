@@ -1,5 +1,5 @@
-// Команда tkbench - замер скорости tk.
-// Вызов из make bench: go run ./cmd/tkbench bin/tk (первый аргумент - путь к собранному tk).
+// Команда tixbench - замер скорости tix.
+// Вызов из make bench: go run ./cmd/tixbench bin/tix (первый аргумент - путь к собранному tix).
 // Код выхода 0, если цели раздела 7 плана выполнены.
 package main
 
@@ -17,7 +17,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"tracker/internal/gitx"
+	"github.com/daniil4545/tix/internal/gitx"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 	maxRuns = 130
 )
 
-// bench - один замеряемый вызов tk и цель по медиане.
+// bench - один замеряемый вызов tix и цель по медиане.
 type bench struct {
 	name     string
 	targetMS float64
@@ -58,20 +58,20 @@ func main() {
 	runs := flag.Int("n", 30, "runs per operation after warm-up")
 	warm := flag.Int("warm", 3, "warm-up runs")
 	tasks := flag.Int("tasks", 1000, "tasks in the store")
-	keep := flag.Bool("keep", false, "keep the temporary TRACKER_HOME")
+	keep := flag.Bool("keep", false, "keep the temporary TIX_HOME")
 	flag.Parse()
 	if flag.NArg() != 1 {
-		fmt.Fprintln(os.Stderr, "usage: tkbench [flags] <path to tk>")
+		fmt.Fprintln(os.Stderr, "usage: tixbench [flags] <path to tix>")
 		os.Exit(2)
 	}
-	tk, err := filepath.Abs(flag.Arg(0))
+	tixBin, err := filepath.Abs(flag.Arg(0))
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tkbench:", err)
+		fmt.Fprintln(os.Stderr, "tixbench:", err)
 		os.Exit(2)
 	}
-	ok, err := run(tk, *tasks, *runs, *warm, *keep)
+	ok, err := run(tixBin, *tasks, *runs, *warm, *keep)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "tkbench:", err)
+		fmt.Fprintln(os.Stderr, "tixbench:", err)
 		os.Exit(1)
 	}
 	if !ok {
@@ -79,24 +79,24 @@ func main() {
 	}
 }
 
-func run(tk string, tasks, runs, warm int, keep bool) (bool, error) {
+func run(tixBin string, tasks, runs, warm int, keep bool) (bool, error) {
 	if tasks <= moveTask {
 		return false, fmt.Errorf("need at least %d tasks", moveTask+1)
 	}
 	if warm+runs > maxRuns {
 		return false, fmt.Errorf("at most %d runs per operation: take needs a new task each run", maxRuns)
 	}
-	home, err := os.MkdirTemp("", "tkbench-")
+	home, err := os.MkdirTemp("", "tixbench-")
 	if err != nil {
 		return false, err
 	}
 	if keep {
-		fmt.Fprintln(os.Stderr, "TRACKER_HOME:", home)
+		fmt.Fprintln(os.Stderr, "TIX_HOME:", home)
 	} else {
 		defer func() { _ = os.RemoveAll(home) }()
 	}
 	t0 := time.Now()
-	if err := seed(tk, home, tasks); err != nil {
+	if err := seed(tixBin, home, tasks); err != nil {
 		return false, fmt.Errorf("store setup: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "store: %d tasks in %s\n", tasks, time.Since(t0).Round(time.Millisecond))
@@ -104,7 +104,7 @@ func run(tk string, tasks, runs, warm int, keep bool) (bool, error) {
 	var samples []sample
 	pass := true
 	for _, b := range append(benches(home, tasks), tuiBenches()...) {
-		s, err := measure(tk, home, b, runs, warm)
+		s, err := measure(tixBin, home, b, runs, warm)
 		if err != nil {
 			return false, fmt.Errorf("%s: %w", b.name, err)
 		}
@@ -203,7 +203,7 @@ func expectMove(out, id, column string) error {
 }
 
 // measure гонит прогрев, затем runs замеров; возвращает медиану и p95.
-func measure(tk, home string, b bench, runs, warm int) (sample, error) {
+func measure(tixBin, home string, b bench, runs, warm int) (sample, error) {
 	times := make([]float64, 0, runs)
 	for i := 0; i < warm+runs; i++ {
 		if b.before != nil {
@@ -215,7 +215,7 @@ func measure(tk, home string, b bench, runs, warm int) (sample, error) {
 		if b.argsOf != nil {
 			args = b.argsOf(i)
 		}
-		d, out, err := timeRun(tk, home, args, b.env)
+		d, out, err := timeRun(tixBin, home, args, b.env)
 		if err != nil {
 			return sample{}, err
 		}
@@ -246,11 +246,11 @@ func percentile(sorted []float64, q float64) float64 {
 	return sorted[min(max(i, 0), len(sorted)-1)]
 }
 
-// tkCmd готовит запуск tk в базе home; cwd = home, чтобы Detect не сузил list до проекта.
-func tkCmd(ctx context.Context, tk, home string, args []string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, tk, args...) //nolint:gosec // tk - аргумент командной строки bench
+// tixCmd готовит запуск tix в базе home; cwd = home, чтобы Detect не сузил list до проекта.
+func tixCmd(ctx context.Context, tixBin, home string, args []string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, tixBin, args...) //nolint:gosec // tix - аргумент командной строки bench
 	cmd.Dir = home
-	cmd.Env = append(cleanEnv(), "TRACKER_HOME="+home, "TRACKER_ACTOR="+benchActor)
+	cmd.Env = append(cleanEnv(), "TIX_HOME="+home, "TIX_ACTOR="+benchActor)
 	return cmd
 }
 
@@ -259,7 +259,7 @@ func cleanEnv() []string {
 	var env []string
 	for _, kv := range os.Environ() {
 		if strings.HasPrefix(kv, "CLAUDE_CODE_SESSION_ID=") || strings.HasPrefix(kv, "CODEX_THREAD_ID=") ||
-			strings.HasPrefix(kv, "TRACKER_ACTOR=") {
+			strings.HasPrefix(kv, "TIX_ACTOR=") {
 			continue
 		}
 		env = append(env, kv)
@@ -267,10 +267,10 @@ func cleanEnv() []string {
 	return env
 }
 
-func timeRun(tk, home string, args, env []string) (time.Duration, string, error) {
+func timeRun(tixBin, home string, args, env []string) (time.Duration, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), runTimeout)
 	defer cancel()
-	cmd := tkCmd(ctx, tk, home, args)
+	cmd := tixCmd(ctx, tixBin, home, args)
 	cmd.Env = append(cmd.Env, env...)
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
@@ -278,7 +278,7 @@ func timeRun(tk, home string, args, env []string) (time.Duration, string, error)
 	err := cmd.Run()
 	d := time.Since(start)
 	if err != nil {
-		return 0, "", fmt.Errorf("tk %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(errOut.String()))
+		return 0, "", fmt.Errorf("tix %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(errOut.String()))
 	}
 	return d, out.String(), nil
 }
@@ -299,13 +299,13 @@ func editOutside(path string, n int) error {
 	return os.WriteFile(path, out, 0o600) //nolint:gosec // путь внутри временной базы
 }
 
-// seed строит базу: первую задачу создаёт сам tk (папка, git, config, .gitignore),
+// seed строит базу: первую задачу создаёт сам tix (папка, git, config, .gitignore),
 // остальные пишутся файлами и уходят одним коммитом; затем история из комментариев.
-func seed(tk, home string, tasks int) error {
-	if _, _, err := timeRun(tk, home, []string{"new", "bench seed"}, nil); err != nil {
+func seed(tixBin, home string, tasks int) error {
+	if _, _, err := timeRun(tixBin, home, []string{"new", "bench seed"}, nil); err != nil {
 		return err
 	}
-	bin, err := gitx.Resolve(os.Getenv("TRACKER_GIT"))
+	bin, err := gitx.Resolve(os.Getenv("TIX_GIT"))
 	if err != nil {
 		return err
 	}

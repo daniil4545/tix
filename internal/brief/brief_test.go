@@ -9,9 +9,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"tracker/internal/brief"
-	"tracker/internal/config"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/brief"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 func guard(t *testing.T) {
@@ -160,8 +160,8 @@ func TestText_HeaderRulesAndRowLines(t *testing.T) {
 	if !strings.HasPrefix(lines[0], "project p") || !strings.Contains(lines[0], "rules: /h/RULES.md") {
 		t.Errorf("первая строка %q, ждали `project p   rules: /h/RULES.md`", lines[0])
 	}
-	if !strings.Contains(text, "tk take") || !strings.Contains(text, "tk note") {
-		t.Errorf("нет строки цикла `take: tk take; step: tk note; ...`:\n%s", text)
+	if !strings.Contains(text, "tix take") || !strings.Contains(text, "tix note") {
+		t.Errorf("нет строки цикла `take: tix take; step: tix note; ...`:\n%s", text)
 	}
 	if !regexp.MustCompile(`(?m)^doing\s+T-12 Fix it`).MatchString(text) || !regexp.MustCompile(`(?m)^todo\s+T-17 Next one`).MatchString(text) {
 		t.Errorf("строки задач не по формату `<колонка> T-N <название>`:\n%s", text)

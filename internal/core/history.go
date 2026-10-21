@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"tracker/internal/actor"
-	"tracker/internal/gitx"
-	"tracker/internal/project"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/project"
 )
 
 // gcEvery - число коммитов между запусками gc (docs/api/git.md, раздел 5: 200-500).
@@ -36,10 +36,10 @@ func (s *Store) codeTrailer() gitx.Trailer {
 	return gitx.Trailer{Key: "Code", Value: name + "@" + sha}
 }
 
-// modelTrailer возвращает трейлер Model: <TRACKER_MODEL>. Переменная пуста или не проходит
+// modelTrailer возвращает трейлер Model: <TIX_MODEL>. Переменная пуста или не проходит
 // проверку - пустой трейлер, он не пишется, запись не отказывает.
 func modelTrailer() gitx.Trailer {
-	model := os.Getenv("TRACKER_MODEL")
+	model := os.Getenv("TIX_MODEL")
 	if !actor.ValidModel(model) {
 		return gitx.Trailer{}
 	}
@@ -67,7 +67,7 @@ func (s *Store) countCommits(n int) bool {
 	if n == 0 {
 		return false
 	}
-	path := filepath.Join(s.root, trackerDir, lockFile)
+	path := filepath.Join(s.root, tixDir, lockFile)
 	cur := 0
 	if data, err := os.ReadFile(path); err == nil { //nolint:gosec // путь строит ядро
 		cur, _ = strconv.Atoi(strings.TrimSpace(string(data)))

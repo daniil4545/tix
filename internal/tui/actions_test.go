@@ -18,8 +18,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
@@ -174,7 +174,7 @@ type acEditor struct {
 }
 
 const acEditorScript = `#!/bin/sh
-d="$TK_AC_DIR"
+d="$TIX_AC_DIR"
 n=$(( $(cat "$d/count" 2>/dev/null || echo 0) + 1 )); echo $n > "$d/count"
 cp "$1" "$d/seen.$n"
 if [ -f "$d/script" ]; then sh "$d/script" "$1"; fi
@@ -195,7 +195,7 @@ func acStubEditor(t *testing.T, script string) *acEditor {
 	}
 	t.Setenv("EDITOR", bin)
 	t.Setenv("VISUAL", "")
-	t.Setenv("TK_AC_DIR", dir)
+	t.Setenv("TIX_AC_DIR", dir)
 	return &acEditor{t: t, dir: dir}
 }
 
@@ -215,11 +215,11 @@ func acFakeOpen(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	log := filepath.Join(dir, "open.log")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TK_AC_OPEN_LOG\"\n"
+	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TIX_AC_OPEN_LOG\"\n"
 	if err := os.WriteFile(filepath.Join(dir, "open"), []byte(script), 0o700); err != nil { //nolint:gosec // заглушка теста
 		t.Fatal(err)
 	}
-	t.Setenv("TK_AC_OPEN_LOG", log)
+	t.Setenv("TIX_AC_OPEN_LOG", log)
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	return log
 }
@@ -1289,7 +1289,7 @@ func TestFocus_G_OpensOnlyForLiveClaimWithValidFile(t *testing.T) {
 		for _, way := range c.ways {
 			t.Run(c.name+"/"+way, func(t *testing.T) {
 				dir := t.TempDir()
-				t.Setenv("TRACKER_FOCUS_DIR", dir)
+				t.Setenv("TIX_FOCUS_DIR", dir)
 				log := acFakeOpen(t)
 				e := acFocusEnv(t, c, dir)
 				e.acPressG(way)

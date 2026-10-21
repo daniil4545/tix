@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // minRankGap - зазор между соседними рангами, меньше которого колонка перенумеруется.

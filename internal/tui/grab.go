@@ -5,8 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // grab - захват карточки: она переезжает по экрану, файлы не трогаются до отпускания.

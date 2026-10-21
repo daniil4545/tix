@@ -15,7 +15,7 @@ const Unknown = "unknown"
 const shortID = 8
 
 // Resolve определяет личность по порядку 2.4 спеки: флаг, окружение агента,
-// TRACKER_ACTOR. Формы агента: "claude:<id>", "codex:<id>". known=false: личность
+// TIX_ACTOR. Формы агента: "claude:<id>", "codex:<id>". known=false: личность
 // не найдена, name равен "unknown".
 func Resolve(flag string, getenv func(string) string) (name string, known bool) {
 	switch {
@@ -26,7 +26,7 @@ func Resolve(flag string, getenv func(string) string) (name string, known bool) 
 	case getenv("CODEX_THREAD_ID") != "":
 		name = "codex:" + getenv("CODEX_THREAD_ID")
 	default:
-		name = getenv("TRACKER_ACTOR")
+		name = getenv("TIX_ACTOR")
 	}
 	if name == "" || name == Unknown {
 		return Unknown, false
@@ -34,7 +34,7 @@ func Resolve(flag string, getenv func(string) string) (name string, known bool) 
 	return name, true
 }
 
-// Valid проверяет введённое имя (`--as`, `TRACKER_ACTOR`): без пробелов, `|`, `-->`
+// Valid проверяет введённое имя (`--as`, `TIX_ACTOR`): без пробелов, `|`, `-->`
 // и переводов строки. `unknown` допустим.
 func Valid(name string) error {
 	if name == "" {

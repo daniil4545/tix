@@ -22,7 +22,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 var mvANSI = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
@@ -112,7 +112,7 @@ func mvNewEnv(t *testing.T, config string) *mvEnv {
 
 func mvNewEnvGit(t *testing.T, config, gitBin string) *mvEnv {
 	t.Helper()
-	base, err := os.MkdirTemp("", "tk-mvp-")
+	base, err := os.MkdirTemp("", "tix-mvp-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,10 +132,10 @@ func mvNewEnvGit(t *testing.T, config, gitBin string) *mvEnv {
 	})
 	root := filepath.Join(base, "tasks")
 	if config != "" {
-		if err := os.MkdirAll(filepath.Join(root, ".tracker"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, ".tix"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, ".tracker", "config.toml"), []byte(config), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(root, ".tix", "config.toml"), []byte(config), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -894,7 +894,7 @@ func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 	}
 }
 
-// 4.A.4: tk note - пустой коммит без правки файла; наблюдатель замечает его по .git/logs/HEAD.
+// 4.A.4: tix note - пустой коммит без правки файла; наблюдатель замечает его по .git/logs/HEAD.
 func TestPulse_NoteWrittenWhileOpen_AppearsWithoutKeypress(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("Noted", "doing")

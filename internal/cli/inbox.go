@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"tracker/internal/actor"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 	inboxReserve = 80   // запас под последнюю строку "... more"
 	inboxMinCut  = 40   // короче этого остатка комментарий не обрезается, а уходит в more
 	humanActor   = "human"
-	inboxHeader  = "New comments on your tasks (from tk):"
+	inboxHeader  = "New comments on your tasks (from tix):"
 
 	eventPostTool = "PostToolUse"
 	eventPrompt   = "UserPromptSubmit"
@@ -69,9 +69,9 @@ func (a *app) cmdInbox(args []string) error {
 		return inputf("inbox takes no arguments, extra: %s", p.pos[0])
 	}
 	if !p.set["hook"] {
-		return inputf("inbox works only as a hook: tk inbox --hook")
+		return inputf("inbox works only as a hook: tix inbox --hook")
 	}
-	// Хук не ломает работу агента: любой сбой - пустой вывод и код 0, причина в .tracker/log.
+	// Хук не ломает работу агента: любой сбой - пустой вывод и код 0, причина в .tix/log.
 	defer func() {
 		if r := recover(); r != nil {
 			a.log.Warn("inbox hook panic", "op", "inbox", "err", r)
@@ -88,7 +88,7 @@ func (a *app) deliverInbox() {
 	}
 	in, ok := readHookInput(a.env.Stdin)
 	if !ok {
-		// Лога ещё нет: база не открыта. Причина (обрыв, мусор, больше потолка) уходит в .tracker/log.
+		// Лога ещё нет: база не открыта. Причина (обрыв, мусор, больше потолка) уходит в .tix/log.
 		if a.open() == nil {
 			a.log.Warn("inbox: hook input not read", "op", "inbox", "limit", hookStdinLimit)
 		}
@@ -191,7 +191,7 @@ func taskNumber(id string) int {
 }
 
 // inboxText собирает текст доставки до inboxLimit знаков. Длинный комментарий обрезается;
-// что не влезло, называет последняя строка "... more: tk show <id>".
+// что не влезло, называет последняя строка "... more: tix show <id>".
 func inboxText(fresh []newComment) string {
 	var b strings.Builder
 	b.WriteString(inboxHeader)
@@ -216,7 +216,7 @@ func inboxText(fresh []newComment) string {
 		used += runeLen(prefix) + runeLen(text)
 	}
 	if len(left) > 0 {
-		b.WriteString("\n... more: tk show " + strings.Join(left, ", "))
+		b.WriteString("\n... more: tix show " + strings.Join(left, ", "))
 	}
 	return b.String()
 }

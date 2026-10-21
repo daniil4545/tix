@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Живая проверка коннекторов З3: Claude Code и Codex проходят цикл tk на настоящих CLI.
+# Живая проверка коннекторов З3: Claude Code и Codex проходят цикл tix на настоящих CLI.
 # План: docs/plans/z3-connectors.md, раздел 7. ТРАТИТ ЛИМИТЫ ПОДПИСОК: запуск только с --yes.
 #
 # Что делает для каждого агента:
-#   1. Фикстура в ~/.cache/tk-e2e/<случайное>/<агент> (не /tmp: у Codex там ложно-зелёный результат):
-#      git-проект e2eproj, TRACKER_HOME с задачей T-1 в ready и одним критерием.
+#   1. Фикстура в ~/.cache/tix-e2e/<случайное>/<агент> (не /tmp: у Codex там ложно-зелёный результат):
+#      git-проект e2eproj, TIX_HOME с задачей T-1 в ready и одним критерием.
 #   2. Прогон 1 (cwd проекта): агент берёт задачу. Pass: коммиты take, note, done с Actor: агента.
-#   3. Прогон 2 (cwd = TRACKER_HOME, «домашняя сессия»): «запиши идею». Pass: новая задача
+#   3. Прогон 2 (cwd = TIX_HOME, «домашняя сессия»): «запиши идею». Pass: новая задача
 #      в idea, проект personal, коммит new с Actor: агента.
 # Настройки пользователя не пишутся. Claude: `--settings` на файл с хуком и разрешением из
 # connectors/claude/hooks.json, скилл в <фикстура>/.claude/skills. Codex: временный CODEX_HOME
-# (симлинк auth.json, tk.rules, hooks.json не ставится), скилл в <фикстура>/.agents/skills.
+# (симлинк auth.json, tix.rules, hooks.json не ставится), скилл в <фикстура>/.agents/skills.
 # Каждый агент идёт через `env -u` с id запускающей сессии, иначе чужой id попадёт в Actor:.
 #
 # Использование: scripts/e2e-agents.sh --yes [--agents claude,codex]
@@ -25,7 +25,7 @@ CODEX_MODEL=${E2E_CODEX_MODEL:-gpt-6.1-sol}
 PROMPT_TASK='Pick up the next task from this project task tracker and finish it.'
 PROMPT_IDEA='Write down an idea: add dark mode to the notes app.'
 # Личность запускающей сессии не должна попасть в Actor: чужого агента.
-SCRUB=(-u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u TRACKER_ACTOR)
+SCRUB=(-u CLAUDE_CODE_SESSION_ID -u CODEX_THREAD_ID -u CODEX_SESSION_ID -u TIX_ACTOR)
 
 confirm=no
 agents=(claude codex)
@@ -54,25 +54,25 @@ for tool in go git jq perl; do
 	command -v "$tool" >/dev/null || { echo "e2e-agents: $tool not found" >&2; exit 2; }
 done
 
-mkdir -p "$HOME/.cache/tk-e2e"
-E2E=$(mktemp -d "$HOME/.cache/tk-e2e/run.XXXXXX") || exit 2
+mkdir -p "$HOME/.cache/tix-e2e"
+E2E=$(mktemp -d "$HOME/.cache/tix-e2e/run.XXXXXX") || exit 2
 echo "e2e-agents: fixtures and logs in $E2E"
 mkdir -p "$E2E/bin"
-go build -C "$ROOT" -o "$E2E/bin/tk" ./cmd/tk || { echo "e2e-agents: go build tk failed" >&2; exit 2; }
+go build -C "$ROOT" -o "$E2E/bin/tix" ./cmd/tix || { echo "e2e-agents: go build tix failed" >&2; exit 2; }
 
 # Файлы коннекторов (зона A).
-SKILL_DIR="$ROOT/connectors/agents/skills/tk"
-RULES_FILE="$ROOT/connectors/codex/tk.rules"
+SKILL_DIR="$ROOT/connectors/agents/skills/tix"
+RULES_FILE="$ROOT/connectors/codex/tix.rules"
 CLAUDE_HOOKS="$ROOT/connectors/claude/hooks.json"
 
 D="" WORK="" TASKS="" FAILS=0
 declare -a SUMMARY=()
 
-# tk_in <cwd> <args>: tk фикстуры без личности запускающей сессии.
-tk_in() {
+# tix_in <cwd> <args>: tix фикстуры без личности запускающей сессии.
+tix_in() {
 	local cwd=$1
 	shift
-	(cd "$cwd" && env "${SCRUB[@]}" "TRACKER_HOME=$TASKS" "PATH=$E2E/bin:$PATH" tk "$@")
+	(cd "$cwd" && env "${SCRUB[@]}" "TIX_HOME=$TASKS" "PATH=$E2E/bin:$PATH" tix "$@")
 }
 
 # agent_run <cwd> <out> <err> <NAME=val...> -- <команда>; промпт - в stdin из $PROMPT_FILE.
@@ -83,7 +83,7 @@ agent_run() {
 	local extra=()
 	while [ "$1" != -- ]; do extra+=("$1"); shift; done
 	shift
-	(cd "$cwd" && env "${SCRUB[@]}" "TRACKER_HOME=$TASKS" "PATH=$E2E/bin:$PATH" ${extra[@]+"${extra[@]}"} \
+	(cd "$cwd" && env "${SCRUB[@]}" "TIX_HOME=$TASKS" "PATH=$E2E/bin:$PATH" ${extra[@]+"${extra[@]}"} \
 		perl -e 'alarm shift; exec @ARGV or exit 127' "$TIMEOUT" "$@") <"$PROMPT_FILE" >"$out" 2>"$err"
 }
 
@@ -95,24 +95,24 @@ setup_fixture() {
 	mkdir -p "$WORK"
 	git -C "$WORK" init -q || return 1
 	git -C "$WORK" -c user.name=e2e -c user.email=e2e@localhost commit -q --allow-empty -m init || return 1
-	tk_in "$WORK" new "Report that the job is done" --to todo --as e2e:setup >/dev/null || return 1
+	tix_in "$WORK" new "Report that the job is done" --to todo --as e2e:setup >/dev/null || return 1
 	local rev
-	rev=$(tk_in "$WORK" show T-1 | sed -n '1s/^rev //p')
+	rev=$(tix_in "$WORK" show T-1 | sed -n '1s/^rev //p')
 	[ -n "$rev" ] || return 1
 	printf '## Details\n\n- [ ] Say "job done" in your final answer\n' |
-		tk_in "$WORK" edit T-1 --base "$rev" --as e2e:setup >/dev/null || return 1
-	[ "$(tk_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj todo" ] || return 1
+		tix_in "$WORK" edit T-1 --base "$rev" --as e2e:setup >/dev/null || return 1
+	[ "$(tix_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj todo" ] || return 1
 	mkdir -p "$TASKS/.git/info"
 	printf '.agents/\n.claude/\n' >>"$TASKS/.git/info/exclude"
 }
 
-# install_skill <каталог скиллов>: скилл в проект и в TRACKER_HOME фикстуры
+# install_skill <каталог скиллов>: скилл в проект и в TIX_HOME фикстуры
 # (Claude: .claude/skills, Codex: .agents/skills).
 install_skill() {
 	local dir
 	for dir in "$WORK" "$TASKS"; do
-		mkdir -p "$dir/$1/tk"
-		cp -R "$SKILL_DIR/." "$dir/$1/tk/" || return 1
+		mkdir -p "$dir/$1/tix"
+		cp -R "$SKILL_DIR/." "$dir/$1/tix/" || return 1
 	done
 }
 
@@ -150,7 +150,7 @@ launch() {
 
 # prepare_claude: настройки на один прогон (--settings): хук и разрешение, как пишет connect.sh.
 prepare_claude() {
-	jq '. + {permissions: {allow: ["Bash(tk *)"]}}' "$CLAUDE_HOOKS" >"$D/claude-settings.json"
+	jq '. + {permissions: {allow: ["Bash(tix *)"]}}' "$CLAUDE_HOOKS" >"$D/claude-settings.json"
 }
 
 # prepare_codex: временный CODEX_HOME; Codex читает промпт из stdin, если аргумента нет.
@@ -159,7 +159,7 @@ prepare_codex() {
 	[ -f "$RULES_FILE" ] || { echo "$RULES_FILE not found"; return 1; }
 	mkdir -p "$D/codex-home/rules"
 	ln -s "$HOME/.codex/auth.json" "$D/codex-home/auth.json"
-	cp "$RULES_FILE" "$D/codex-home/rules/tk.rules"
+	cp "$RULES_FILE" "$D/codex-home/rules/tix.rules"
 	printf 'sandbox_mode = "workspace-write"\napproval_policy = "never"\n' >"$D/codex-home/config.toml"
 }
 
@@ -192,7 +192,7 @@ run_agent() {
 	local agent=$1 bad=0 rc sid mode want
 	echo "== $agent"
 	command -v "$agent" >/dev/null || { echo "    FAIL $agent not found in PATH"; return 1; }
-	setup_fixture "$agent" || { echo "    FAIL fixture setup (tk new/edit/list)"; return 1; }
+	setup_fixture "$agent" || { echo "    FAIL fixture setup (tix new/edit/list)"; return 1; }
 	case $agent in
 	claude)
 		prepare_claude || return 1
@@ -234,7 +234,7 @@ run_agent() {
 		check_actor new '^T-([2-9]|[1-9][0-9]+): new' "$want" "$mode" || bad=1
 	fi
 	local idea
-	idea=$(tk_in "$TASKS" list --json | jq -r '[.[] | select(.id != "T-1")] | first | (.status // "-") + " " + (.project // "-")')
+	idea=$(tix_in "$TASKS" list --json | jq -r '[.[] | select(.id != "T-1")] | first | (.status // "-") + " " + (.project // "-")')
 	if [ "$idea" = "idea personal" ]; then
 		echo "    ok   idea task: column/project $idea"
 	else

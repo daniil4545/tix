@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/gitx"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // notesLoaded - последние заметки задач из git; err - git не ответил, пульс идёт без заметок.

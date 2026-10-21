@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"tracker/internal/actor"
-	"tracker/internal/brief"
-	"tracker/internal/core"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/brief"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
@@ -153,7 +153,7 @@ func readHookModel(r io.Reader) string {
 	}
 }
 
-// exportModel читает JSON хука SessionStart со stdin и дописывает `export TRACKER_MODEL='<model>'`; кавычки гасят glob в [1m]
+// exportModel читает JSON хука SessionStart со stdin и дописывает `export TIX_MODEL='<model>'`; кавычки гасят glob в [1m]
 // в CLAUDE_ENV_FILE. Нет файла, пустой или чужой ввод, модель не проходит проверку - молча
 // пропуск: хук не должен ломать сессию. Файл исполняет shell, поэтому значение проверяется.
 func (a *app) exportModel() {
@@ -170,7 +170,7 @@ func (a *app) exportModel() {
 		a.warn("model not exported: %s", firstLine(err.Error()))
 		return
 	}
-	line := "export TRACKER_MODEL='" + model + "'\n"
+	line := "export TIX_MODEL='" + model + "'\n"
 	// Чужая последняя строка без перевода строки слиплась бы с нашей.
 	if st, statErr := f.Stat(); statErr == nil && st.Size() > 0 {
 		last := make([]byte, 1)
@@ -200,7 +200,7 @@ func (a *app) cmdTake(args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := target(p, 1, "tk take <id> [--steal|--release]")
+	id, err := target(p, 1, "tix take <id> [--steal|--release]")
 	if err != nil {
 		return err
 	}
@@ -234,7 +234,7 @@ func (a *app) cmdMove(args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := target(p, 2, "tk move <id> <column> [--first|--after T-9] [-m text] [--force]")
+	id, err := target(p, 2, "tix move <id> <column> [--first|--after T-9] [-m text] [--force]")
 	if err != nil {
 		return err
 	}
@@ -284,7 +284,7 @@ func (a *app) cmdSet(args []string) error {
 		return err
 	}
 	if len(p.pos) < 2 {
-		return &idError{ID: id, Err: inputf("usage: tk set <id> field=value...")}
+		return &idError{ID: id, Err: inputf("usage: tix set <id> field=value...")}
 	}
 	fields := make([]core.Field, 0, len(p.pos)-1)
 	names := make([]string, 0, len(p.pos)-1)
@@ -321,7 +321,7 @@ func (a *app) cmdCheck(args []string) error {
 		return err
 	}
 	if len(p.pos) < 2 {
-		return &idError{ID: id, Err: inputf("usage: tk check <id> N...")}
+		return &idError{ID: id, Err: inputf("usage: tix check <id> N...")}
 	}
 	nums := make([]int, 0, len(p.pos)-1)
 	for _, arg := range p.pos[1:] {
@@ -351,7 +351,7 @@ func (a *app) cmdDone(args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := target(p, 1, "tk done <id> [-m result] [--force]")
+	id, err := target(p, 1, "tix done <id> [-m result] [--force]")
 	if err != nil {
 		return err
 	}

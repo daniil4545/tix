@@ -6,8 +6,8 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"tracker/internal/actor"
-	"tracker/internal/history"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/history"
 )
 
 const (

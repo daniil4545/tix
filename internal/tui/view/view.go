@@ -7,7 +7,7 @@ import (
 
 	"charm.land/lipgloss/v2"
 
-	"tracker/internal/history"
+	"github.com/daniil4545/tix/internal/history"
 )
 
 // Row - строка колонки доски. Третья строка карточки (пульс) - первое из: вопрос Ask (жёлтый),

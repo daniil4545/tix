@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tracker/internal/actor"
+	"github.com/daniil4545/tix/internal/actor"
 )
 
 func TestInboxDir_EnvOverridesCache(t *testing.T) {

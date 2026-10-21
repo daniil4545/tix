@@ -15,14 +15,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/tui"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/tui"
 )
 
 var gitBin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "tk-tui-")
+	dir, err := os.MkdirTemp("", "tix-tui-")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 		os.Exit(2)
 	}
 	os.Setenv("HOME", dir)
-	os.Setenv("TRACKER_HOME", filepath.Join(dir, "never-used"))
+	os.Setenv("TIX_HOME", filepath.Join(dir, "never-used"))
 	os.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")
 	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	for _, k := range []string{"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "GIT_DIR", "GIT_WORK_TREE", "VISUAL"} {
@@ -80,10 +80,10 @@ func newEnv(t *testing.T, config string) *env {
 	t.Helper()
 	root := filepath.Join(t.TempDir(), "tasks")
 	if config != "" {
-		if err := os.MkdirAll(filepath.Join(root, ".tracker"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, ".tix"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, ".tracker", "config.toml"), []byte(config), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(root, ".tix", "config.toml"), []byte(config), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -8,11 +8,11 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/actor"
-	"tracker/internal/gitx"
-	"tracker/internal/history"
-	"tracker/internal/task"
-	"tracker/internal/tui/view"
+	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/history"
+	"github.com/daniil4545/tix/internal/task"
+	"github.com/daniil4545/tix/internal/tui/view"
 )
 
 // cardState - карточка: курсор по истории и раскрытые серии правок.

@@ -1,4 +1,4 @@
-// Package config читает и печатает .tracker/config.toml.
+// Package config читает и печатает .tix/config.toml.
 package config
 
 import (

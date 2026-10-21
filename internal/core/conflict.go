@@ -6,7 +6,7 @@ type ConflictError struct{ Rev, Merged string }
 
 // Error даёт прежний текст отказа (код 3 в CLI).
 func (e *ConflictError) Error() string {
-	return ErrConflict.Error() + ": body changed after tk show, reread and retry"
+	return ErrConflict.Error() + ": body changed after tix show, reread and retry"
 }
 
 // Is делает errors.Is(err, ErrConflict) истинным.

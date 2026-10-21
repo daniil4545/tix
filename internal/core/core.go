@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"tracker/internal/config"
-	"tracker/internal/gitx"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // Ошибки ядра. Сравнивать через errors.Is.
@@ -42,7 +42,7 @@ const (
 	unknownActor       = "unknown"
 	warnCommit         = "commit not recorded"
 
-	trackerDir = ".tracker"
+	tixDir     = ".tix"
 	nextIDFile = "next_id"
 	configFile = "config.toml"
 	rulesFile  = "RULES.md"
@@ -58,7 +58,7 @@ var (
 )
 
 // Options - настройки Open. LockTimeout <= 0 - 5 с (2.1). GitBin - сырое значение
-// TRACKER_GIT, путь к git находит gitx.Resolve при первом вызове git.
+// TIX_GIT, путь к git находит gitx.Resolve при первом вызове git.
 type Options struct {
 	LockTimeout time.Duration
 	GitBin      string
@@ -89,13 +89,16 @@ type Store struct {
 }
 
 // Open открывает базу в root и читает конфиг. Ничего не создаёт: пустой или
-// несуществующий root - пустая база.
+// несуществующий root - пустая база. Единственная правка - миграция .tracker в .tix.
 func Open(root string, o Options) (*Store, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, fmt.Errorf("store path %q: %w", root, err)
 	}
-	cfg, err := config.Load(filepath.Join(abs, trackerDir, configFile))
+	if err := migrateLegacyDir(abs); err != nil {
+		return nil, err
+	}
+	cfg, err := config.Load(filepath.Join(abs, tixDir, configFile))
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +158,7 @@ func (s *Store) Create(title, project, column, actor string) (Result, error) {
 }
 
 func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result, error) {
-	cfg, err := config.Load(filepath.Join(s.root, trackerDir, configFile))
+	cfg, err := config.Load(filepath.Join(s.root, tixDir, configFile))
 	if err != nil {
 		return Result{}, err
 	}
@@ -189,7 +192,7 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 		return Result{}, fmt.Errorf("file %s already exists", path)
 	}
 	data := t.Render()
-	idPath := filepath.Join(s.root, trackerDir, nextIDFile)
+	idPath := filepath.Join(s.root, tixDir, nextIDFile)
 	nextID := []byte(fmt.Sprintf("%d\n", num+1))
 	if err := s.writeNew(idPath, nextID); err != nil {
 		return Result{}, err
@@ -200,7 +203,7 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	res := Result{ID: id, Rev: blobID(data)}
 	written := append([]gitx.File{
 		{Path: name, Data: data},
-		{Path: filepath.ToSlash(filepath.Join(trackerDir, nextIDFile)), Data: nextID},
+		{Path: filepath.ToSlash(filepath.Join(tixDir, nextIDFile)), Data: nextID},
 	}, tx.extra...)
 	s.commit(tx, &res, written, id+": new", actor)
 	return res, nil
@@ -216,7 +219,7 @@ func (s *Store) Edit(id, baseRev, body, actor string) (Result, error) {
 		return Result{}, errors.New("body is empty")
 	}
 	if baseRev == "" {
-		return Result{}, errors.New("base required: rev from tk show")
+		return Result{}, errors.New("base required: rev from tix show")
 	}
 	return s.modify(id, actor, "edit", func(t *task.Task, curRev string) error {
 		merged, err := s.mergeBody(t, curRev, baseRev, body)

@@ -1,4 +1,4 @@
-module tracker
+module github.com/daniil4545/tix
 
 go 1.27.2
 

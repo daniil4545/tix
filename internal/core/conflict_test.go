@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 func TestStore_Edit_ConflictCarriesMergedAndRetryResolves(t *testing.T) {
@@ -31,7 +31,7 @@ func TestStore_Edit_ConflictCarriesMergedAndRetryResolves(t *testing.T) {
 	if !errors.As(err, &ce) {
 		t.Fatalf("Edit по старой базе: %v, ждали *core.ConflictError", err)
 	}
-	if !errors.Is(err, core.ErrConflict) || !strings.Contains(err.Error(), "body changed after tk show") {
+	if !errors.Is(err, core.ErrConflict) || !strings.Contains(err.Error(), "body changed after tix show") {
 		t.Errorf("ошибка %q: ждали errors.Is ErrConflict и прежний текст для кода 3", err)
 	}
 	for _, want := range []string{"<<<<<<<", "=======", ">>>>>>>", "AGENT", "USER", "line1", "line3"} {

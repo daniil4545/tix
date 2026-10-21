@@ -11,28 +11,28 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"tracker/internal/core"
-	"tracker/internal/tui"
+	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/tui"
 )
 
 var ansi = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
 
-// TestTUI_OneShot_FirstFrameInPipe: tk без аргументов, stdout не терминал, TRACKER_TUI_ONESHOT=1:
+// TestTUI_OneShot_FirstFrameInPipe: tix без аргументов, stdout не терминал, TIX_TUI_ONESHOT=1:
 // бинарь открывает базу, рисует доску в пайп и выходит с кодом 0.
 func TestTUI_OneShot_FirstFrameInPipe(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Frame task", "--to", "idea")
-	r := b.runEnv(b.with("TRACKER_TUI_ONESHOT=1"), "")
+	r := b.runEnv(b.with("TIX_TUI_ONESHOT=1"), "")
 	out := ansi.ReplaceAllString(r.out, "")
 	if r.code != 0 || !strings.Contains(out, "idea") || !strings.Contains(out, "Frame task") {
 		t.Fatalf("код %d, stderr %q, кадр:\n%s", r.code, r.err, out)
 	}
 }
 
-// TestTUI_NoTerminal_FallsBackToCLI: без ONESHOT и без терминала tk работает как раньше (cli.Run).
+// TestTUI_NoTerminal_FallsBackToCLI: без ONESHOT и без терминала tix работает как раньше (cli.Run).
 func TestTUI_NoTerminal_FallsBackToCLI(t *testing.T) {
 	b := newBox(t)
-	r := b.tk("")
+	r := b.tix("")
 	if strings.Contains(r.out, "\x1b[?1049h") {
 		t.Errorf("альтернативный экран открыт без терминала: %q", r.out)
 	}
@@ -61,8 +61,8 @@ func (p probe) View() tea.View {
 	return v
 }
 
-// TestTUI_LiveUpdate_AgentWritesThroughTk: доска открыта, агент пишет настоящим процессом tk.
-func TestTUI_LiveUpdate_AgentWritesThroughTk(t *testing.T) {
+// TestTUI_LiveUpdate_AgentWritesThroughTix: доска открыта, агент пишет настоящим процессом tix.
+func TestTUI_LiveUpdate_AgentWritesThroughTix(t *testing.T) {
 	b := newBox(t)
 	t.Setenv("HOME", b.root)
 	t.Setenv("GIT_CONFIG_GLOBAL", "/dev/null")

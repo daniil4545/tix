@@ -2,9 +2,12 @@
 # Нужны go и golangci-lint. Проект без БД и сети: интеграционные тесты идут в том же go test.
 .PHONY: build test test-fast vet fmt fmt-check lint check bench e2e-agents
 
+# VERSION=1.2.3 make build подставляет версию в tix --version; без неё dev.
+VERSION ?= dev
+
 build:
 	go build ./...
-	go build -o bin/tk ./cmd/tk
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/tix ./cmd/tix
 
 # Быстрый ярус: без гонки и kill -9.
 test-fast:
@@ -30,9 +33,9 @@ lint:
 # Приёмка: формат, vet, линтер, тесты, сборка.
 check: fmt-check vet lint test build
 
-# Замер скорости: tkbench сам создаёт 1000 задач во временном TRACKER_HOME.
+# Замер скорости: tixbench сам создаёт 1000 задач во временном TIX_HOME.
 bench: build
-	go run ./cmd/tkbench bin/tk
+	go run ./cmd/tixbench bin/tix
 
 # Живой прогон двух агентов (Claude Code, Codex) тратит лимиты подписок: только с согласием.
 # Без E2E_ARGS=--yes скрипт печатает предупреждение и выходит с кодом 2. Подмножество: E2E_ARGS="--yes --agents claude".

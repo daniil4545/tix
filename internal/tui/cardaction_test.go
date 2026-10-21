@@ -13,7 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"tracker/internal/core"
+	"github.com/daniil4545/tix/internal/core"
 )
 
 var cardANSI = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
@@ -236,7 +236,7 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 	}
 
 	dir := t.TempDir()
-	t.Setenv("TRACKER_FOCUS_DIR", dir)
+	t.Setenv("TIX_FOCUS_DIR", dir)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +393,7 @@ func TestFocus_G_ExpiredClaim_NoSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	t.Setenv("TRACKER_FOCUS_DIR", dir)
+	t.Setenv("TIX_FOCUS_DIR", dir)
 	url := "warp://session/0123456789abcdef0123456789abcdef"
 	if err := os.WriteFile(filepath.Join(dir, "claude-abcd1234"), []byte(url+"\n"), 0o600); err != nil {
 		t.Fatal(err)

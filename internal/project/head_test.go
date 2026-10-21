@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"tracker/internal/project"
+	"github.com/daniil4545/tix/internal/project"
 )
 
 func gitRun(t *testing.T, dir string, args ...string) string {

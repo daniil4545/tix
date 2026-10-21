@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	ident "tracker/internal/actor"
-	"tracker/internal/config"
-	"tracker/internal/gitx"
-	"tracker/internal/task"
+	ident "github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // Ошибки рабочего цикла агента.
@@ -74,11 +74,11 @@ const (
 
 // loadConfig читает config.toml заново: под локом конфиг мог измениться рукой.
 func (s *Store) loadConfig() (*config.Config, error) {
-	return config.Load(filepath.Join(s.root, trackerDir, configFile))
+	return config.Load(filepath.Join(s.root, tixDir, configFile))
 }
 
 func (s *Store) claimed(id string, c task.Claim) error {
-	return &kindErr{kind: ErrClaimed, msg: fmt.Sprintf("claimed by %s until %s; steal: tk take %s --steal",
+	return &kindErr{kind: ErrClaimed, msg: fmt.Sprintf("claimed by %s until %s; steal: tix take %s --steal",
 		ident.Short(c.Actor), c.Until.Format("15:04"), id)}
 }
 
@@ -129,7 +129,7 @@ func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool,
 		if c, ok := cfg.ByRole(roleReady); ok {
 			hint = c.Name
 		}
-		return "", rule("%s is in %s; run: tk move %s %s", t.ID, t.Status, t.ID, hint)
+		return "", rule("%s is in %s; run: tix move %s %s", t.ID, t.Status, t.ID, hint)
 	}
 	active, ok := cfg.ByRole(roleActive)
 	if !ok {
@@ -316,7 +316,7 @@ func closeChecks(t *task.Task, msg string, force bool) (bool, error) {
 		return false, nil
 	}
 	if !force {
-		return false, rule("%d/%d criteria checked; run: tk check %s %s",
+		return false, rule("%d/%d criteria checked; run: tix check %s %s",
 			len(crit)-len(open), len(crit), t.ID, strings.Join(open, " "))
 	}
 	return true, nil
@@ -356,7 +356,7 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 func setField(t *task.Task, role string, f Field) error {
 	switch f.Name {
 	case "status", "claim", "rank":
-		return rule("%s is changed by tk move", f.Name)
+		return rule("%s is changed by tix move", f.Name)
 	case "id", "created":
 		return rule("%s cannot be changed", f.Name)
 	case "abstract":
@@ -370,7 +370,7 @@ func setField(t *task.Task, role string, f Field) error {
 		return t.SetField("title", strings.TrimSpace(f.Value))
 	case "waiting":
 		if strings.TrimSpace(f.Value) == "" && role == roleWaiting {
-			return rule("waiting needs a reason: use -m, or leave with tk move")
+			return rule("waiting needs a reason: use -m, or leave with tix move")
 		}
 	case "due":
 		if _, err := time.Parse("2006-01-02", f.Value); err != nil && f.Value != "" {

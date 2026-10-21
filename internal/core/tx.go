@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"tracker/internal/assets"
-	"tracker/internal/gitx"
-	"tracker/internal/task"
+	"github.com/daniil4545/tix/internal/assets"
+	"github.com/daniil4545/tix/internal/gitx"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // txEnv - состояние операции под локом.
@@ -27,10 +27,10 @@ type txEnv struct {
 	commits int            // коммитов за время лока: питает счётчик gc
 }
 
-const gitignore = `.tracker/tmp/
-.tracker/lock
-.tracker/log
-.tracker/connect-state.json
+const gitignore = `.tix/tmp/
+.tix/lock
+.tix/log
+.tix/connect-state.json
 .obsidian/workspace*
 .trash/
 *.swp
@@ -51,7 +51,7 @@ func (s *Store) withLock(create bool, fn func(tx *txEnv) error) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(s.root, trackerDir, tmpDir), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Join(s.root, tixDir, tmpDir), 0o750); err != nil {
 		return fmt.Errorf("create %s: %w", s.root, err)
 	}
 	unlock, err := s.lock()
@@ -76,9 +76,9 @@ func (s *Store) withLock(create bool, fn func(tx *txEnv) error) error {
 	return err
 }
 
-// lock берёт flock .tracker/lock; ждёт до s.wait. Снимается при смерти процесса.
+// lock берёт flock .tix/lock; ждёт до s.wait. Снимается при смерти процесса.
 func (s *Store) lock() (func(), error) {
-	f, err := os.OpenFile(filepath.Join(s.root, trackerDir, lockFile), os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(filepath.Join(s.root, tixDir, lockFile), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("lock: %w", err)
 	}
@@ -129,7 +129,7 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 		data []byte
 	}{
 		{".gitignore", []byte(gitignore)},
-		{filepath.ToSlash(filepath.Join(trackerDir, configFile)), s.cfg.Render()},
+		{filepath.ToSlash(filepath.Join(tixDir, configFile)), s.cfg.Render()},
 		{rulesFile, []byte(assets.Rules)},
 	}
 	for _, f := range files {
@@ -148,7 +148,7 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 
 // cleanTmp удаляет temp-файлы ядра, оставшиеся от убитого процесса: под локом они ничьи.
 func (s *Store) cleanTmp() {
-	dir := filepath.Join(s.root, trackerDir, tmpDir)
+	dir := filepath.Join(s.root, tixDir, tmpDir)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return
@@ -323,7 +323,7 @@ func (s *Store) mergeBody(cur *task.Task, curRev, baseRev, body string) (string,
 	if baseRev == curRev {
 		return body, nil
 	}
-	stale := fmt.Errorf("base %s not found in git, run tk show again", baseRev)
+	stale := fmt.Errorf("base %s not found in git, run tix show again", baseRev)
 	if !revRe.MatchString(baseRev) {
 		return "", stale
 	}
