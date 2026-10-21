@@ -224,8 +224,12 @@ FROM_HOOK="$LEGACY"'($v.hooks[0].command) as $want
   | [getpath($p)[]? | (.hooks // [])[]? | (.command? // empty) | select(. as $c | any(legacy($want)[]; . == $c))] | .[0] // ""'
 AD_ARR='setpath($p; (getpath($p) // []) + [$v])'
 RM_ARR='if (try (getpath($p)|type) catch "x") == "array" then setpath($p; getpath($p) | map(select(. != $v))) else . end'
-RM_HOOK='if (try (getpath($p)|type) catch "x") == "array" then
-    setpath($p; getpath($p) | map(select((type == "object" and ((.hooks // []) | length) == 1 and ((.hooks[0].command) as $c | ["tk ctx", "tk ctx --hook", "tk inbox --hook", "tix ctx", "tix ctx --hook", "tix inbox --hook"] | any(. == $c))) | not)))
+# Снятие хука: группа ровно как в манифесте; команда tk из старого манифеста может стоять уже как tix.
+RENAMED='def renamed($w): [$w] + (if ($w | test("^tk ")) then [$w | sub("^tk "; "tix ")] else [] end)
+  + (if $w == "tk ctx" then ["tix ctx --hook"] else [] end);'
+RM_HOOK="$RENAMED"'($v.hooks[0].command) as $want | if (try (getpath($p)|type) catch "x") == "array" then
+    setpath($p; getpath($p) | map(select(type == "object" and ((.hooks // []) | length) == 1
+      and (.hooks[0].command as $c | any(renamed($want)[]; . == $c)) and ((.hooks[0].command = $want) == $v) | not)))
   else . end'
 # Хук tk меняется на tix (UP_HOOK); снятие возвращает записанную в манифесте команду from (DN_HOOK).
 UP_HOOK="$LEGACY"'($v.hooks[0].command) as $want | setpath($p; getpath($p) | map(if (.hooks | type) == "array"
@@ -349,22 +353,22 @@ check_tools() {
 
 # ---------- миграция установки под именем tk ----------
 
-# Манифест из .tracker переезжает в .tix. Служебная папка базы переименовывается так же, как
-# в ядре (если .tix нет), и в .gitignore базы .tracker/ меняется на .tix/. plan только читает.
+# Манифест из .tracker переезжает в .tix. Служебную папку базы переносит сам tix при открытии
+# базы (порядок и гонки - в ядре). plan и запуск без tix только читают старый манифест.
 migrate_manifest() {
-  local base g
-  [ ! -e "$MAN" ] && [ -f "$LEGACY_MAN" ] || return 0
-  if [ "$CMD" = plan ]; then MAN=$LEGACY_MAN; return 0; fi
-  base=$(dirname "$(dirname "$MAN")")
-  if [ ! -e "$base/.tix" ]; then
-    mv "$base/.tracker" "$base/.tix" || die "не удалось переименовать $base/.tracker"
-    g=$base/.gitignore
-    if [ -f "$g" ] && grep -q '^\.tracker/' "$g"; then
-      sed 's#^\.tracker/#.tix/#' "$g" | write_atomic "$(resolve "$g")"
+  local base
+  if [ ! -e "$MAN" ] && [ -f "$LEGACY_MAN" ]; then
+    if [ "$CMD" = plan ] || ! command -v tix >/dev/null 2>&1; then MAN=$LEGACY_MAN; return 0; fi
+    base=$(dirname "$(dirname "$MAN")")
+    if [ -e "$base/.tix" ]; then
+      mv -f "$LEGACY_MAN" "$MAN" || die "не удалось перенести манифест в $MAN"
+    else
+      TIX_HOME=$base tix list >/dev/null || die "tix не открыл базу $base"
+      [ -f "$MAN" ] || die "tix не перенёс $base/.tracker в $base/.tix"
     fi
-  else
-    mv -f "$LEGACY_MAN" "$MAN" || die "не удалось перенести манифест в $MAN"
   fi
+  # Пути .tracker в манифесте: после переноса здесь или раньше, хуком tix в новой сессии.
+  [ "$CMD" != plan ] && [ -f "$MAN" ] && grep -q '/\.tracker' "$MAN" || return 0
   jq '(.. | strings) |= (sub("/\\.tracker$"; "/.tix") | sub("/\\.tracker/"; "/.tix/"))' "$MAN" | write_atomic "$(resolve "$MAN")"
 }
 

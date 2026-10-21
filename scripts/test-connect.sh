@@ -104,6 +104,13 @@ chmod +x "$BASE/tix-stub"
 link_tools "$TOOLS"
 for x in jq tix; do link_tools "$BASE/tools-no-$x" "$x"; done
 
+# Миграция базы .tracker в .tix - дело ядра: тесты старой установки идут на настоящем tix.
+REAL_TIX=${TIX_BIN:-$BASE/tix-real}
+if [ -z "${TIX_BIN:-}" ]; then
+  (cd "$REPO" && go build -o "$REAL_TIX" ./cmd/tix) || { echo "go build tix не прошёл" >&2; exit 2; }
+fi
+TIX_BIN=$REAL_TIX link_tools "$BASE/tools-real"
+
 # ---------- проверки и утилиты ----------
 
 fail() { echo "    FAIL: $*" >&2; exit 1; }
@@ -354,6 +361,7 @@ t_old_installed_hook_upgraded() {
 
 # Установка прежней версии (имя tk, манифест в .tracker): apply переводит всё на tix, undo чистит дочиста.
 t_legacy_tk_install_migrated() {
+  TOOLS_OVERRIDE=$BASE/tools-real
   new_home
   cp -R "$FIX/legacy-home/." "$HOME/"
   sed -i.bak "s#@HOME@#$HOME#g" "$HOME/tasks/.tracker/connect-state.json"; rm -f "$HOME/tasks/.tracker/connect-state.json.bak"
@@ -382,6 +390,32 @@ t_legacy_tk_install_migrated() {
   undo
   [ -z "$(find "$HOME" -mindepth 1 \( -type f -o -type l \) ! -name .gitignore)" ] || fail "после undo остались файлы: $(find "$HOME" -type f | head -5)"
   [ -z "$(find "$HOME" -mindepth 1 -type d -empty)" ] || fail "после undo остались пустые каталоги: $(find "$HOME" -type d -empty | head -5)"
+}
+
+# Частый порядок: хук tix в новой сессии уже перенёс базу в .tix, apply идёт следом.
+t_legacy_base_migrated_by_tix_first() {
+  TOOLS_OVERRIDE=$BASE/tools-real
+  new_home
+  cp -R "$FIX/legacy-home/." "$HOME/"
+  sed -i.bak "s#@HOME@#$HOME#g" "$HOME/tasks/.tracker/connect-state.json"; rm -f "$HOME/tasks/.tracker/connect-state.json.bak"
+  printf '.tracker/lock\n*.swp\n' >"$HOME/tasks/.gitignore"
+  env -i HOME="$HOME" TIX_HOME="$HOME/tasks" "$REAL_TIX" list >/dev/null || fail "tix list на старой базе"
+  must_exist "$(MANIFEST)"; must_absent "$HOME/tasks/.tracker"
+  apply
+  grep -q 'tracker' "$(MANIFEST)" && fail "манифест хранит пути .tracker"
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | test("^tix "))] | length == 4' 'хуки не переведены на tix'
+  undo
+  [ -z "$(find "$HOME" -mindepth 1 \( -type f -o -type l \) ! -name .gitignore)" ] || fail "после undo остались файлы: $(find "$HOME" -type f | head -5)"
+}
+
+# undo снимает только записанную группу: своя группа пользователя с той же командой остаётся.
+t_undo_keeps_foreign_group_with_same_command() {
+  new_home
+  apply
+  local own='{"matcher":"Write","hooks":[{"type":"command","command":"tix inbox --hook","timeout":30}]}'
+  jq --argjson g "$own" '.hooks.Stop += [$g]' "$HOME/.claude/settings.json" >"$H.tmp" && mv "$H.tmp" "$HOME/.claude/settings.json"
+  undo
+  jq_ok "$HOME/.claude/settings.json" ".hooks.Stop == [$own]" 'undo снял чужую группу с tix inbox --hook'
 }
 
 t_modified_own_files_skipped_without_force() {
@@ -651,6 +685,8 @@ TESTS=(
   t_undo_on_pristine_home_leaves_no_trace
   t_existing_tk_permission_survives_undo
   t_legacy_tk_install_migrated
+  t_legacy_base_migrated_by_tix_first
+  t_undo_keeps_foreign_group_with_same_command
   t_existing_own_hook_upgraded_and_restored
   t_old_installed_hook_upgraded
   t_modified_own_files_skipped_without_force
