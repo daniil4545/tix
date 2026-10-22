@@ -168,7 +168,7 @@ label has its own muted color.
 | `h j k l`, arrows | select a column and a card |
 | `space` | grab the card; arrows move it, `space` or `enter` drops it, `esc` cancels |
 | `enter` | open the card |
-| `n` | new task in the selected column: asks for a title, then opens `$EDITOR` |
+| `n` | new task in the selected column (in the inbox column if that column needs criteria): asks for a title, then opens `$EDITOR` |
 | `a` | answer the agent's question |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
 | `g` | go to the agent's session (macOS and Warp only) |

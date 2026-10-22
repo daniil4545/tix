@@ -184,7 +184,7 @@ flowchart TD
      `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
    - the human main path without the CLI, by keys and mouse (D66):
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
-     `n` and `+` new task, `a` reply, `g` agent session, `e`, `c`, `o` due date, `p` project,
+     `n` and `+` new task (a column with an entry check gets it in the inbox column), `a` reply, `g` agent session, `e`, `c`, `o` due date, `p` project,
      Delete with `y/n`, `?` help, `q`; card - up-down arrows over criteria and history
      (`enter` and click check an item), left-right the neighbor task, `f` field, `esc`.
      The hints of the board and the card are rows of buttons.

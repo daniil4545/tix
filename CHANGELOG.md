@@ -21,7 +21,8 @@ All notable changes to this project are documented here. The format follows
 - A due date in the past is red, and each project label has its own color.
 - `tix new --to` a column with an entry check (ready, waiting, closed) is
   refused with code 5 before any write: create the task, add criteria, then
-  `tix move`.
+  `tix move`. On the board, `n` in such a column creates the task in the inbox
+  column and keeps the title.
 - Project names are stored in lower case; the project filter ignores case.
 
 ## [0.2.0] - 2026-10-22
