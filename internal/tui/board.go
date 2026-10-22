@@ -251,14 +251,14 @@ func (m *Model) cycleProject() {
 	seen := map[string]bool{}
 	var list []string
 	for _, t := range m.tasks {
-		if t.Project != "" && !seen[t.Project] {
-			seen[t.Project] = true
-			list = append(list, t.Project)
+		if p := strings.ToLower(t.Project); p != "" && !seen[p] {
+			seen[p] = true
+			list = append(list, p)
 		}
 	}
 	sort.Strings(list)
 	list = append([]string{""}, list...)
-	i := slices.Index(list, m.project)
+	i := slices.Index(list, strings.ToLower(m.project))
 	m.project = list[(i+1)%len(list)]
 	m.rebuild()
 }

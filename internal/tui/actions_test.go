@@ -705,21 +705,21 @@ func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 	}
 }
 
-// New task in a column with an entry check: the core refuses, the status line says why, nothing is written.
-func TestNewTask_N_InReadyColumn_RefusedByEntryCheck(t *testing.T) {
+// New task in a column with an entry check: the core refuses that column, the board keeps the title
+// and creates the task in the inbox column (owner decision 2026-10-22).
+func TestNewTask_N_InReadyColumn_CreatedInInbox(t *testing.T) {
 	acStubEditor(t, "")
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.start(140, 30)
 	e.screenHas("Alpha")
-	before := e.acCommitCount()
 	e.key("l", "n") // column todo, ready role
 	e.screenHas("title:")
-	e.tm.Type("Refused")
+	e.tm.Type("Fallback")
 	e.key("enter")
-	e.screenHas("a new task has no criteria")
-	if e.acByTitle("Refused") != nil || e.acCommitCount() != before {
-		t.Errorf("the refused task left a trace: task %v, commits %d -> %d", e.acByTitle("Refused"), before, e.acCommitCount())
+	e.until("task created", func() bool { return e.acByTitle("Fallback") != nil })
+	if tk := e.acByTitle("Fallback"); tk.Status != "idea" {
+		t.Errorf("task column %q, want idea", tk.Status)
 	}
 }
 

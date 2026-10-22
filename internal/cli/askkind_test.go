@@ -8,7 +8,7 @@ import (
 // spec: T-44 scenario 2
 func TestCLI_SetAsk_UnknownKindRefused(t *testing.T) {
 	defer guard(t)
-	for _, ask := range []string{"foo: x", "http://host/path", "a:b"} {
+	for _, ask := range []string{"foo: x", "note:"} {
 		t.Run(ask, func(t *testing.T) {
 			b := newBox(t)
 			b.ok("", "new", "Task")
@@ -25,7 +25,7 @@ func TestCLI_SetAsk_UnknownKindRefused(t *testing.T) {
 // spec: T-44 scenario 2
 func TestCLI_SetAsk_KnownKindOrPlainText_StoredAsIs(t *testing.T) {
 	defer guard(t)
-	for _, ask := range []string{"review: look", "access: need a key", "decide: which db?", "plain question", "Note: x", "see foo: x"} {
+	for _, ask := range []string{"review: look", "access: need a key", "decide: which db?", "plain question", "Note: x", "see foo: x", "http://host/path down?", "a:b"} {
 		t.Run(ask, func(t *testing.T) {
 			b := newBox(t)
 			b.ok("", "new", "Task")
