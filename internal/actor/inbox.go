@@ -29,20 +29,23 @@ func InboxDir(getenv func(string) string) string {
 	return filepath.Join(cache, "tix", "inbox")
 }
 
-// HookActor - the agent identity in a hook: the environment (Resolve), otherwise the hook input session_id
-// with the agent prefix. Codex is told apart by turn_id in the input: CODEX_* variable names are not enough for that.
+// HookActor - the agent identity in a hook: the hook input session_id with the agent prefix, otherwise the
+// environment (Resolve). The input wins: an agent started inside another inherits the parent's variable.
+// Codex is told apart by turn_id in the input: CODEX_* variable names are not enough for that.
 // Empty if no identity is found or the name fails Valid.
 func HookActor(getenv func(string) string, sessionID string, codex bool) string {
-	name, known := Resolve("", getenv)
-	if !known {
-		if sessionID == "" {
+	name := ""
+	switch {
+	case sessionID != "" && codex:
+		name = "codex:" + sessionID
+	case sessionID != "":
+		name = "claude:" + sessionID
+	default:
+		resolved, known, err := Resolve("", getenv)
+		if !known || err != nil {
 			return ""
 		}
-		kind := "claude"
-		if codex {
-			kind = "codex"
-		}
-		name = kind + ":" + sessionID
+		name = resolved
 	}
 	if Valid(name) != nil {
 		return ""

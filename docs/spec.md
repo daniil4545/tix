@@ -113,6 +113,7 @@ flowchart TD
       next operation as an external edit. Accepted risk S1: a foreign `git add` between
       `update-index` and `commit` goes out under the agent's `Actor:`. If the commit failed, the edit is already in the file, the reply is
       `ok` with a warning, code 0, an entry in the log; the next operation commits it as an external edit.
+      `note` lives only in its commit: a failed commit is an error, code 1, and the note is not written.
 4. Critical rules:
    - one edit - one commit; the message starts with `T-12:`; trailer `Actor:`; from a project
      folder - trailer `Code: <project>@<sha HEAD>` (D58, S2);
@@ -201,7 +202,10 @@ flowchart TD
 4. Critical rules:
    - identity (`Actor:` and `claim`) is `agent:session id`, the id is full (D56), in order: `--as`;
      `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`; `TIX_ACTOR`; TUI - `human`. With no identity
-     `take` refuses with the hint `--as`, the others write `unknown`. OpenCode: the session id - S3;
+     `take` refuses with the hint `--as`, the others write `unknown`. OpenCode: the session id - S3.
+     Both agent variables without `--as` (an agent started inside another) - a write refuses with code 6
+     and both `--as` forms, `ctx` works without the own-task mark. A hook takes the name from its input
+     `session_id`, not from an inherited variable;
    - model (D65): the start hook of Claude Code calls `tix ctx --hook`, which writes `TIX_MODEL` to
      `CLAUDE_ENV_FILE` (the value is validated, the shell executes the file); the commit of a write carries the trailer
      `Model:`. Limits until v0.2: a `/model` switch does not update the value, subagents get the model
