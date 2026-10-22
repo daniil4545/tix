@@ -171,8 +171,9 @@ flowchart TD
    - board: number, project, title, first line of the summary, criteria, due date, `claim`, star;
      an unknown column is the column `?`;
    - card: title and column, fields in one line, the `ask` line, abstract, summary, details,
-     history: moves, notes, comments are always visible; consecutive other edits by the same
-     `Actor` - one line "N edits", `enter` expands it; `external` is a separate author (D60);
+     history: moves, closes, takes, releases, notes and comments are always visible; two or more
+     edits in a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
+     `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
    - the human main path without the CLI, by keys and mouse (D66):
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
      `n` and `+` new task, `a` reply, `g` agent session, `e`, `c`, `o` due date, `p` project,
