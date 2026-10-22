@@ -8,14 +8,16 @@ import (
 // spec: T-82 scenario 5
 func TestCLI_New_ToCheckedColumn_RefusedNothingWritten(t *testing.T) {
 	defer guard(t)
-	for _, to := range []string{"todo", "ready", "blocked", "waiting", "done", "closed"} {
+	path := map[string]string{"todo": "tix move <id>", "ready": "tix move <id>", "blocked": "tix move <id>",
+		"waiting": "tix move <id>", "done": "tix done <id>", "closed": "tix done <id>"}
+	for to, want := range path {
 		t.Run(to, func(t *testing.T) {
 			b := newBox(t)
 			b.ok("", "new", "Seed")
 			before := b.snapshot()
 			msg := b.rule("new", "Fresh", "--to", to)
-			ensure(t, strings.Contains(msg, "a new task has no"), "refusal %q does not say what the new task lacks", msg)
-			ensure(t, strings.Contains(msg, "tix move <id>"), "refusal %q does not name the path", msg)
+			ensure(t, strings.Contains(msg, "a new task"), "refusal %q does not say why", msg)
+			ensure(t, strings.Contains(msg, want), "refusal %q does not name the path %q", msg, want)
 			ensure(t, b.snapshot() == before, "the refused new changed the store")
 		})
 	}

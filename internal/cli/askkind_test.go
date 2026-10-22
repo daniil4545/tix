@@ -8,7 +8,7 @@ import (
 // spec: T-44 scenario 2
 func TestCLI_SetAsk_UnknownKindRefused(t *testing.T) {
 	defer guard(t)
-	for _, ask := range []string{"foo: x", "note:"} {
+	for _, ask := range []string{"foo: x", "note:", " foo: x"} {
 		t.Run(ask, func(t *testing.T) {
 			b := newBox(t)
 			b.ok("", "new", "Task")

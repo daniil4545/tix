@@ -17,7 +17,7 @@ func TestStore_Create_CheckedColumn_RuleErrorNothingWritten(t *testing.T) {
 			}
 			commits := e.count()
 			_, err := s.Create("Fresh", "proj", column, "tester")
-			wantRule(t, "Create into "+column, err, "a new task has no")
+			wantRule(t, "Create into "+column, err, "a new task")
 			ensure(t, e.count() == commits, "the refused Create added a commit")
 			tasks, _ := s.List()
 			ensure(t, len(tasks) == 1, "the refused Create left %d tasks, want 1", len(tasks))

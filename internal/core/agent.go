@@ -401,7 +401,7 @@ func setField(t *task.Task, role string, f Field) error {
 			return rule("due must be 2006-01-02")
 		}
 	case "ask":
-		if _, _, known := task.ParseAsk(f.Value); !known {
+		if _, _, known := task.ParseAsk(strings.TrimSpace(f.Value)); !known { // the board reads it trimmed
 			return rule("unknown ask kind; a prefix must be one of: %s", strings.Join(task.AskKinds, ", "))
 		}
 	case "tags", "external":

@@ -221,8 +221,11 @@ func (s *Store) checkNewEntry(cfg *config.Config, column string) error {
 	if _, err := s.enter(&task.Task{Status: column}, role, "", MoveOpts{}, ""); err == nil {
 		return nil
 	}
-	if role == roleWaiting {
+	switch role {
+	case roleWaiting:
 		return rule("a new task has no waiting reason; create it, then run: tix move <id> %s -m <reason>", column)
+	case roleClosed:
+		return rule("a new task cannot start closed; create it, then run: tix done <id> -m <result>")
 	}
 	return rule("a new task has no criteria; create it, add criteria with tix edit, then run: tix move <id> %s", column)
 }
