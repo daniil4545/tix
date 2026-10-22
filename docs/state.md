@@ -7,7 +7,7 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## In progress
 
-- Trial run of v0.1.1 in normal work (user, from 2026-10-21): agents now open a tix task by default.
+- Trial run of tix (0.2.0 since 2026-10-22) in normal work (user, from 2026-10-21): agents now open a tix task by default.
 
 ## Next
 
@@ -18,8 +18,7 @@ repository, one commit on top, push. Never push from this repository (it has no 
 ## Open
 
 - Branch `z2-rank-cache` (`be562f9`) is kept for T-5: rank cache without tests and review.
-- Codex cannot write `~/tasks` from the `workspace-write` sandbox, `writable_roots` keeps `.git` closed (T-76).
-- A Codex started from a Claude shell inherits `CLAUDE_CODE_SESSION_ID` and acts as the parent (T-80).
+- Release review follow-ups: `new --to` skips the column entry check (T-82), spec 2.3 fold text (T-83).
 - Known race: the reply `a` may erase a new `ask` of the agent in a window of milliseconds; conditional write - later.
 - The model in the `Model:` trailer is only for Claude Code; `/model` in the middle of a session and subagents - later.
 - `make e2e-agents` and live Codex calls spend subscription limits: only with the user's consent.
@@ -27,9 +26,13 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## Done
 
+- 2026-10-22. Release 0.2.0 (`main` tag `v0.2.0`, public snapshot `ca67353`): T-71 and T-77, T-80. T-76 closed
+  as not a defect: the allow rule takes a single `tix` out of the sandbox (live `codex exec` note committed);
+  Codex is rarely used. Checked: `make check`, review and final review (no must-fix), CI and release green,
+  the darwin_arm64 archive passes `SHA256SUMS` and prints `0.2.0`.
 - 2026-10-22. T-20 closed: comment delivery checked live. Claude: a human comment arrived on the next
   PostToolUse. Codex exec 0.163: SessionStart, UserPromptSubmit and Stop hooks run, the model quoted the
-  comment. Why Codex never wrote: the sandbox (T-76). Found: nested agent identity (T-80), lost note (T-77).
+  comment. Found: nested agent identity (T-80), lost note (T-77).
 - 2026-10-22. Retro of agent use (566 store commits, 323 calls) and T-71 in `main` (`5a5b33f`): `done`
   clears `ask`, `take --release` puts an active task at the head of ready, `new --to` takes a role,
   `<command> --help`, the full hint for `take` without criteria, release is not folded in the history;
