@@ -40,7 +40,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | Work log in the task (`RULES.md`): a note for each decision, question and stage change; the answer to `ask` is written into the task, whoever answers; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
 | Columns with roles in `config.toml`; fields `waiting`, `claim`, `due`, `tags`, `ask` | yes | custom fields, theme choice, theme `cards` | |
-| Yellow star on `ask` | yes | reply to the agent from the card; colors by kind of need | |
+| Star on `ask`: colored by kind, grey without a live session (2.3) | yes | reply to the agent from the card | |
 | Connectors for Claude Code, Codex, OpenCode (2.4) | the agent installs one once | `setup` | |
 | `RULES.md`, home session in `~/tasks` | yes | | |
 | Backup by `git push` to a private remote | by command | in the background | |
@@ -144,10 +144,10 @@ flowchart TD
 |---|---|
 | `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; up to 2000 characters |
 | `list`, `show` | list with filters; the whole task, with `rev` |
-| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does |
+| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; a column with an entry check of 2.5 (`ready`, `waiting`, `closed`) refuses with code 5 before any write: create, add criteria, then `move` |
 | `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
-| `set` | only `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
+| `set` | only `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix is refused with code 5 |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask` |
@@ -156,7 +156,8 @@ flowchart TD
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,
      `done`); `set` and `edit` do not accept them;
    - project: the name of the folder above `.git` (for a worktree - above the main one), searched in Go without running git; a map
-     of names in the config; `--project` overrides; in `~/tasks` - all projects, `new` - project `personal`;
+     of names in the config; `--project` overrides; in `~/tasks` - all projects, `new` - project `personal`; a project name is stored
+     in lower case (`new`, `set project=`), the project filter ignores case;
    - a repeated `take` by the same session, `done` of a closed task, a move to the same column - `ok` without
      a commit.
 4. Critical rules: the numbers of section 7.
@@ -166,8 +167,11 @@ flowchart TD
 1. Purpose: the human screen, first of all for viewing.
 2. Input and output: keys; one operation queue in the background, the screen is not blocked by the lock.
 3. How it works (mockup):
-   - ASCII, lines made of hyphens; colors: main, muted, accent; yellow star - your action
-     is needed, orange - error;
+   - ASCII, lines made of hyphens; colors: main, muted, accent; the star - your action is needed,
+     orange - error. The star color is the kind of need, the `ask` prefix `decide:` (default, no
+     prefix), `review:`, `access:`: yellow, blue, red. A task with an `ask` and no live claim (none or
+     expired): grey star, `g` says "session ended; the answer stays in the task". The pulse line
+     shows the text without the prefix; the card shows the whole value;
    - board: number, project, title, first line of the summary, criteria, due date, `claim`, star;
      an unknown column is the column `?`;
    - card: title and column, fields in one line, the `ask` line, abstract, summary, details,

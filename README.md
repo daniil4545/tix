@@ -112,7 +112,7 @@ and the task card with its history.
 
 | Command | What it does |
 |---|---|
-| `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column |
+| `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column; a column that needs criteria or a reason is refused |
 | `tix list [--project p] [--status s] [--json]` | lists tasks |
 | `tix show T-12 [--json]` | prints the whole task with its `rev` |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
@@ -122,7 +122,7 @@ and the task card with its history.
 | `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
-| `tix set T-12 field=value...` | sets `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
+| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number |
 | `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask` |
 | `tix backup` | commits edits made outside `tix` and pushes `HEAD` to `origin` |

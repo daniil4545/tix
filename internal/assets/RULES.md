@@ -37,9 +37,10 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Into ready: at least one criterion.
 - Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
+- `tix new --to` a column that needs a check (ready, waiting, closed) is refused. Create the task in the inbox, add criteria, then `tix move`.
 - A column without a role is not yours.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
-- `set` takes: title, waiting, due, tags, ask, external, abstract, summary.
+- `set` takes: title, project, waiting, due, tags, ask, external, abstract, summary.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
 - Exit codes: 2 held by another, 3 conflict, 4 not found, 5 rule refusal, 6 bad input.
 
@@ -50,7 +51,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to the inbox column with project `personal`.
-- A task needs the user? Put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it.
+- A task needs the user? Put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it. Start `ask` with `review:` (look at it) or `access:` (you need a key or a login); no prefix means a decision. The star is yellow, blue or red by kind, grey if your session ended.
 
 ## Ticket template
 
