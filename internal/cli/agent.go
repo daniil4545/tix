@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -39,7 +40,10 @@ func (a *app) actorOf(p *parsed) (string, error) {
 			return "", inputf("bad --as: %s", firstLine(err.Error()))
 		}
 	}
-	name, known := actor.Resolve(flag, a.env.Getenv)
+	name, known, err := actor.Resolve(flag, a.env.Getenv)
+	if err != nil {
+		return "", err
+	}
 	if !known {
 		return unknownActor, nil
 	}
@@ -81,7 +85,11 @@ func (a *app) cmdCtx(args []string) error {
 	if p.set["hook"] {
 		a.exportModel()
 	}
+	// ctx only marks own tasks: an ambiguous name leaves them unmarked, the first write names the fix.
 	who, err := a.actorOf(p)
+	if errors.Is(err, actor.ErrAmbiguous) {
+		who, err = unknownActor, nil
+	}
 	if err != nil {
 		return err
 	}

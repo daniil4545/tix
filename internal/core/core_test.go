@@ -325,6 +325,20 @@ func TestStore_CommitFails_WarningNotError(t *testing.T) {
 	}
 }
 
+// A note lives only in its commit: a failed commit is an error, not ok with a warning.
+func TestStore_NoteCommitFails_Error(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.open(2 * time.Second)
+	mustCreate(t, s, "Alpha")
+	if err := os.WriteFile(filepath.Join(e.fake, "failcommit"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Note("T-1", "lost", "a"); !errors.Is(err, core.ErrNotRecorded) {
+		t.Fatalf("Note with a failed commit: err = %v, want ErrNotRecorded", err)
+	}
+}
+
 func TestStore_StaleIndexLock_DroppedWithWarn(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)

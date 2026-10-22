@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/project"
@@ -70,7 +71,7 @@ func exitCode(err error) int {
 		return exitNotFound
 	case errors.Is(err, core.ErrRule):
 		return exitRule
-	case errors.As(err, &in), errors.Is(err, core.ErrNoIdentity):
+	case errors.As(err, &in), errors.Is(err, core.ErrNoIdentity), errors.Is(err, actor.ErrAmbiguous):
 		return exitInput
 	}
 	return exitOther

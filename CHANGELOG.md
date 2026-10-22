@@ -18,6 +18,14 @@ All notable changes to this project are documented here. The format follows
 - `RULES.md` and the agent skill: frozen work stays in the inbox with the tag
   `frozen`, a task is closed once all criteria are checked, a long report goes
   into a file.
+- When both `CLAUDE_CODE_SESSION_ID` and `CODEX_THREAD_ID` are set, a write
+  refuses with code 6 and names both `--as` forms instead of guessing which
+  agent calls. The comment hook takes the name from its input.
+
+### Fixed
+
+- `tix note` reports an error when its commit fails: the note lived only in the
+  commit and was lost behind an `ok`.
 
 ### Added
 

@@ -26,6 +26,8 @@ var (
 	ErrConflict = errors.New("edit conflict")
 	ErrLocked   = errors.New("store is busy")
 	ErrNotFound = errors.New("task not found")
+	// ErrNotRecorded - the commit failed and the operation lives only in the commit: a note.
+	ErrNotRecorded = errors.New("note not recorded: the commit failed, see .tix/log; run the note again")
 )
 
 // errGitBusy - a fresh git lock file: the reply "git is busy", errors.Is(err, ErrLocked).
@@ -269,6 +271,9 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 			res.Rev = blobID(data)
 		}
 		s.commit(tx, &res, tx.extra, id+": note "+text, actor)
+		if res.Warning != "" {
+			return ErrNotRecorded
+		}
 		return nil
 	})
 	return res, err

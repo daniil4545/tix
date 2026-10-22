@@ -131,6 +131,8 @@ and the task card with its history.
 An id works with or without the prefix: `12` means `T-12`. Every command takes
 `--as <name>` for the actor and `-v` to print the commit hash. Without `--as`
 the name comes from `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` or `TIX_ACTOR`.
+When both agent variables are set (one agent started inside another), a write
+asks for `--as`.
 Text that starts with a dash goes after `--`.
 
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,

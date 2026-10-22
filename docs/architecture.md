@@ -206,7 +206,7 @@ The diagram shows the main paths: `move` is allowed between any columns that hav
 | `backup`: push failed or hung | `gitx.Push`, `WaitDelay` | - | 30 s, once | `err`, code 1, details in `.tix/log` |
 | Background gc failed | `gcScript` | - | at the next threshold | `WARN` in `.tix/log` |
 
-Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task; 5 rule (`ErrRule`); 6 input (`ErrNoIdentity`, flag, id); 1 other.
+Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task; 5 rule (`ErrRule`); 6 input (`ErrNoIdentity`, `actor.ErrAmbiguous`, flag, id); 1 other (`ErrNotRecorded` of `note`).
 
 ## 7. Observability
 
