@@ -91,8 +91,8 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 
 func TestRenderBoard_StarOnlyOnRowThatNeedsYou(t *testing.T) {
 	b := view.Board{W: 120, H: 30, Total: 2, Cols: []view.Col{{Name: "todo", Rows: []view.Row{
-		{ID: "T-1", Project: "p", Title: "Quiet"},
-		{ID: "T-2", Project: "p", Title: "Needs you", Star: true},
+		{ID: "T-1", Project: "p", Title: "Quiet", Live: true},
+		{ID: "T-2", Project: "p", Title: "Needs you", Ask: "pick", Live: true},
 	}}}}
 	for _, ln := range strings.Split(plain(view.RenderBoard(b)), "\n") {
 		hasStar := strings.Contains(ln, "*")
@@ -248,7 +248,7 @@ func TestGolden_BoardAndCard(t *testing.T) {
 		{Name: "idea"},
 		{Name: "todo", Rows: []view.Row{
 			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
-			{ID: "T-9", Project: "alpha", Title: "Write docs", Star: true},
+			{ID: "T-9", Project: "alpha", Title: "Write docs", Ask: "which db?", Live: true},
 		}},
 		{Name: "doing", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
 		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice"}}},

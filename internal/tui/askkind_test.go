@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -9,14 +10,14 @@ import (
 )
 
 // askRow returns the board row of task id.
-func askRow(t *testing.T, m *Model, id string) (ended bool, ask string) {
+func askRow(t *testing.T, m *Model, id string) (live bool, ask string) {
 	t.Helper()
 	tk := m.byID(id)
 	if tk == nil {
 		t.Fatalf("task %s is not on the board", id)
 	}
 	rows := m.rows([]*task.Task{tk})
-	return rows[0].AskEnded, rows[0].Ask
+	return rows[0].Live, rows[0].Ask
 }
 
 // spec: T-44 scenario 3 (live claim decides the star state, by the model clock)
@@ -32,15 +33,48 @@ func TestBoardRow_AskSession_LiveOrEnded(t *testing.T) {
 	m := newMouseModel(t, e, 120, 30)
 	caReload(m)
 
-	if ended, ask := askRow(t, m, live); ended || ask != "review: look" {
-		t.Errorf("live claim: ended=%v ask=%q, want ended=false and the raw value", ended, ask)
+	if isLive, ask := askRow(t, m, live); !isLive || ask != "review: look" {
+		t.Errorf("live claim: live=%v ask=%q, want live=true and the raw value", isLive, ask)
 	}
-	if ended, _ := askRow(t, m, none); !ended {
-		t.Errorf("no claim: ended=false, want true")
+	if isLive, _ := askRow(t, m, none); isLive {
+		t.Errorf("no claim: live=true, want false")
 	}
 	m.now = func() time.Time { return time.Now().Add(10000 * time.Hour) }
-	if ended, _ := askRow(t, m, live); !ended {
-		t.Errorf("expired claim (model clock): ended=false, want true")
+	if isLive, _ := askRow(t, m, live); isLive {
+		t.Errorf("expired claim (model clock): live=true, want false")
+	}
+}
+
+// spec: T-85 overdue: a due date before the model-clock day marks the due part of the meta
+func TestBoardRow_Overdue_ByModelClock(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "doing")
+	e.set(id, "due", "2026-10-20")
+	m := newMouseModel(t, e, 120, 30)
+	caReload(m)
+	overdue := func() string {
+		return m.rows([]*task.Task{m.byID(id)})[0].Overdue
+	}
+	day := func(s string) func() time.Time {
+		return func() time.Time {
+			d, _ := time.ParseInLocation(time.DateOnly, s, time.Local)
+			return d.Add(15 * time.Hour)
+		}
+	}
+	cases := []struct{ today, want string }{
+		{"2026-10-19", ""},
+		{"2026-10-20", ""},
+		{"2026-10-21", "due 20.10"},
+	}
+	for _, c := range cases {
+		m.now = day(c.today)
+		if got := overdue(); got != c.want {
+			t.Errorf("today %s: Overdue %q, want %q", c.today, got, c.want)
+		}
+	}
+	m.now = day("2026-10-21")
+	if meta := m.rows([]*task.Task{m.byID(id)})[0].Meta; !strings.Contains(meta, "due 20.10") {
+		t.Errorf("meta %q lost the due text", meta)
 	}
 }
 

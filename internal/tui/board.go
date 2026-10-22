@@ -205,7 +205,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	for i, t := range ts {
 		out[i] = view.Row{
 			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), AskEnded: !m.liveClaim(t), Note: m.note(t, now),
+			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Live: m.liveClaim(t), Overdue: overdue(t, now), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}
@@ -225,6 +225,15 @@ func meta(t *task.Task, now time.Time) string {
 		parts = append(parts, "@"+actor.Short(c.Actor))
 	}
 	return strings.Join(parts, " ")
+}
+
+// overdue - the due text of the meta line when the date is before the model-clock day; else empty.
+func overdue(t *task.Task, now time.Time) string {
+	d, err := time.Parse(time.DateOnly, t.Due)
+	if err != nil || d.Format(time.DateOnly) >= now.Format(time.DateOnly) {
+		return ""
+	}
+	return "due " + dueText(t.Due)
 }
 
 func checks(crit []task.Criterion) string {

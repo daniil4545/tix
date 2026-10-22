@@ -209,20 +209,14 @@ func columnCells(b Board, index, bodyHeight int) []string {
 	return out
 }
 
-// askStyles returns the star and pulse style of a row, plain and on the selected line.
-func askStyles(kind string, ended bool) (plain, selected lipgloss.Style) {
-	color := askKindColors[kind]
-	if ended {
-		color = askEndedColor
-	}
-	fg := lipgloss.Color(color)
-	return lipgloss.NewStyle().Foreground(fg), selAskStyle.Foreground(fg)
-}
-
 func rowCells(row Row, selected bool) []string {
+	state := stateOf(row)
+	look := scheme[state]
 	kind, text, _ := task.ParseAsk(strings.TrimSpace(row.Ask))
-	askFg, selAsk := askStyles(kind, row.AskEnded && strings.TrimSpace(row.Ask) != "")
-	star := row.Star || strings.TrimSpace(row.Ask) != ""
+	signStyle, selSign := look.Title, selKindStyle(kind)
+	if look.KindColor {
+		signStyle = kindStyle(kind)
+	}
 	marker := " "
 	switch {
 	case row.Grabbed:
@@ -230,49 +224,73 @@ func rowCells(row Row, selected bool) []string {
 	case selected:
 		marker = ">"
 	}
-	head := marker + clean(row.ID+" "+row.Project)
 	title := " " + clean(row.Title)
-	summary, third := pulseLine(row, text, askFg)
-	meta := " " + clean(row.Meta)
+	summary, third := pulseLine(row, text, look, kindStyle(kind))
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected || row.Grabbed {
 		sel := selStyle
 		if row.Grabbed {
-			sel, selAsk = grabStyle, grabStyle
+			sel, selSign = grabStyle, grabStyle
 		}
+		head := marker + clean(row.ID+" "+row.Project)
 		first := sel.Render(fit(head, colWidth))
-		if star {
-			first = sel.Render(fit(head, colWidth-2)+" ") + selAsk.Render("*")
-		}
 		pulse := sel
-		if strings.TrimSpace(row.Ask) != "" {
-			pulse = selAsk
+		if look.Sign != "" {
+			first = sel.Render(fit(head, colWidth-2)+" ") + selSign.Render(look.Sign)
+			pulse = selSign
 		}
 		return []string{
 			first,
 			sel.Render(fit(title, colWidth)),
 			pulse.Render(fit(summary, colWidth)),
-			sel.Render(fit(meta, colWidth)),
+			sel.Render(fit(" "+clean(row.Meta), colWidth)),
 			blank,
 		}
 	}
-	first := fit(head, colWidth)
-	if star {
-		first = fit(head, colWidth-2) + " " + askFg.Render("*")
+	first := headLine(marker, row, look, colWidth)
+	if look.Sign != "" {
+		first = headLine(marker, row, look, colWidth-2) + " " + signStyle.Render(look.Sign)
 	}
-	return []string{first, fit(title, colWidth), third.Render(fit(summary, colWidth)), dimStyle.Render(fit(meta, colWidth)), blank}
+	return []string{first, look.Title.Render(fit(title, colWidth)), third.Render(fit(summary, colWidth)), metaLine(row, look.Rest), blank}
 }
 
-// pulseLine picks the third card line and its style: ask (askText, askFg), note, summary.
-func pulseLine(row Row, askText string, askFg lipgloss.Style) (string, lipgloss.Style) {
+// headLine draws the ID line: the ID in the state style, the project in its palette color.
+func headLine(marker string, row Row, look cardLook, width int) string {
+	id := marker + clean(row.ID) + " "
+	text := fit(id+clean(row.Project), width)
+	rest, ok := strings.CutPrefix(text, id)
+	if !ok {
+		return look.Head.Render(text)
+	}
+	label := strings.TrimRight(rest, " ")
+	return look.Head.Render(id) + projectStyle(row.Project).Render(label) + strings.Repeat(" ", len(rest)-len(label))
+}
+
+// metaLine draws the meta line; the Overdue part of it gets the overdue style.
+func metaLine(row Row, rest lipgloss.Style) string {
+	text := fit(" "+clean(row.Meta), colWidth)
+	if row.Overdue != "" {
+		if before, after, ok := strings.Cut(text, clean(row.Overdue)); ok {
+			return rest.Render(before) + overdueStyle.Render(clean(row.Overdue)) + rest.Render(after)
+		}
+	}
+	return rest.Render(text)
+}
+
+// pulseLine picks the third card line and its style: ask (askText, the kind style on a card that
+// takes the kind color), note, summary.
+func pulseLine(row Row, askText string, look cardLook, askFg lipgloss.Style) (string, lipgloss.Style) {
 	switch {
 	case strings.TrimSpace(row.Ask) != "":
-		return " " + clean(firstLine("? "+askText)), askFg
+		if look.KindColor {
+			return " " + clean(firstLine("? "+askText)), askFg
+		}
+		return " " + clean(firstLine("? "+askText)), look.Rest
 	case strings.TrimSpace(row.Note) != "":
-		return " " + clean(firstLine(strings.TrimSpace(row.Note))), dimStyle
+		return " " + clean(firstLine(strings.TrimSpace(row.Note))), look.Rest
 	}
-	return " " + clean(firstLine(row.Summary)), dimStyle
+	return " " + clean(firstLine(row.Summary)), look.Rest
 }
 
 func firstLine(s string) string {
