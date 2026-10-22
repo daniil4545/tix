@@ -1,7 +1,6 @@
 package view_test
 
 import (
-	"hash/fnv"
 	"strings"
 	"testing"
 
@@ -202,8 +201,9 @@ func TestRenderBoard_Overdue_DuePartRed(t *testing.T) {
 	}
 }
 
-// spec: T-85 project color: FNV-1a of the lower-cased name picks the palette entry; also on grey cards
-func TestRenderBoard_ProjectColor_StableAndCaseFree(t *testing.T) {
+// spec: T-85 project color: each project on the board gets its own palette slot (FNV-1a of the
+// lower-cased name, the next free slot on a collision); the label is drawn in it, also on grey cards
+func TestProjectColors_DistinctCaseFreeStable(t *testing.T) {
 	if view.ProjectPaletteSize() != 6 {
 		t.Fatalf("palette size %d, want 6", view.ProjectPaletteSize())
 	}
@@ -214,20 +214,30 @@ func TestRenderBoard_ProjectColor_StableAndCaseFree(t *testing.T) {
 	if len(seen) != 6 {
 		t.Errorf("palette has repeated colors: %d distinct of 6", len(seen))
 	}
-	for _, name := range []string{"tarn", "galera", "tracker", "a", "beta-2"} {
-		h := fnv.New32a()
-		_, _ = h.Write([]byte(name))
-		want := view.ProjectPaletteSGR(int(h.Sum32() % 6))
-		for _, spelled := range []string{name, strings.ToUpper(name[:1]) + name[1:]} {
-			if got := view.ProjectSGR(spelled); got != want {
-				t.Errorf("project %q color %q, want %q (FNV-1a of %q)", spelled, got, want, name)
-			}
+	// shop and api, tracker and galera share an FNV slot: they must still differ.
+	names := []string{"shop", "api", "tracker", "Galera", "tarn", "personal"}
+	got := view.ProjectColors(names)
+	slots := map[int]string{}
+	for _, n := range names {
+		slot, ok := got[strings.ToLower(n)]
+		if !ok {
+			t.Fatalf("no slot for %q in %v", n, got)
+		}
+		if other, dup := slots[slot]; dup {
+			t.Errorf("%q and %q share slot %d", n, other, slot)
+		}
+		slots[slot] = n
+	}
+	again := view.ProjectColors([]string{"personal", "TARN", "galera", "Tracker", "API", "shop", "shop"})
+	for n, slot := range got {
+		if again[n] != slot {
+			t.Errorf("%q: slot %d, then %d for the same set in another order and case", n, slot, again[n])
 		}
 	}
-	for _, row := range []view.Row{{Project: "Tarn"}, {Project: "tarn", Live: true}} {
+	for _, row := range []view.Row{{Project: "Tarn", ProjectColor: 2}, {Project: "tarn", ProjectColor: 2, Live: true}} {
 		first := cardLinesOf(t, row, false)[0]
-		if !strings.Contains(first, view.ProjectSGR("tarn")+row.Project) {
-			t.Errorf("project label without its color: %q", first)
+		if !strings.Contains(first, view.ProjectPaletteSGR(2)+row.Project) {
+			t.Errorf("project label without its slot color: %q", first)
 		}
 		if !strings.Contains(plain(first), "T-7 "+row.Project) {
 			t.Errorf("project label text changed: %q", plain(first))

@@ -30,6 +30,5 @@ func SignOf(s CardState) string      { return scheme[s].Sign }
 func KindStarOf(s CardState) bool    { return scheme[s].KindColor }
 func KindSGR(kind string) string     { return sgr(kindStyle(kind)) }
 func OverdueSGR() string             { return sgr(overdueStyle) }
-func ProjectSGR(name string) string  { return sgr(projectStyle(name)) }
 func ProjectPaletteSGR(i int) string { return sgr(projectPalette[i]) }
 func ProjectPaletteSize() int        { return len(projectPalette) }

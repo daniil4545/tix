@@ -202,9 +202,15 @@ func (m *Model) boardView() view.Board {
 func (m *Model) rows(ts []*task.Task) []view.Row {
 	out := make([]view.Row, len(ts))
 	now := m.now()
+	names := make([]string, len(m.tasks))
+	for i, t := range m.tasks {
+		names[i] = t.Project
+	}
+	colors := view.ProjectColors(names) // over all tasks: a project keeps its color under any filter
 	for i, t := range ts {
 		out[i] = view.Row{
-			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
+			ProjectColor: colors[strings.ToLower(t.Project)],
+			ID:           t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
 			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Live: m.liveClaim(t), Overdue: overdue(t, now), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}

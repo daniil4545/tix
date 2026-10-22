@@ -19,6 +19,7 @@ type Row struct {
 	Live                              bool   // the task has a live claim; without it the card is grey and has no sign
 	Overdue                           string // the part of Meta drawn as overdue (the due text); empty - not overdue
 	Grabbed                           bool   // the card is grabbed: highlight and the "=" marker instead of ">"
+	ProjectColor                      int    // the project label slot in the palette, from ProjectColors
 }
 
 // UnknownColumn - the column name for tasks with a status that is not in config.toml.

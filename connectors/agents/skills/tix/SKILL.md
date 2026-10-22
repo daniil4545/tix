@@ -16,7 +16,7 @@ Run `tix ctx` first (a hook may have run it). It lists `active`, `waiting`, `rea
 4. `tix set T-12 summary="..."` - short result.
 5. `tix done T-12 -m "result"` - close once all criteria are checked.
 
-Remaining or new scope is a new task: `tix new`. Frozen work stays in inbox with tag `frozen`, never done. Blocked on the human: `tix move T-12 waiting -m "reason"`. A question: `tix set T-12 ask="..."`, prefix `review:` or `access:`.
+Remaining or new scope is a new task: `tix new`. Frozen work stays in inbox with tag `frozen`, never done. Need the human: keep it, `tix set T-12 ask="..."` (prefix `review:`/`access:`). External wait: `tix move T-12 waiting -m "reason"`.
 
 ## Rules
 

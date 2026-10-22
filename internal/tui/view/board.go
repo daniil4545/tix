@@ -264,7 +264,7 @@ func headLine(marker string, row Row, look cardLook, width int) string {
 		return look.Head.Render(text)
 	}
 	label := strings.TrimRight(rest, " ")
-	return look.Head.Render(id) + projectStyle(row.Project).Render(label) + strings.Repeat(" ", len(rest)-len(label))
+	return look.Head.Render(id) + projectStyle(row.ProjectColor).Render(label) + strings.Repeat(" ", len(rest)-len(label))
 }
 
 // metaLine draws the meta line; the Overdue part of it gets the overdue style.

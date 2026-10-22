@@ -2,6 +2,8 @@ package view
 
 import (
 	"hash/fnv"
+	"maps"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -45,12 +47,12 @@ var (
 
 	// projectPalette - muted colors of the project label; the name picks one by hash.
 	projectPalette = [6]lipgloss.Style{
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#8B9DC3")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#A98FBF")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#C08F9A")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#B5A27A")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#B58F6E")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("#86A9B3")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#82AAFF")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#C792EA")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#F78C6C")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#89DDFF")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF9CAC")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#C3A57A")),
 	}
 
 	// selKindBase - the selected line behind a colored sign.
@@ -82,9 +84,34 @@ func selKindStyle(kind string) lipgloss.Style {
 	return selKindBase.Foreground(kindStyle(kind).GetForeground())
 }
 
-// projectStyle - the palette style of a project: FNV-1a of the lower-cased name.
-func projectStyle(name string) lipgloss.Style {
-	h := fnv.New32a()
-	_, _ = h.Write([]byte(strings.ToLower(name)))
-	return projectPalette[h.Sum32()%uint32(len(projectPalette))]
+// ProjectColors gives each project a palette slot: the FNV-1a slot of the lower-cased name, the next
+// free slot on a collision. Names are placed in sorted order, so the same set gives the same colors;
+// colors are distinct while there are no more projects than palette entries.
+func ProjectColors(names []string) map[string]int {
+	uniq := map[string]bool{}
+	for _, n := range names {
+		uniq[strings.ToLower(n)] = true
+	}
+	taken := [len(projectPalette)]bool{}
+	free := len(projectPalette)
+	out := make(map[string]int, len(uniq))
+	for _, n := range slices.Sorted(maps.Keys(uniq)) {
+		h := fnv.New32a()
+		_, _ = h.Write([]byte(n))
+		i := int(h.Sum32() % uint32(len(projectPalette)))
+		for free > 0 && taken[i] {
+			i = (i + 1) % len(projectPalette)
+		}
+		if free > 0 {
+			taken[i] = true
+			free--
+		}
+		out[n] = i
+	}
+	return out
+}
+
+// projectStyle - the palette style of a slot; a slot outside the palette wraps around.
+func projectStyle(slot int) lipgloss.Style {
+	return projectPalette[(slot%len(projectPalette)+len(projectPalette))%len(projectPalette)]
 }
