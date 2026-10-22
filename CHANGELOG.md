@@ -19,8 +19,8 @@ All notable changes to this project are documented here. The format follows
   `frozen`, a task is closed once all criteria are checked, a long report goes
   into a file.
 - When both `CLAUDE_CODE_SESSION_ID` and `CODEX_THREAD_ID` are set, a write
-  refuses with code 6 and names both `--as` forms instead of writing under the
-  parent agent's name. The comment hook takes the name from its input.
+  refuses with code 6 and names both `--as` forms instead of guessing which
+  agent calls. The comment hook takes the name from its input.
 
 ### Fixed
 

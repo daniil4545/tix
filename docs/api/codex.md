@@ -23,6 +23,8 @@ Sources: [L] live `codex exec` on 2026-10-20 with a temporary CODEX_HOME; [S] `c
 | Confirmation: a rule added through the TUI ("allow list") is written to `~/.codex/rules/default.rules`; with Smart approvals Codex offers a prefix_rule on escalation | [D] | A hand-made file is picked up at start without confirmation (except `codex exec` without the TUI: no confirmation needed, checked in a live run with a rule from a file) |
 | Another CODEX_HOME: `CODEX_HOME=dir codex ...` reads config.toml, rules/ and auth.json from there; for runs without touching ~/.codex a symlink of auth.json is enough | [L] | Integration tests isolate through CODEX_HOME |
 | `-c key=value` takes a TOML value: `sandbox_mode="workspace-write"` needs quotes | [L] | |
+| Hook input on stdin, captured 2026-10-22 in `codex exec` 0.163: SessionStart `session_id, transcript_path, cwd, hook_event_name, model, permission_mode, source`; UserPromptSubmit and Stop add `turn_id` (Stop also `stop_hook_active, last_assistant_message`). `session_id` equals `CODEX_THREAD_ID`. Hooks run outside the sandbox | [L] wrapper `tix` on PATH logging stdin | `HookActor` matches `session_id` to the variables, `turn_id` marks Codex |
+| A single `tix note` from `codex exec` (workspace-write, never) runs outside the sandbox by the allow rule and commits as `codex:<thread>`; `codex sandbox` ignores execpolicy and is no check for that | [L] 2026-10-22, store commit `a149008` | |
 | The model gpt-5.5 is rejected with a ChatGPT account (400); gpt-6.1-sol works | [L] | Not critical for tix |
 
 ## Addendum 2026-10-20: writing to ~/tasks (recon codex-write)

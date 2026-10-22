@@ -31,11 +31,15 @@ func InboxDir(getenv func(string) string) string {
 
 // HookActor - the agent identity in a hook: the hook input session_id with the agent prefix, otherwise the
 // environment (Resolve). The input wins: an agent started inside another inherits the parent's variable.
-// Codex is told apart by turn_id in the input: CODEX_* variable names are not enough for that.
+// The agent kind comes from the variable equal to session_id, else from turn_id in the input (Codex has it).
 // Empty if no identity is found or the name fails Valid.
 func HookActor(getenv func(string) string, sessionID string, codex bool) string {
 	name := ""
 	switch {
+	case sessionID != "" && sessionID == getenv("CODEX_THREAD_ID"):
+		name = "codex:" + sessionID
+	case sessionID != "" && sessionID == getenv("CLAUDE_CODE_SESSION_ID"):
+		name = "claude:" + sessionID
 	case sessionID != "" && codex:
 		name = "codex:" + sessionID
 	case sessionID != "":
