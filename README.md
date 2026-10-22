@@ -154,11 +154,14 @@ The same file has a `[projects]` table to rename a project folder.
 
 `tix` without arguments opens the board in a terminal. Columns show cards with
 the title, the project and a one-line pulse. The board refreshes when a file in
-`~/tasks` changes, so an agent's work appears live. A `*` marks a task whose
-`ask` field holds a question for you: yellow for a decision, blue for a review
+`~/tasks` changes, so an agent's work appears live. Color shows who is on a
+task: the title is green while an agent holds a live claim, and the whole card
+is grey when nobody does. A `*` appears only when a live agent waits for you:
+its `ask` field holds a question, yellow for a decision, blue for a review
 (`ask="review: ..."`), red for access such as a key or a login
-(`ask="access: ..."`). The star is grey when the asking session holds no claim
-any more: the answer stays in the task for the next agent.
+(`ask="access: ..."`). A card without a live claim has no star: the answer stays
+in the task for the next agent. A due date in the past is red, and each project
+label has its own muted color.
 
 | Keys | Action |
 |---|---|

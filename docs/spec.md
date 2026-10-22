@@ -40,7 +40,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | Work log in the task (`RULES.md`): a note for each decision, question and stage change; the answer to `ask` is written into the task, whoever answers; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
 | Columns with roles in `config.toml`; fields `waiting`, `claim`, `due`, `tags`, `ask` | yes | custom fields, theme choice, theme `cards` | |
-| Star on `ask`: colored by kind, grey without a live session (2.3) | yes | reply to the agent from the card | |
+| Board colors: green title with a live claim, star on `ask` colored by kind, grey card without a live claim, red overdue date, project colors (2.3) | yes | reply to the agent from the card | |
 | Connectors for Claude Code, Codex, OpenCode (2.4) | the agent installs one once | `setup` | |
 | `RULES.md`, home session in `~/tasks` | yes | | |
 | Backup by `git push` to a private remote | by command | in the background | |
@@ -167,12 +167,16 @@ flowchart TD
 1. Purpose: the human screen, first of all for viewing.
 2. Input and output: keys; one operation queue in the background, the screen is not blocked by the lock.
 3. How it works (mockup):
-   - ASCII, lines made of hyphens; colors: main, muted, accent; the star - your action is needed,
-     orange - error. The star color is the kind of need, the `ask` prefix `decide:` (default, no
-     prefix), `review:`, `access:`: yellow, blue, red. A task with an `ask` and no live claim (none or
-     expired): grey star, `g` says "session ended; the answer stays in the task". The pulse line
-     shows the text without the prefix; the card shows the whole value;
-   - board: number, project, title, first line of the summary, criteria, due date, `claim`, star;
+   - ASCII, lines made of hyphens; colors: main, muted, accent, orange - error. Color carries life:
+     a live claim with no `ask` - title green, no sign; a live claim and an `ask` - title
+     green and a `*`, colored by the kind of need, the `ask` prefix `decide:` (default, no prefix),
+     `review:`, `access:`: yellow, blue, red; no live claim (none, expired, released, any column) -
+     no sign and the whole card grey, the ask text included, `g` says "session ended; the answer
+     stays in the task". A due date in the past (model clock) is red in the meta line. The project
+     label has its own muted color from a palette of 6 by a hash of the lower-cased name. The
+     pulse line shows the text without the prefix; the card shows the whole value. The scheme is
+     one table in `internal/tui/view/scheme.go`;
+   - board: number, project, title, first line of the summary, criteria, due date, `claim`, star (only when the human is needed);
      an unknown column is the column `?`;
    - card: title and column, fields in one line, the `ask` line, abstract, summary, details,
      history: moves, closes, takes, releases, notes and comments are always visible; two or more

@@ -100,3 +100,5 @@ Color carries life; a sign appears only when the human is needed.
 - Tests (first, red): green title with a live claim; star by kind only with a live claim; grey card and no
   star without a claim and with an expired one; red overdue date; the project color is the same for
   `Tarn` and `tarn` and stable between runs; selected row unchanged.
+- Where it lives: the whole scheme is one table in `internal/tui/view/scheme.go` (card states, title style, sign,
+  ask-kind colors, overdue style, project palette); board code only looks it up.

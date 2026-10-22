@@ -15,8 +15,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- The star of an `ask` turns grey when the task has no live claim, and `g` on
-  it says that the session ended.
+- Board colors show life: the title is green with a live claim, a card without
+  one is grey and has no star, and `g` on its `ask` says that the session
+  ended. The star appears only with a live claim and an `ask`.
+- A due date in the past is red, and each project label has its own color.
 - `tix new --to` a column with an entry check (ready, waiting, closed) is
   refused with code 5 before any write: create the task, add criteria, then
   `tix move`.
