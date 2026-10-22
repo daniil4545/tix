@@ -78,7 +78,7 @@ does. Docs only.
 
 Acceptance: `make check` green; `scripts/test-connect.sh` green.
 
-## 5. T-84: board color scheme (owner decision 2026-10-22, replaces the grey star of section 1)
+## 5. T-85: board color scheme (owner decision 2026-10-22, replaces the grey star of section 1)
 
 Color carries life; a sign appears only when the human is needed.
 
