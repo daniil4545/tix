@@ -79,24 +79,43 @@ func (e *env) text(id string) string {
 	return string(d)
 }
 
+// mkIn creates a task in a column. A column with an entry check gets the task through the inbox:
+// created, given criteria or a reason, then moved.
 func mkIn(t *testing.T, s *core.Store, title, column string) string {
 	t.Helper()
-	r, err := s.Create(title, "proj", column, "tester")
-	if err != nil {
-		t.Fatalf("Create(%q): %v", title, err)
-	}
-	return r.ID
+	return seed(t, s, title, column, false)
 }
 
 // mkCrit creates a task in a column and writes three criteria.
 func mkCrit(t *testing.T, s *core.Store, title, column string) string {
 	t.Helper()
-	r, err := s.Create(title, "proj", column, "tester")
+	return seed(t, s, title, column, true)
+}
+
+func seed(t *testing.T, s *core.Store, title, column string, crit bool) string {
+	t.Helper()
+	checked := column == "todo" || column == "blocked" || column == "done"
+	into := column
+	if checked {
+		into = "idea"
+	}
+	r, err := s.Create(title, "proj", into, "tester")
 	if err != nil {
 		t.Fatalf("Create(%q): %v", title, err)
 	}
-	if _, err := s.Edit(r.ID, r.Rev, critBody, "tester"); err != nil {
-		t.Fatalf("Edit %s: %v", r.ID, err)
+	if crit || column == "todo" {
+		if r, err = s.Edit(r.ID, r.Rev, critBody, "tester"); err != nil {
+			t.Fatalf("Edit %s: %v", r.ID, err)
+		}
+	}
+	if checked {
+		o := core.MoveOpts{}
+		if column != "todo" {
+			o.Message, o.Force = "seed", column == "done"
+		}
+		if _, err := s.Move(r.ID, column, o, "tester"); err != nil {
+			t.Fatalf("Move %s to %s: %v", r.ID, column, err)
+		}
 	}
 	return r.ID
 }

@@ -61,6 +61,10 @@ role = "waiting"
 [[column]]
 name = "fin"
 role = "closed"
+
+[[column]]
+name = "work"
+role = "active"
 `
 
 const moveCfg = `[[column]]

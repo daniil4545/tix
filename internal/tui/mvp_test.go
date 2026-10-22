@@ -150,11 +150,12 @@ func mvNewEnvGit(t *testing.T, config, gitBin string) *mvEnv {
 
 func (e *mvEnv) create(title, column string) string {
 	e.t.Helper()
-	r, err := e.store.Create(title, "p", column, "seed")
-	if err != nil {
-		e.t.Fatalf("Create(%q): %v", title, err)
-	}
-	return r.ID
+	return e.createIn(title, "p", column)
+}
+
+func (e *mvEnv) createIn(title, project, column string) string {
+	e.t.Helper()
+	return SeedTask(e.t, e.store, e.root, title, project, column)
 }
 
 func (e *mvEnv) set(id, name, value string) {

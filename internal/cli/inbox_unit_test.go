@@ -49,7 +49,7 @@ func unitHookStdin(event, session string, kv ...string) string {
 // Marks file: JSON {id: number} in a dir outside the store, no temp files, the store does not change.
 func TestInboxUnit_MarksFileShape_BaseUntouched(t *testing.T) {
 	b, dir := unitInboxBox(t, map[string]string{"CLAUDE_CODE_SESSION_ID": "u1"})
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	b.ok("", "take", "T-1")
 	b.ok("", "comment", "T-1", "first", "--as", "human")
 	unitInboxRun(t, b, unitHookStdin("PostToolUse", "u1"))
@@ -78,7 +78,7 @@ func TestInboxUnit_MarksFileShape_BaseUntouched(t *testing.T) {
 // Codex identity without environment variables: turn_id in the input gives the prefix codex:.
 func TestInboxUnit_CodexIdentityFromInput(t *testing.T) {
 	b, dir := unitInboxBox(t, map[string]string{"CODEX_THREAD_ID": "x9"})
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	b.ok("", "take", "T-1")
 	b.extra = map[string]string{"TIX_INBOX_DIR": dir}
 	in := unitHookStdin("UserPromptSubmit", "x9", "turn_id", "t1")
@@ -96,7 +96,7 @@ func TestInboxUnit_CodexIdentityFromInput(t *testing.T) {
 // Stop in Codex and Claude: decision=block and reason, no hookSpecificOutput.
 func TestInboxUnit_StopFormat(t *testing.T) {
 	b, _ := unitInboxBox(t, map[string]string{"CLAUDE_CODE_SESSION_ID": "u1"})
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	b.ok("", "take", "T-1")
 	unitInboxRun(t, b, unitHookStdin("Stop", "u1"))
 	b.ok("", "comment", "T-1", "stop me", "--as", "human")
@@ -112,7 +112,7 @@ func TestInboxUnit_StopFormat(t *testing.T) {
 func TestInboxUnit_OrderAndMoreListsTasks(t *testing.T) {
 	b, _ := unitInboxBox(t, map[string]string{"CLAUDE_CODE_SESSION_ID": "u1"})
 	for i := 0; i < 3; i++ {
-		b.ok("", "new", "Work", "--to", "todo")
+		b.newTask("Work", "todo")
 		b.ok("", "take", fmt.Sprintf("T-%d", i+1))
 	}
 	unitInboxRun(t, b, unitHookStdin("PostToolUse", "u1"))
@@ -152,7 +152,7 @@ func TestInboxUnit_WithoutHook_InputError(t *testing.T) {
 // unitHold creates T-1 and claims it with session u1.
 func unitHold(b *box) {
 	b.t.Helper()
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	b.ok("", "take", "T-1")
 }
 

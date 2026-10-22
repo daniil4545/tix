@@ -101,11 +101,7 @@ func e0(t *testing.T, root string, lock time.Duration) *core.Store {
 
 func (e *env) create(title, project, column string) string {
 	e.t.Helper()
-	r, err := e.store.Create(title, project, column, "seed")
-	if err != nil {
-		e.t.Fatalf("Create(%q): %v", title, err)
-	}
-	return r.ID
+	return tui.SeedTask(e.t, e.store, e.root, title, project, column)
 }
 
 // body sets the whole task body.

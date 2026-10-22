@@ -60,8 +60,9 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 	b.cwd = b.project("myproj", true)
 	b.env = b.with("CLAUDE_CODE_SESSION_ID=happy-1")
 
-	b.ok("", "new", "Fix parser", "--to", "todo")
+	b.ok("", "new", "Fix parser")
 	b.ok("## Details\n- [ ] reproduce\n- [ ] fix\n", "edit", "T-1", "--base", b.showRev("T-1"))
+	b.ok("", "move", "T-1", "todo")
 
 	ctx := b.ok("", "ctx").out
 	if !strings.HasPrefix(ctx, "project myproj") || !regexp.MustCompile(`(?m)^todo\s+T-1 Fix parser`).MatchString(ctx) ||
@@ -123,7 +124,9 @@ func (b *box) checkHistory(prefixes []string) {
 // A race of 5 take processes - one ok, the others code 2, without --steal.
 func TestScenario_FiveTakesRace_OneWinner(t *testing.T) {
 	b := newBox(t)
-	b.ok("", "new", "Contended", "--to", "todo")
+	b.ok("", "new", "Contended")
+	b.ok("## Details\n- [ ] one\n", "edit", "T-1", "--base", b.showRev("T-1"))
+	b.ok("", "move", "T-1", "todo")
 	codes := make([]int, 5)
 	var wg sync.WaitGroup
 	for i := range codes {
