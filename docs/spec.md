@@ -47,7 +47,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | External trackers | `external` as a link | status and result: `tix pull`, key `s` (D61, `docs/specs/integrations.md`) | sync of fields and comments |
 | Scheduled assistant, execution time on screen | | yes | |
 | Public repository v0.1.0: the whole repository in English, manifest and scenarios in the README, demo, CI, release (D47) | yes | | |
-| Column `review`, archive of `done` after 7 days, limit of tasks in progress per project, launching an agent from the board | | v0.2 (D65) | |
+| Column `review`, archive of `done` after 7 days, limit of tasks in progress per project, launching an agent from the board | | later (D65) | |
 | Operations center: launching an agent from a card | | own spec, Galera #165 | in near versions |
 | `blocked_by`, `parent` and task links - investigation after the MVP (D65); `tix sync` for two machines (D61), opening the session of an edit, built-in editor, side panel, view in Obsidian Bases | | if needed | |
 | `estimate`, `branch`, `links`; editing comments; server, web, several machines; own LLM | | | yes |
@@ -208,7 +208,7 @@ flowchart TD
      `session_id`, not from an inherited variable;
    - model (D65): the start hook of Claude Code calls `tix ctx --hook`, which writes `TIX_MODEL` to
      `CLAUDE_ENV_FILE` (the value is validated, the shell executes the file); the commit of a write carries the trailer
-     `Model:`. Limits until v0.2: a `/model` switch does not update the value, subagents get the model
+     `Model:`. Known limits: a `/model` switch does not update the value, subagents get the model
      of the parent, Codex does not write the trailer;
    - `CLAUDE.md` and `AGENTS.md` are not touched - for the user they are symlinks to one file;
    - Codex takes `tix` out of the sandbox only for a single command, without `;`, `&&`, pipes, `cd`
