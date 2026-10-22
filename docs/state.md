@@ -8,10 +8,6 @@ repository, one commit on top, push. Never push from this repository (it has no 
 ## In progress
 
 - Trial run of v0.1.1 in normal work (user, from 2026-10-21): agents now open a tix task by default.
-- T-20 "A reply from the task reaches the agent": in `main`, hooks installed; back in `idea` with tag
-  `frozen`, the owner chose it as the next task on 2026-10-22. Step "Acceptance": a live check on a new
-  session, approval of the hooks in Codex `/hooks`. Also find out why Codex never ran `tix`: the retro of
-  2026-10-22 saw 0 commits by a `codex:` actor, while 45 Codex sessions mention tix.
 
 ## Next
 
@@ -22,7 +18,8 @@ repository, one commit on top, push. Never push from this repository (it has no 
 ## Open
 
 - Branch `z2-rank-cache` (`be562f9`) is kept for T-5: rank cache without tests and review.
-- Codex: approve the new `tix` hooks in `/hooks`.
+- Codex cannot write `~/tasks` from the `workspace-write` sandbox, `writable_roots` keeps `.git` closed (T-76).
+- A Codex started from a Claude shell inherits `CLAUDE_CODE_SESSION_ID` and acts as the parent (T-80).
 - Known race: the reply `a` may erase a new `ask` of the agent in a window of milliseconds; conditional write - v0.2.
 - The model in the `Model:` trailer is only for Claude Code; `/model` in the middle of a session and subagents - v0.2.
 - `make e2e-agents` and live Codex calls spend subscription limits: only with the user's consent.
@@ -30,6 +27,9 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## Done
 
+- 2026-10-22. T-20 closed: comment delivery checked live. Claude: a human comment arrived on the next
+  PostToolUse. Codex exec 0.163: SessionStart, UserPromptSubmit and Stop hooks run, the model quoted the
+  comment. Why Codex never wrote: the sandbox (T-76). Found: nested agent identity (T-80), lost note (T-77).
 - 2026-10-22. Retro of agent use (566 store commits, 323 calls) and T-71 in `main` (`5a5b33f`): `done`
   clears `ask`, `take --release` puts an active task at the head of ready, `new --to` takes a role,
   `<command> --help`, the full hint for `take` without criteria, release is not folded in the history;
