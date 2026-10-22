@@ -196,6 +196,7 @@ func (e *mvEnv) start(w, h int) {
 	e.t.Cleanup(func() {
 		_ = e.tm.Quit()
 		e.tm.WaitFinished(e.t, teatest.WithFinalTimeout(5*time.Second))
+		_, _ = e.store.Note("T-0", "drain", "test") // waits for a commit the board writer still runs
 	})
 }
 
