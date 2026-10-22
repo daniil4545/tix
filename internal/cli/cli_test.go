@@ -196,8 +196,8 @@ func TestCLI_EmptyBase_ListOneLine_NewCreatesHome(t *testing.T) {
 func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	if r := b.ok("", "new", "Alpha", "--to", "todo"); r.out != "ok T-1 todo\n" {
-		t.Errorf("new --to: %q", r.out)
+	if id := b.newTask("Alpha", "todo"); id != "T-1" {
+		t.Errorf("first task id %q, want T-1", id)
 	}
 	b.ok("", "new", "Beta")
 	b.ok("", "new", "Gamma")
@@ -478,12 +478,12 @@ func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
 	}
 }
 
-// new --to takes a role as move does: `--to ready` lands in the ready role column.
+// new --to takes a role as move does: `--to active` lands in the active role column.
 func TestCLI_New_ToRole(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	if r := b.ok("", "new", "Alpha", "--to", "ready"); r.out != "ok T-1 todo\n" {
-		t.Errorf("new --to ready: stdout %q, want %q", r.out, "ok T-1 todo\n")
+	if r := b.ok("", "new", "Alpha", "--to", "active"); r.out != "ok T-1 doing\n" {
+		t.Errorf("new --to active: stdout %q, want %q", r.out, "ok T-1 doing\n")
 	}
 }
 

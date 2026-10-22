@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	yellowFg = "38;2;233;207;106" // #E9CF6A
 	selBg    = "48;2;127;209;195" // #7FD1C3, highlight of the selected line
 	hintHead = "arrows select  space grab  enter open"
 )
@@ -67,14 +66,15 @@ func TestRenderBoard_NarrowWidth_HintTruncatedNotWrapped(t *testing.T) {
 	}
 }
 
-// Scenario: the ask star is yellow in both the selected and the unselected line.
-func TestRenderBoard_Ask_YellowSelectedAndNot(t *testing.T) {
+// Scenario: the ask color (decide kind, live claim) is the table color in both the selected and the unselected line.
+func TestRenderBoard_Ask_KindColorSelectedAndNot(t *testing.T) {
 	b := view.Board{Total: 3, W: 120, H: 40, Col: 0, Row: 0, Cols: []view.Col{oneCol(
-		view.Row{ID: "T-1", Title: "Alpha", Ask: "alpha-question", Meta: "m"},
-		view.Row{ID: "T-2", Title: "Bravo", Ask: "bravo-question", Meta: "m"},
-		view.Row{ID: "T-3", Title: "Charlie", Summary: "charlie-summary", Meta: "m"},
+		view.Row{ID: "T-1", Title: "Alpha", Ask: "alpha-question", Meta: "m", Live: true},
+		view.Row{ID: "T-2", Title: "Bravo", Ask: "bravo-question", Meta: "m", Live: true},
+		view.Row{ID: "T-3", Title: "Charlie", Summary: "charlie-summary", Meta: "m", Live: true},
 	)}}
 	raw := view.RenderBoard(b)
+	yellowFg := strings.TrimSuffix(strings.TrimPrefix(view.KindSGR("decide"), "\x1b["), "m")
 
 	sel := lineWith(t, raw, "alpha-question")
 	if !strings.Contains(sel, yellowFg) {

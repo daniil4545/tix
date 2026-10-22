@@ -619,7 +619,7 @@ func TestGrab_OrderByDue_ColumnOnly(t *testing.T) {
 // Scenario 4: new task
 // ---------------------------------------------------------------------------------------------
 
-// New task: a click on "+" of column todo, title, editor; the cursor on the new task.
+// New task: a click on "+" of column doing, title, editor; the cursor on the new task.
 func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 	cases := []struct{ name, script, wantBody string }{
 		{"editor without an edit", "", ""},
@@ -630,10 +630,10 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			st := acStubEditor(t, c.script)
 			e := mvNewEnv(t, "")
 			e.create("Alpha", "idea")
-			e.create("Beta", "todo")
+			e.create("Beta", "doing")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Beta")
-			plusX := mvColStep + 23 // the last character of the second column cell
+			plusX := 2*mvColStep + 23 // the last character of the third column cell
 			if r := []rune(e.lines()[2]); len(r) <= plusX || r[plusX] != '+' {
 				t.Fatalf("no '+' at x=%d in the column names line: %q", plusX, e.lines()[2])
 			}
@@ -644,8 +644,8 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			e.until("editor called", func() bool { return st.calls() == 1 && st.seen(1) != "" })
 			e.until("task created", func() bool { return e.acByTitle("Brand new") != nil })
 			tk := e.acByTitle("Brand new")
-			if tk.Status != "todo" || tk.Project != "personal" {
-				t.Errorf("task: column %q, project %q, expected todo and personal", tk.Status, tk.Project)
+			if tk.Status != "doing" || tk.Project != "personal" {
+				t.Errorf("task: column %q, project %q, expected doing and personal", tk.Status, tk.Project)
 			}
 			acCheckTemplate(t, st.seen(1))
 			e.settle()
@@ -689,21 +689,37 @@ func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 			if _, err := e.store.Create("Alpha", c.seed, "idea", "seed"); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := e.store.Create("Beta", c.seed, "todo", "seed"); err != nil {
-				t.Fatal(err)
-			}
+			e.createIn("Beta", c.seed, "doing")
 			e.acStartIn(c.launch, 140, 30)
 			e.screenHas("Alpha", "Beta")
-			e.key("l", "n") // column todo
+			e.key("l", "l", "n") // column doing
 			e.screenHas("title:")
 			e.tm.Type("From key")
 			e.key("enter")
 			e.until("task created", func() bool { return e.acByTitle("From key") != nil })
 			tk := e.acByTitle("From key")
-			if tk.Status != "todo" || tk.Project != c.want {
-				t.Errorf("task: column %q, project %q, expected todo and %q", tk.Status, tk.Project, c.want)
+			if tk.Status != "doing" || tk.Project != c.want {
+				t.Errorf("task: column %q, project %q, expected doing and %q", tk.Status, tk.Project, c.want)
 			}
 		})
+	}
+}
+
+// New task in a column with an entry check: the core refuses that column, the board keeps the title
+// and creates the task in the inbox column (owner decision 2026-10-22).
+func TestNewTask_N_InReadyColumn_CreatedInInbox(t *testing.T) {
+	acStubEditor(t, "")
+	e := mvNewEnv(t, "")
+	e.create("Alpha", "idea")
+	e.start(140, 30)
+	e.screenHas("Alpha")
+	e.key("l", "n") // column todo, ready role
+	e.screenHas("title:")
+	e.tm.Type("Fallback")
+	e.key("enter")
+	e.until("task created", func() bool { return e.acByTitle("Fallback") != nil })
+	if tk := e.acByTitle("Fallback"); tk.Status != "idea" {
+		t.Errorf("task column %q, want idea", tk.Status)
 	}
 }
 
@@ -1319,4 +1335,16 @@ func (e *mvEnv) acPressG(way string) {
 		return
 	}
 	e.key("g")
+}
+
+// The launch project (a folder name) filters the board whatever its case: tasks are stored in lower case.
+func TestBoard_LaunchProjectWithCapital_ShowsLowerCaseProject(t *testing.T) {
+	e := mvNewEnv(t, "")
+	e.createIn("Alpha", "Tarn", "idea")
+	e.createIn("Beta", "other", "idea")
+	e.acStartIn("Tarn", 140, 30)
+	e.screenHas("Alpha")
+	if s := e.text(); strings.Contains(s, "Beta") {
+		t.Errorf("the filter let another project in:\n%s", s)
+	}
 }

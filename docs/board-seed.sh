@@ -32,8 +32,8 @@ tix take 3 --as codex:0b5e2d44 >/dev/null
 tix note 3 "Columns added" --as codex:0b5e2d44 >/dev/null
 tix check 3 1 --as codex:0b5e2d44 >/dev/null
 tix take 4 --as claude:c19d0e85 >/dev/null
-tix move 4 waiting -m "Needs a decision on fees" --as claude:c19d0e85 >/dev/null
 tix set 4 ask="Stripe or Adyen?" --as claude:c19d0e85 >/dev/null
 tix take 8 --as codex:0b5e2d44 >/dev/null
 tix check 8 1 --as codex:0b5e2d44 >/dev/null
 tix "done" 8 -m "Both runners green" --as codex:0b5e2d44 >/dev/null
+tix set 3 ask="review: backfill plan in PR 41" --as codex:0b5e2d44 >/dev/null

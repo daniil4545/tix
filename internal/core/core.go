@@ -140,7 +140,7 @@ func (s *Store) Create(title, project, column, actor string) (Result, error) {
 		return Result{}, err
 	}
 	title = strings.TrimSpace(title)
-	project = strings.TrimSpace(project)
+	project = strings.ToLower(strings.TrimSpace(project))
 	if title == "" || strings.ContainsAny(title+project, "\r\n") {
 		return Result{}, errors.New("title is empty or has several lines")
 	}
@@ -166,6 +166,9 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	}
 	column, err = pickColumn(cfg, column)
 	if err != nil {
+		return Result{}, err
+	}
+	if err := s.checkNewEntry(cfg, column); err != nil {
 		return Result{}, err
 	}
 	files, err := s.taskFiles()
@@ -209,6 +212,22 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	}, tx.extra...)
 	s.commit(tx, &res, written, id+": new", actor)
 	return res, nil
+}
+
+// checkNewEntry applies the entry check of the column to a new task, which has no criteria and no
+// waiting reason yet. The message names the path: create, fill, then move.
+func (s *Store) checkNewEntry(cfg *config.Config, column string) error {
+	role := cfg.RoleOf(column)
+	if _, err := s.enter(&task.Task{Status: column}, role, "", MoveOpts{}, ""); err == nil {
+		return nil
+	}
+	switch role {
+	case roleWaiting:
+		return rule("a new task has no waiting reason; create it, then run: tix move <id> %s -m <reason>", column)
+	case roleClosed:
+		return rule("a new task cannot start closed; create it, then run: tix done <id> -m <result>")
+	}
+	return rule("a new task has no criteria; create it, add criteria with tix edit, then run: tix move <id> %s", column)
 }
 
 // Edit replaces the body; baseRev - the version the caller read.

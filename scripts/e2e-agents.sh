@@ -95,12 +95,13 @@ setup_fixture() {
 	mkdir -p "$WORK"
 	git -C "$WORK" init -q || return 1
 	git -C "$WORK" -c user.name=e2e -c user.email=e2e@localhost commit -q --allow-empty -m init || return 1
-	tix_in "$WORK" new "Report that the job is done" --to todo --as e2e:setup >/dev/null || return 1
+	tix_in "$WORK" new "Report that the job is done" --as e2e:setup >/dev/null || return 1
 	local rev
 	rev=$(tix_in "$WORK" show T-1 | sed -n '1s/^rev //p')
 	[ -n "$rev" ] || return 1
 	printf '## Details\n\n- [ ] Say "job done" in your final answer\n' |
 		tix_in "$WORK" edit T-1 --base "$rev" --as e2e:setup >/dev/null || return 1
+	tix_in "$WORK" move T-1 todo --as e2e:setup >/dev/null || return 1
 	[ "$(tix_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj todo" ] || return 1
 	mkdir -p "$TASKS/.git/info"
 	printf '.agents/\n.claude/\n' >>"$TASKS/.git/info/exclude"
