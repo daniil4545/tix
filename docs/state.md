@@ -7,18 +7,18 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## In progress
 
-- Trial run of tix (0.2.0 since 2026-10-22) in normal work (user, from 2026-10-21): agents now open a tix task by default.
+- Pause for testing (owner, 2026-10-22): 0.3.0 in normal work, no new features until the next retro.
 
 ## Next
 
-1. T-39: philosophy of tools (essay and agent rule), a separate session during the trial.
-2. T-44: an `ask` left by a closed session; jumping to its author fails. Decide what happens to the question.
-3. After the MVP: T-27 (clicks on the question line, needs a modifier probe in Warp), T-5, T-7.
+1. Retro after a few days of 0.3.0: board colors, ask kinds, agents keeping the task while asking.
+2. Later: T-27 (clicks on the question line, needs a modifier probe in Warp), T-5, T-7; `project` in the card `f` menu.
 
 ## Open
 
 - Branch `z2-rank-cache` (`be562f9`) is kept for T-5: rank cache without tests and review.
-- Release review follow-ups: `new --to` skips the column entry check (T-82), spec 2.3 fold text (T-83).
+- vhs 0.12.1 skipped the `Screenshot` of `docs/board.tape`; the picture came from the last GIF frame (see the tape header).
+- The grey card relies on the 3-hour claim: a closed window greys out only when the claim expires.
 - Known race: the reply `a` may erase a new `ask` of the agent in a window of milliseconds; conditional write - later.
 - The model in the `Model:` trailer is only for Claude Code; `/model` in the middle of a session and subagents - later.
 - `make e2e-agents` and live Codex calls spend subscription limits: only with the user's consent.
@@ -26,6 +26,12 @@ repository, one commit on top, push. Never push from this repository (it has no 
 
 ## Done
 
+- 2026-10-22. Release 0.3.0 (`main` tag `v0.3.0`, public snapshot `2d0db33`): ask kinds by prefix (T-44), board
+  color scheme in `internal/tui/view/scheme.go` (T-85: live claim colored, the rest grey, distinct project
+  colors), `new` keeps the entry check and the board falls back to the inbox (T-82), lower-case projects and
+  `set project=` (T-73), spec 2.3 (T-83), a flaky TUI test harness fixed. Checked: `make check`,
+  `test-connect.sh`, two reviews and an Opus final review (no must-fix), CI and release green, the
+  darwin_arm64 archive passes `SHA256SUMS` and prints `0.3.0`.
 - 2026-10-22. Release 0.2.0 (`main` tag `v0.2.0`, public snapshot `ca67353`): T-71 and T-77, T-80. T-76 closed
   as not a defect: the allow rule takes a single `tix` out of the sandbox (live `codex exec` note committed);
   Codex is rarely used. Checked: `make check`, review and final review (no must-fix), CI and release green,
