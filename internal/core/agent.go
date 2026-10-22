@@ -394,7 +394,11 @@ func setField(t *task.Task, role string, f Field) error {
 		if _, err := time.Parse("2006-01-02", f.Value); err != nil && f.Value != "" {
 			return rule("due must be 2006-01-02")
 		}
-	case "tags", "ask", "external":
+	case "ask":
+		if _, _, known := task.ParseAsk(f.Value); !known {
+			return rule("unknown ask kind; a prefix must be one of: %s", strings.Join(task.AskKinds, ", "))
+		}
+	case "tags", "external":
 	default:
 		return rule("field %s cannot be set; allowed: %s", f.Name, allowedFields)
 	}

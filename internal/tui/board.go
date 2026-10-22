@@ -205,7 +205,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	for i, t := range ts {
 		out[i] = view.Row{
 			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Note: m.note(t, now),
+			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), AskEnded: !m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}

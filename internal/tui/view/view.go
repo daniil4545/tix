@@ -10,11 +10,13 @@ import (
 	"github.com/daniil4545/tix/internal/history"
 )
 
-// Row - a board column line. The third card line (the pulse) is the first of: the Ask question (yellow),
+// Row - a board column line. The third card line (the pulse) is the first of: the Ask question (the kind prefix is cut;
+// the color is yellow, blue or red by kind, muted if AskEnded),
 // the Note note (a ready line "<age> <text>", empty outside the active column), Summary.
 type Row struct {
 	ID, Project, Title, Summary, Meta string
 	Ask, Note                         string
+	AskEnded                          bool // the ask has no live session: the star and the pulse line go muted
 	Star                              bool // a star in the first line; a non-zero Ask turns it on itself
 	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
 }
@@ -62,7 +64,10 @@ var (
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8A06A"))
 	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#111416"))
 	selAskStyle = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#E9CF6A"))
-	grabStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#E9CF6A")).Foreground(lipgloss.Color("#111416"))
+	// askKindColors - the star color by ask kind: red and blue are the terminal ANSI colors.
+	askKindColors = map[string]string{"decide": "#E9CF6A", "review": "4", "access": "1"}
+	askEndedColor = "#69756F"
+	grabStyle     = lipgloss.NewStyle().Background(lipgloss.Color("#E9CF6A")).Foreground(lipgloss.Color("#111416"))
 )
 
 // RenderInput draws the input line: the prompt, the text and the cursor. A long text is shown by its tail.

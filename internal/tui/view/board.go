@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
@@ -207,7 +209,19 @@ func columnCells(b Board, index, bodyHeight int) []string {
 	return out
 }
 
+// askStyles returns the star and pulse style of a row, plain and on the selected line.
+func askStyles(kind string, ended bool) (plain, selected lipgloss.Style) {
+	color := askKindColors[kind]
+	if ended {
+		color = askEndedColor
+	}
+	fg := lipgloss.Color(color)
+	return lipgloss.NewStyle().Foreground(fg), selAskStyle.Foreground(fg)
+}
+
 func rowCells(row Row, selected bool) []string {
+	kind, text, _ := task.ParseAsk(strings.TrimSpace(row.Ask))
+	askFg, selAsk := askStyles(kind, row.AskEnded && strings.TrimSpace(row.Ask) != "")
 	star := row.Star || strings.TrimSpace(row.Ask) != ""
 	marker := " "
 	switch {
@@ -218,12 +232,12 @@ func rowCells(row Row, selected bool) []string {
 	}
 	head := marker + clean(row.ID+" "+row.Project)
 	title := " " + clean(row.Title)
-	summary, third := pulseLine(row)
+	summary, third := pulseLine(row, text, askFg)
 	meta := " " + clean(row.Meta)
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected || row.Grabbed {
-		sel, selAsk := selStyle, selAskStyle
+		sel := selStyle
 		if row.Grabbed {
 			sel, selAsk = grabStyle, grabStyle
 		}
@@ -245,16 +259,16 @@ func rowCells(row Row, selected bool) []string {
 	}
 	first := fit(head, colWidth)
 	if star {
-		first = fit(head, colWidth-2) + " " + askStyle.Render("*")
+		first = fit(head, colWidth-2) + " " + askFg.Render("*")
 	}
 	return []string{first, fit(title, colWidth), third.Render(fit(summary, colWidth)), dimStyle.Render(fit(meta, colWidth)), blank}
 }
 
-// pulseLine picks the third card line and its style: ask, note, summary.
-func pulseLine(row Row) (string, lipgloss.Style) {
-	switch ask := strings.TrimSpace(row.Ask); {
-	case ask != "":
-		return " " + clean(firstLine("? "+ask)), askStyle
+// pulseLine picks the third card line and its style: ask (askText, askFg), note, summary.
+func pulseLine(row Row, askText string, askFg lipgloss.Style) (string, lipgloss.Style) {
+	switch {
+	case strings.TrimSpace(row.Ask) != "":
+		return " " + clean(firstLine("? "+askText)), askFg
 	case strings.TrimSpace(row.Note) != "":
 		return " " + clean(firstLine(strings.TrimSpace(row.Note))), dimStyle
 	}
