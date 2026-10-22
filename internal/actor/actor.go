@@ -3,6 +3,7 @@ package actor
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"unicode"
@@ -14,24 +15,32 @@ const Unknown = "unknown"
 // shortID - how many id characters Short keeps.
 const shortID = 8
 
+// ErrAmbiguous - both agent variables are set: one agent runs inside another, and the environment
+// does not tell which one calls.
+var ErrAmbiguous = errors.New("both CLAUDE_CODE_SESSION_ID and CODEX_THREAD_ID are set")
+
 // Resolve determines the identity in the order of spec 2.4: flag, agent environment,
 // TIX_ACTOR. Agent forms: "claude:<id>", "codex:<id>". known=false: no identity
-// found, name equals "unknown".
-func Resolve(flag string, getenv func(string) string) (name string, known bool) {
+// found, name equals "unknown". Both agent variables without a flag: ErrAmbiguous with the --as hint.
+func Resolve(flag string, getenv func(string) string) (name string, known bool, err error) {
+	claude, codex := getenv("CLAUDE_CODE_SESSION_ID"), getenv("CODEX_THREAD_ID")
 	switch {
 	case flag != "":
 		name = flag
-	case getenv("CLAUDE_CODE_SESSION_ID") != "":
-		name = "claude:" + getenv("CLAUDE_CODE_SESSION_ID")
-	case getenv("CODEX_THREAD_ID") != "":
-		name = "codex:" + getenv("CODEX_THREAD_ID")
+	case claude != "" && codex != "":
+		return Unknown, false, fmt.Errorf("%w; pass --as codex:%s inside Codex or --as claude:%s inside Claude Code",
+			ErrAmbiguous, codex, claude)
+	case claude != "":
+		name = "claude:" + claude
+	case codex != "":
+		name = "codex:" + codex
 	default:
 		name = getenv("TIX_ACTOR")
 	}
 	if name == "" || name == Unknown {
-		return Unknown, false
+		return Unknown, false, nil
 	}
-	return name, true
+	return name, true, nil
 }
 
 // Valid checks an entered name (`--as`, `TIX_ACTOR`): no spaces, `|`, `-->`

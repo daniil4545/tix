@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
+### Changed
+
+- `tix take --release` moves a task out of the active column back to the head
+  of the ready column, so the active column shows only work in progress. It
+  also drops an expired claim of another agent.
+- `tix done` clears `ask`: a closed task no longer shows the yellow star.
+- `tix new --to` takes a role as well as a column name, as `tix move` does.
+- `tix take` on a task without criteria names the whole path: add criteria,
+  move, take.
+- `RULES.md` and the agent skill: frozen work stays in the inbox with the tag
+  `frozen`, a task is closed once all criteria are checked, a long report goes
+  into a file.
+- When both `CLAUDE_CODE_SESSION_ID` and `CODEX_THREAD_ID` are set, a write
+  refuses with code 6 and names both `--as` forms instead of guessing which
+  agent calls. The comment hook takes the name from its input.
+
+### Fixed
+
+- `tix note` reports an error when its commit fails: the note lived only in the
+  commit and was lost behind an `ok`.
+
+### Added
+
+- `tix <command> --help` prints the usage line of the command.
+
 ## [0.1.1] - 2026-10-21
 
 ### Changed
@@ -72,6 +99,7 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/daniil4545/tix/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daniil4545/tix/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daniil4545/tix/releases/tag/v0.1.0

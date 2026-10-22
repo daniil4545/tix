@@ -120,17 +120,19 @@ and the task card with its history.
 | `tix note T-12 "text"` | logs a step in the history |
 | `tix rm T-12` | deletes a task |
 | `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task |
-| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it |
+| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
 | `tix set T-12 field=value...` | sets `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number |
-| `tix done T-12 [-m text] [--force]` | closes a task and drops the claim |
+| `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask` |
 | `tix backup` | commits edits made outside `tix` and pushes `HEAD` to `origin` |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
 
 An id works with or without the prefix: `12` means `T-12`. Every command takes
 `--as <name>` for the actor and `-v` to print the commit hash. Without `--as`
 the name comes from `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` or `TIX_ACTOR`.
+When both agent variables are set (one agent started inside another), a write
+asks for `--as`.
 Text that starts with a dash goes after `--`.
 
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,

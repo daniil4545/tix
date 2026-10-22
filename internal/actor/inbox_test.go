@@ -23,7 +23,11 @@ func TestHookActor(t *testing.T) {
 		codex   bool
 		want    string
 	}{
-		{"environment wins over input", map[string]string{"CLAUDE_CODE_SESSION_ID": "e1"}, "s1", false, "claude:e1"},
+		{"input wins over inherited environment", map[string]string{"CLAUDE_CODE_SESSION_ID": "e1"}, "s1", true, "codex:s1"},
+		{"Codex variable equal to input, no turn_id", map[string]string{"CLAUDE_CODE_SESSION_ID": "e1", "CODEX_THREAD_ID": "s1"}, "s1", false, "codex:s1"},
+		{"Claude variable equal to input, with turn_id", map[string]string{"CLAUDE_CODE_SESSION_ID": "s1", "CODEX_THREAD_ID": "x1"}, "s1", true, "claude:s1"},
+		{"environment without input", map[string]string{"CLAUDE_CODE_SESSION_ID": "e1"}, "", false, "claude:e1"},
+		{"both variables without input", map[string]string{"CLAUDE_CODE_SESSION_ID": "e1", "CODEX_THREAD_ID": "x1"}, "", false, ""},
 		{"Claude input", nil, "s1", false, "claude:s1"},
 		{"Codex input", nil, "s1", true, "codex:s1"},
 		{"no identity", nil, "", false, ""},

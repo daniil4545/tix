@@ -72,13 +72,13 @@ func (a *app) cmdNew(args []string) error {
 	return nil
 }
 
-// column returns the column of a new task: --to by name, else the inbox role column, else the first.
+// column returns the column of a new task: --to by name or role, else the inbox role column, else the first.
 func (a *app) column(p *parsed) (string, error) {
 	cols := a.store.Config().Columns
 	if len(cols) == 0 {
 		return "", errors.New("config.toml has no columns")
 	}
-	want := p.vals["to"]
+	want := a.store.Config().Resolve(p.vals["to"])
 	for _, c := range cols {
 		if p.set["to"] && c.Name == want || !p.set["to"] && c.Role == "inbox" {
 			return c.Name, nil

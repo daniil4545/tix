@@ -477,3 +477,65 @@ func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
 		t.Errorf("tix new Beta: stdout %q, want %q", r.out, "ok T-2 ideas\n")
 	}
 }
+
+// new --to takes a role as move does: `--to ready` lands in the ready role column.
+func TestCLI_New_ToRole(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	if r := b.ok("", "new", "Alpha", "--to", "ready"); r.out != "ok T-1 todo\n" {
+		t.Errorf("new --to ready: stdout %q, want %q", r.out, "ok T-1 todo\n")
+	}
+}
+
+// Spec 2.4: both agent variables (an agent inside another) - a write is refused with the --as hint
+// and leaves the store as it was; --as resolves it.
+func TestCLI_BothAgentVariables_RefusedUntilAs(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	before := b.snapshot()
+	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1"}
+	r := b.tix("", "comment", "T-1", "hello")
+	if r.code != 6 || !oneErrLine(r.err) || !strings.Contains(r.err, "--as codex:x1") {
+		t.Fatalf("comment with both variables: code %d, stderr %q; want 6 and the --as hint", r.code, r.err)
+	}
+	if after := b.snapshot(); after != before {
+		t.Errorf("a refused write changed the store:\n%s\nwas:\n%s", after, before)
+	}
+	b.ok("", "comment", "T-1", "hello", "--as", "codex:x1")
+	if log := b.git("log", "-1", "--format=%(trailers:key=Actor,valueonly)"); strings.TrimSpace(log) != "codex:x1" {
+		t.Errorf("Actor = %q, want codex:x1", log)
+	}
+}
+
+// The start hook of a nested agent still gets the context: ctx reads, it does not need the name.
+func TestCLI_Ctx_BothAgentVariables_Works(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1"}
+	if r := b.ok("", "ctx"); !strings.Contains(r.out, "columns:") {
+		t.Errorf("ctx with both variables: stdout %q, want the context", r.out)
+	}
+}
+
+// --help prints the usage of the command and writes nothing; after "--" it is plain text.
+func TestCLI_CommandHelp_PrintsUsageWritesNothing(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	before := b.snapshot()
+	for _, args := range [][]string{{"new", "--help"}, {"take", "T-1", "-h"}, {"note", "--help", "T-1", "x"}} {
+		r := b.ok("", args...)
+		if !strings.HasPrefix(r.out, "tix "+args[0]+" ") || r.err != "" {
+			t.Errorf("tix %v: stdout %q, stderr %q, want the usage line `tix %s ...`", args, r.out, r.err, args[0])
+		}
+	}
+	if after := b.snapshot(); after != before {
+		t.Errorf("--help changed the store:\n%s\nafter:\n%s", before, after)
+	}
+	b.ok("", "note", "T-1", "--", "--help")
+	if subj := strings.TrimSpace(b.git("log", "-1", "--format=%s")); subj != "T-1: note --help" {
+		t.Errorf("note after --: subject %q, want `T-1: note --help`", subj)
+	}
+}

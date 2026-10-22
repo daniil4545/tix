@@ -9,9 +9,9 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 3. `tix check T-12 1 2`: mark finished criteria.
 4. `tix set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
 5. `tix comment T-12 "text"`: comments are only appended.
-6. `tix done T-12 -m "result"`: closes the task and releases it.
+6. `tix done T-12 -m "result"`: closes the task, releases it and clears `ask`. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
-When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`.
+When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to the ready column.
 
 ## Progress
 
@@ -30,7 +30,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 ready`. `move` takes a column name or a role; `tix ctx` prints which column has which role.
+- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 ready`. `tix <command> --help` prints the flags of a command. `move` takes a column name or a role; `tix ctx` prints which column has which role.
 
 ## Checks
 
@@ -46,6 +46,8 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Scope
 
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
+- Frozen work stays in the inbox column with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.
+- A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to the inbox column with project `personal`.
 - A task needs the user? Put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it.

@@ -82,7 +82,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 		want  string
 	}{
 		{"flag wins", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_ACTOR": "ta:1"}, "codex:f1", "codex:f1"},
-		{"Claude session", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1", "TIX_ACTOR": "ta:1"}, "", "claude:c1"},
+		{"Claude session", map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "TIX_ACTOR": "ta:1"}, "", "claude:c1"},
 		{"Codex thread", map[string]string{"CODEX_THREAD_ID": "x1", "TIX_ACTOR": "ta:1"}, "", "codex:x1"},
 		{"TIX_ACTOR", map[string]string{"TIX_ACTOR": "opencode:o1"}, "", "opencode:o1"},
 	}
