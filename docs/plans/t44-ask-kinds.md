@@ -77,3 +77,26 @@ does. Docs only.
 6. Create with project `Galera` stores `galera`; `set project=Tarn` stores `tarn`; empty refused.
 
 Acceptance: `make check` green; `scripts/test-connect.sh` green.
+
+## 5. T-84: board color scheme (owner decision 2026-10-22, replaces the grey star of section 1)
+
+Color carries life; a sign appears only when the human is needed.
+
+| Card | Sign | Color |
+|---|---|---|
+| Live claim, no `ask` (an agent works) | none | title green |
+| Live claim and `ask` (the agent waits for you) | `*` | title green; star by kind: decide yellow, review blue, access red |
+| No live claim (never taken, session gone, released, ask from a gone session, any column) | none | the whole card grey (`dimStyle`): title, meta, pulse line incl. the ask text |
+| Due date in the past (model clock) | none | the due part of the meta red, on any card |
+| Project label | none | its own muted color from a fixed palette of 6, chosen by a stable hash (FNV) of the lower-cased name; on grey cards too |
+
+- Live claim: the same helper as `focusURL` and section 1 (claim present, `Until` after the model clock).
+- The grey star of section 1 is removed: no live claim means no star at all.
+- `g` text from section 1 stays.
+- Selected and grab rows keep their background styles; the star keeps its kind color there, as today.
+- Green, red and the 6 project colors: hex like the rest of `internal/tui/view/view.go`, readable on a
+  dark background, distinct from the accent `#7FD1C3` used for the selection.
+- Docs: spec board section and the star rows, README board paragraph, CHANGELOG `[Unreleased]`.
+- Tests (first, red): green title with a live claim; star by kind only with a live claim; grey card and no
+  star without a claim and with an expired one; red overdue date; the project color is the same for
+  `Tarn` and `tarn` and stable between runs; selected row unchanged.
