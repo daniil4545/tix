@@ -147,7 +147,7 @@ flowchart TD
 | `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; a column with an entry check of 2.5 (`ready`, `waiting`, `closed`) refuses with code 5 before any write: create, add criteria, then `move` |
 | `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
-| `set` | only `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix is refused with code 5 |
+| `set` | only `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix (`word: `) is refused with code 5, a link like `http://` is text |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask` |

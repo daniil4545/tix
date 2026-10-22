@@ -15,7 +15,7 @@ The star means "the human is needed". Its color now carries two facts.
 
 - Format: the kind is a prefix of the `ask` value: `decide: ...`, `review: ...`, `access: ...`.
   No prefix means `decide`. Matching is on the raw value: `^(decide|review|access):\s*`.
-- A prefix is a lowercase ASCII word directly followed by `:` at the start (`^[a-z]+:`). An unknown
+- A prefix is a lowercase ASCII word followed by `:` and a space or the end (`^[a-z]+:(\s|$)`), so `http://` is text. An unknown
   one (`foo: x`) is refused by `tix set` with a rule error (code 5) that lists the three kinds.
   `Note: x` (capital) or `x: y` after a space is plain text, not a prefix. Old asks without a prefix
   keep working as `decide`.

@@ -7,7 +7,7 @@ var AskKinds = []string{"decide", "review", "access"}
 
 var (
 	askKindRe   = regexp.MustCompile(`^(decide|review|access):\s*`)
-	askPrefixRe = regexp.MustCompile(`^[a-z]+:`)
+	askPrefixRe = regexp.MustCompile(`^[a-z]+:(\s|$)`) // a word and a colon, then a space: "http://" is text
 )
 
 // ParseAsk splits an ask value into its kind and text. No prefix means decide. known is false
