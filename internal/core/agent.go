@@ -101,7 +101,7 @@ func (s *Store) Take(id string, mode TakeMode, actor string) (Result, error) {
 		}
 		if mode == Release {
 			op.kind, op.subject = "release", "release"
-			info, err = s.release(t, actor)
+			info, err = s.release(t, cfg, actor)
 			return err
 		}
 		info, err = s.take(t, cfg, actor, mode == Steal, op)
@@ -111,15 +111,26 @@ func (s *Store) Take(id string, mode TakeMode, actor string) (Result, error) {
 	return res, err
 }
 
-func (s *Store) release(t *task.Task, actor string) (string, error) {
+// release drops the claim; a task in the active column goes back to the head of ready: active means someone works on it.
+func (s *Store) release(t *task.Task, cfg *config.Config, actor string) (string, error) {
 	claim, has := t.ClaimInfo()
 	if has && claim.Actor != actor && claim.Until.After(s.now()) {
 		return "", s.claimed(t.ID, claim)
 	}
-	if has && claim.Actor == actor {
-		t.ClearClaim()
+	if has {
+		t.ClearClaim() // own or expired: a live foreign claim was refused above
 	}
-	return "released", nil
+	col, ok := cfg.ByRole(roleReady)
+	if cfg.RoleOf(t.Status) != roleActive || !ok {
+		return "released", nil
+	}
+	pl, err := s.place(t, col.Name, Place{First: true})
+	if err != nil {
+		return "", err
+	}
+	from := t.Status
+	t.Status, t.Rank = col.Name, pl.rank
+	return "released  " + transition(from, col.Name), nil
 }
 
 func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool, op *opInfo) (string, error) {
@@ -128,6 +139,10 @@ func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool,
 		hint := "<ready column>"
 		if c, ok := cfg.ByRole(roleReady); ok {
 			hint = c.Name
+		}
+		if len(t.Criteria()) == 0 {
+			return "", rule("%s is in %s and has no criteria; add `- [ ]` lines under ## Details with tix edit, "+
+				"then run: tix move %s %s, then tix take %s", t.ID, t.Status, t.ID, hint, t.ID)
 		}
 		return "", rule("%s is in %s; run: tix move %s %s", t.ID, t.Status, t.ID, hint)
 	}
@@ -262,6 +277,9 @@ func (s *Store) leave(t *task.Task, fromRole, toRole, msg string, o MoveOpts, ac
 	}
 	if fromRole == roleActive || toRole == roleClosed {
 		t.ClearClaim()
+	}
+	if toRole == roleClosed {
+		return t.SetField("ask", "")
 	}
 	return nil
 }

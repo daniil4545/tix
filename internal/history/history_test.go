@@ -205,7 +205,7 @@ func TestFold(t *testing.T) {
 		{"a comment breaks the series", []history.Entry{e("set", "A", 1), e("comment", "A", 2), e("set", "A", 3)}, "set,comment,set"},
 		{"visible kinds do not fold", []history.Entry{e("note", "A", 1), e("note", "A", 2), e("move", "A", 3), e("move", "A", 4)}, "note,note,move,move"},
 		{"external is a separate author", []history.Entry{e("external edit", "external", 1), e("external edit", "external", 2), e("edit", "A", 3), e("edit", "A", 4)}, "fold(2),fold(2)"},
-		{"series between visible ones", []history.Entry{e("take", "A", 1), e("set", "A", 2), e("release", "A", 3), e("done", "A", 4)}, "take,fold(2),done"},
+		{"series between visible ones", []history.Entry{e("take", "A", 1), e("set", "A", 2), e("check", "A", 3), e("release", "A", 4), e("done", "A", 5)}, "take,fold(2),release,done"},
 		{"unknown kind is visible", []history.Entry{e("frobnicate", "A", 1), e("frobnicate", "A", 2)}, "frobnicate,frobnicate"},
 	}
 	for _, c := range cases {
