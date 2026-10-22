@@ -32,7 +32,7 @@ func (m *Model) dropGone() {
 	}
 	t := m.byID(m.grab.id)
 	switch {
-	case t == nil || (m.project != "" && t.Project != m.project):
+	case t == nil || (m.project != "" && !strings.EqualFold(t.Project, m.project)):
 		m.setStatus(m.grab.id+" removed", true)
 		m.grab = nil
 	case t.Status != m.grab.status:
@@ -50,7 +50,7 @@ func (m *Model) rebuild() {
 	byCol := map[string][]*task.Task{}
 	total := 0
 	for _, t := range m.tasks {
-		if m.project != "" && t.Project != m.project {
+		if m.project != "" && !strings.EqualFold(t.Project, m.project) {
 			continue
 		}
 		col := t.Status

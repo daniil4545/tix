@@ -140,7 +140,7 @@ func (s *Store) Create(title, project, column, actor string) (Result, error) {
 		return Result{}, err
 	}
 	title = strings.TrimSpace(title)
-	project = strings.TrimSpace(project)
+	project = strings.ToLower(strings.TrimSpace(project))
 	if title == "" || strings.ContainsAny(title+project, "\r\n") {
 		return Result{}, errors.New("title is empty or has several lines")
 	}

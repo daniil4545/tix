@@ -1336,3 +1336,15 @@ func (e *mvEnv) acPressG(way string) {
 	}
 	e.key("g")
 }
+
+// The launch project (a folder name) filters the board whatever its case: tasks are stored in lower case.
+func TestBoard_LaunchProjectWithCapital_ShowsLowerCaseProject(t *testing.T) {
+	e := mvNewEnv(t, "")
+	e.createIn("Alpha", "Tarn", "idea")
+	e.createIn("Beta", "other", "idea")
+	e.acStartIn("Tarn", 140, 30)
+	e.screenHas("Alpha")
+	if s := e.text(); strings.Contains(s, "Beta") {
+		t.Errorf("the filter let another project in:\n%s", s)
+	}
+}
