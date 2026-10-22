@@ -8,8 +8,10 @@ repository, one commit on top, push. Never push from this repository (it has no 
 ## In progress
 
 - Trial run of v0.1.1 in normal work (user, from 2026-10-21): agents now open a tix task by default.
-- T-20 "A reply from the task reaches the agent": in `main`, hooks installed. Step "Acceptance": a live check
-  on a new session (this one did not pick up the hooks), approval of the hooks in Codex `/hooks`.
+- T-20 "A reply from the task reaches the agent": in `main`, hooks installed; back in `idea` with tag
+  `frozen`, the owner chose it as the next task on 2026-10-22. Step "Acceptance": a live check on a new
+  session, approval of the hooks in Codex `/hooks`. Also find out why Codex never ran `tix`: the retro of
+  2026-10-22 saw 0 commits by a `codex:` actor, while 45 Codex sessions mention tix.
 
 ## Next
 
@@ -27,6 +29,12 @@ repository, one commit on top, push. Never push from this repository (it has no 
 - The docker image `golang:1.27` is kept for checking on Linux.
 
 ## Done
+
+- 2026-10-22. Retro of agent use (566 store commits, 323 calls) and T-71 in `main` (`5a5b33f`): `done`
+  clears `ask`, `take --release` puts an active task at the head of ready, `new --to` takes a role,
+  `<command> --help`, the full hint for `take` without criteria, release is not folded in the history;
+  RULES.md and the skill: frozen means inbox with tag `frozen`. Store: the frozen backlog of T-48 split back
+  into tasks. Checked: `make check`, `test-connect.sh`, a thorough review (no must-fix), `connect.sh apply`.
 
 - 2026-10-20. Recon, the MVP spec, S1-S4: core, CLI, connectors, TUI; install on the Mac; tasks in the tracker.
 - 2026-10-21. The MVP boundaries were rebuilt (D65), philosophy: the task is the boundary "discussed / doing".
