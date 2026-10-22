@@ -203,8 +203,10 @@ func (l *lifecycle) stealAndRelease() {
 	if _, err := l.s.Take(l.id, core.Release, "claude:b"); err != nil {
 		l.t.Fatalf("Release by the owner: %v", err)
 	}
-	_, ok := get(l.t, l.s, l.id).ClaimInfo()
+	tk := get(l.t, l.s, l.id)
+	_, ok := tk.ClaimInfo()
 	l.ensure(!ok, "the claim remained after Release")
+	l.ensure(tk.Status == "todo", "status after Release %q, want todo: active means someone works on it", tk.Status)
 	l.ensure(l.e.subject() == l.id+": release", "subject %q, want %q", l.e.subject(), l.id+": release")
 	n := l.e.count()
 	_, err = l.s.Take(l.id, core.Release, "claude:b")
@@ -261,6 +263,84 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 	}
 	if e.count() != n || e.text(ready) != before {
 		t.Error("a Take refusal changed the history or the file")
+	}
+	// No criteria: the hint names the whole path, not a move that the ready check refuses.
+	_, err := s.Take(inbox, core.Take, "claude:a")
+	wantRule(t, "Take from inbox without criteria", err, "has no criteria")
+	if err != nil && (!strings.Contains(err.Error(), "tix edit") || !strings.Contains(err.Error(), "tix take "+inbox)) {
+		t.Errorf("text %q, want the hint `tix edit ... tix take %s`", err, inbox)
+	}
+	crit := mkCrit(t, s, "Planned", "idea")
+	_, err = s.Take(crit, core.Take, "claude:a")
+	if err == nil || strings.Contains(err.Error(), "no criteria") {
+		t.Errorf("Take from inbox with criteria = %v, want the short hint `tix move`", err)
+	}
+}
+
+// Release of a waiting task drops the claim and keeps the column.
+func TestTake_Release_KeepsNonActiveColumn(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	id := mkCrit(t, s, "A", "todo")
+	if _, err := s.Take(id, core.Take, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Move(id, "blocked", core.MoveOpts{Message: "need key"}, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Take(id, core.Release, "claude:a"); err != nil {
+		t.Fatalf("Release: %v", err)
+	}
+	if tk := get(t, s, id); tk.Status != "blocked" {
+		t.Errorf("status %q, want blocked", tk.Status)
+	}
+}
+
+// Release by another actor of an expired claim: the stale claim goes, the task is the head of ready again.
+func TestTake_Release_ExpiredForeignClaimToHeadOfReady(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	clk := newClock()
+	s := e.openAt(clk)
+	id := mkCrit(t, s, "A", "todo")
+	mkCrit(t, s, "B", "todo")
+	if _, err := s.Take(id, core.Take, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	clk.add(4 * time.Hour)
+	if _, err := s.Take(id, core.Release, "claude:b"); err != nil {
+		t.Fatalf("Release of an expired foreign claim: %v", err)
+	}
+	tk := get(t, s, id)
+	if _, ok := tk.ClaimInfo(); ok || tk.Status != "todo" {
+		t.Errorf("after Release: status %q, claim kept %v; want todo without a claim", tk.Status, ok)
+	}
+	if got := order(t, s, "todo"); len(got) == 0 || got[0] != id {
+		t.Errorf("todo order %v, want %s first: the released task stays next", got, id)
+	}
+}
+
+// Closing clears ask: a closed task does not keep the yellow star.
+func TestMove_Close_ClearsAsk(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	id := mkIn(t, s, "A", "doing")
+	if _, err := s.Set(id, []core.Field{{Name: "ask", Value: "which port?"}}, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Move(id, "blocked", core.MoveOpts{Message: "need key"}, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	if tk := get(t, s, id); tk.Ask != "which port?" {
+		t.Errorf("ask after a move to blocked %q, want it kept", tk.Ask)
+	}
+	if _, err := s.Move(id, "done", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	if tk := get(t, s, id); tk.Ask != "" {
+		t.Errorf("ask after done %q, want empty", tk.Ask)
 	}
 }
 

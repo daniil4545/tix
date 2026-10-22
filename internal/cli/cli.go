@@ -128,6 +128,10 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return inputf("command required: %s", usage)
 	}
 	a.cmd, args = args[0], args[1:]
+	if h, ok := commandHelp[a.cmd]; ok && wantsHelp(args) {
+		a.out("tix %s; flags of every command: -v, --as agent:id", h)
+		return nil
+	}
 	switch a.cmd {
 	case "-h", "--help", "help":
 		a.out("%s", usage)
@@ -162,6 +166,38 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdBackup(ctx, args)
 	}
 	return inputf("unknown command %s; %s", a.cmd, usage)
+}
+
+// commandHelp - the usage line of each command for `tix <command> --help`.
+var commandHelp = map[string]string{
+	"ctx":     "ctx [--project P] [--json] [--hook]",
+	"inbox":   "inbox [--hook]",
+	"new":     "new <title> [--to column|role] [--project P]",
+	"list":    "list [--project P] [--status column] [--json]",
+	"show":    "show <id> [--json]",
+	"edit":    "edit <id> --base <rev> < body.md",
+	"comment": "comment <id> <text>",
+	"note":    "note <id> <text>",
+	"rm":      "rm <id>",
+	"take":    "take <id> [--steal|--release]",
+	"move":    "move <id> <column|role> [--first|--after T-9] [-m text] [--force]",
+	"set":     "set <id> field=value...; fields: title waiting due tags ask external abstract summary",
+	"check":   "check <id> N...",
+	"done":    "done <id> [-m result] [--force]",
+	"backup":  "backup",
+}
+
+// wantsHelp reports -h or --help among the flags; text after "--" does not count.
+func wantsHelp(args []string) bool {
+	for _, arg := range args {
+		switch arg {
+		case "--":
+			return false
+		case "-h", "--help":
+			return true
+		}
+	}
+	return false
 }
 
 // out prints a reply line to stdout.

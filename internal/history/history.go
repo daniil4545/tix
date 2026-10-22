@@ -21,8 +21,8 @@ const (
 )
 
 // foldable - minor edits: two or more in a row by one Actor merge into an "N edits" line (D60).
-// Moves, notes, takes and comments stay separate lines.
-var foldable = map[string]bool{"set": true, "check": true, "edit": true, "release": true, opExternal: true}
+// Moves, notes, takes, releases and comments stay separate lines: a release can move the task.
+var foldable = map[string]bool{"set": true, "check": true, "edit": true, opExternal: true}
 
 // subjectRe - the start of a core commit subject: "T-12: ".
 var subjectRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+: `)

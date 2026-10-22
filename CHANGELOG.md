@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `tix take --release` moves a task out of the active column back to the head
+  of the ready column, so the active column shows only work in progress. It
+  also drops an expired claim of another agent.
+- `tix done` clears `ask`: a closed task no longer shows the yellow star.
+- `tix new --to` takes a role as well as a column name, as `tix move` does.
+- `tix take` on a task without criteria names the whole path: add criteria,
+  move, take.
+- `RULES.md` and the agent skill: frozen work stays in the inbox with the tag
+  `frozen`, a task is closed once all criteria are checked, a long report goes
+  into a file.
+
+### Added
+
+- `tix <command> --help` prints the usage line of the command.
+
 ## [0.1.1] - 2026-10-21
 
 ### Changed

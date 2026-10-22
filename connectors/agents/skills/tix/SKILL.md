@@ -14,9 +14,9 @@ Run `tix ctx` first (the session hook may already have printed it). It lists tas
 2. `tix note T-12 "decided X because Y"` - log a decision, question, finding or stage change; not every command.
 3. `tix check T-12 1 2` - tick done criteria by number.
 4. `tix set T-12 summary="..."` - short result for the human.
-5. `tix done T-12 -m "result"` - close; unchecked criteria need `--force`.
+5. `tix done T-12 -m "result"` - close once all criteria are checked.
 
-Remaining or new scope is a new task: `tix new`. Blocked on the human: `tix move T-12 waiting -m "reason"`.
+Remaining or new scope is a new task: `tix new`. Frozen work stays in inbox with tag `frozen`, never done. Blocked on the human: `tix move T-12 waiting -m "reason"`.
 
 ## Rules
 

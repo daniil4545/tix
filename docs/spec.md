@@ -136,20 +136,20 @@ flowchart TD
 ### 2.2 CLI
 
 1. Purpose: the agent interface with the minimum of tokens.
-2. Input and output: a command; a one-line reply; `--json` only on `ctx`, `list`, `show`.
+2. Input and output: a command; a one-line reply; `--json` only on `ctx`, `list`, `show`; `tix <command> --help` prints its usage line.
 3. Commands (proposal, sample - the "agent" tab of the mockup):
 
 | Command | What it does |
 |---|---|
 | `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; up to 2000 characters |
 | `list`, `show` | list with filters; the whole task, with `rev` |
-| `new` | new task, in `inbox` by default |
-| `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim |
+| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does |
+| `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40) |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask` |
 | `rm`, `backup` | delete; commit of edits that bypass the core (step 2 of 2.1), then `git push` |
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,
@@ -219,7 +219,7 @@ A `config.toml` error gives the path and the line.
 | Role | Default | Check on move |
 |---|---|---|
 | `inbox` | idea | - |
-| `ready` | todo | at least one criterion; `ctx` takes the next task from here |
+| `ready` | todo | at least one criterion; `ctx` takes the next task from here; `take --release` puts an active task at its head without the check |
 | `active` | doing | execution time is counted here |
 | `waiting` | blocked | `waiting` is required (D41) |
 | `closed` | done | all criteria checked, or `--force -m` (D40) |
