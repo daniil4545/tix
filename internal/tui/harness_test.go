@@ -101,11 +101,7 @@ func e0(t *testing.T, root string, lock time.Duration) *core.Store {
 
 func (e *env) create(title, project, column string) string {
 	e.t.Helper()
-	r, err := e.store.Create(title, project, column, "seed")
-	if err != nil {
-		e.t.Fatalf("Create(%q): %v", title, err)
-	}
-	return r.ID
+	return tui.SeedTask(e.t, e.store, e.root, title, project, column)
 }
 
 // body sets the whole task body.
@@ -126,7 +122,12 @@ func (e *env) start(project string, w, h int) {
 	e.t.Cleanup(cancel)
 	m := tui.New(ctx, tui.Deps{Store: e.store, Root: e.root, Actor: "human", Project: project})
 	e.tm = teatest.NewTestModel(e.t, probe{Model: m, mu: &e.mu, screen: &e.screen}, teatest.WithInitialTermSize(w, h))
-	e.t.Cleanup(func() { _ = e.tm.Quit() })
+	e.t.Cleanup(func() {
+		_ = e.tm.Quit()
+		e.tm.WaitFinished(e.t, teatest.WithFinalTimeout(5*time.Second))
+		// The board writer may still be committing: a locked no-op waits for it before TempDir is removed.
+		_, _ = e.store.Note("T-0", "drain", "test")
+	})
 }
 
 func (e *env) text() string {

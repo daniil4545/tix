@@ -29,11 +29,31 @@ func (b *box) edit(id, body string) {
 }
 
 // newTask creates a task with three criteria; to - the column.
-func (b *box) newTask(title, to string) string {
+func (b *box) newTask(title, to string) string { return b.newTaskIn(b.cwd, title, to) }
+
+// newTaskIn is newTask run in the folder cwd; extra - more flags of new (--project).
+// A column with an entry check (todo, blocked, done) gets the task through the inbox:
+// created, edited, moved.
+func (b *box) newTaskIn(cwd, title, to string, extra ...string) string {
 	b.t.Helper()
-	r := b.ok("", "new", title, "--to", to)
+	checked := to == "todo" || to == "blocked" || to == "done"
+	into := to
+	if checked {
+		into = "idea"
+	}
+	r := b.runIn(cwd, "", append([]string{"new", title, "--to", into}, extra...)...)
+	if r.code != 0 {
+		b.t.Fatalf("tix new %q: code %d, stderr %q", title, r.code, r.err)
+	}
 	id := strings.Fields(r.out)[1]
 	b.edit(id, critBody)
+	if checked {
+		args := []string{"move", id, to}
+		if to != "todo" {
+			args = append(args, "-m", "seed", "--force")
+		}
+		b.ok("", args...)
+	}
 	return id
 }
 
@@ -91,7 +111,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 			defer guard(t)
 			b := newBox(t)
 			b.extra = c.extra
-			b.ok("", "new", "Work", "--to", "todo")
+			b.newTask("Work", "todo")
 			args := []string{"take", "T-1"}
 			if c.flag != "" {
 				args = append(args, "--as", c.flag)
@@ -107,7 +127,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 	}
 
 	b := newBox(t)
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	n := b.commitCount()
 	for _, args := range [][]string{
 		{"take", "T-1"},
@@ -142,7 +162,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 func TestCLI_Take_ForeignClaimStealReleaseCodes(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	b.ok("", "new", "Work", "--to", "todo")
+	b.newTask("Work", "todo")
 	b.ok("", "new", "Idea")
 	reply := regexp.MustCompile(`^ok T-1 todo > doing  @\S+ until \d\d:\d\d\n$`)
 	if r := b.ok("", "take", "T-1", "--as", "claude:a"); !reply.MatchString(r.out) {
@@ -385,9 +405,9 @@ func seedProject(t *testing.T) (*box, string) {
 	b := newBox(t)
 	proj := projectDir(t, b, "myproj")
 	for i := 1; i <= 7; i++ {
-		b.runIn(proj, "", "new", fmt.Sprintf("Ready %d", i), "--to", "todo")
+		b.newTaskIn(proj, fmt.Sprintf("Ready %d", i), "todo")
 	}
-	b.ok("", "new", "Other project", "--project", "other", "--to", "todo")
+	b.newTaskIn(b.cwd, "Other project", "todo", "--project", "other")
 	b.runIn(proj, "", "new", "Idea task") // inbox is not part of ctx
 	return b, proj
 }
@@ -460,7 +480,7 @@ func TestCLI_Ctx_NoGit_LimitsAndOwnClaim(t *testing.T) {
 	b := newBox(t)
 	long := strings.Repeat("Длинное название задачи ", 10)
 	for i := 0; i < 30; i++ {
-		b.ok("", "new", fmt.Sprintf("%d %s", i, long), "--to", []string{"todo", "doing", "blocked"}[i%3])
+		b.newTask(fmt.Sprintf("%d %s", i, long), []string{"todo", "doing", "blocked"}[i%3])
 	}
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "me1"}
 	b.ok("", "take", "T-2") // doing: own

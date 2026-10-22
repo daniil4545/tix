@@ -34,6 +34,10 @@ func (m *Model) startFocus() tea.Cmd {
 		return nil
 	}
 	url := m.focusURL(t)
+	if url == "" && strings.TrimSpace(t.Ask) != "" && !m.liveClaim(t) {
+		m.setStatus(t.ID+": session ended; the answer stays in the task", false)
+		return nil
+	}
 	if url == "" {
 		m.setStatus(t.ID+": no session to open", false)
 		return nil
@@ -49,13 +53,19 @@ func (m *Model) startFocus() tea.Cmd {
 	return nil
 }
 
+// liveClaim reports whether the task has a claim that is not expired by the model clock.
+func (m *Model) liveClaim(t *task.Task) bool {
+	c, ok := t.ClaimInfo()
+	return ok && c.Until.After(m.now())
+}
+
 // focusURL - the checked tab address of the claim owner; empty if there is no claim, it expired,
 // there is no file or the address is of the wrong form.
 func (m *Model) focusURL(t *task.Task) string {
-	c, ok := t.ClaimInfo()
-	if !ok || !c.Until.After(m.now()) {
+	if !m.liveClaim(t) {
 		return ""
 	}
+	c, _ := t.ClaimInfo()
 	name, dir := actor.FocusFile(c.Actor), actor.FocusDir(os.Getenv)
 	if name == "" || dir == "" {
 		return ""

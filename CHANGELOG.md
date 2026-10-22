@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
+### Added
+
+- `ask` takes a kind prefix: `decide:` (the default), `review:` or `access:`.
+  The board star is yellow, blue or red by kind. `tix set` refuses an unknown
+  lowercase prefix with code 5.
+- `tix set T-12 project=<name>` changes the project of a task.
+
+### Changed
+
+- Board colors show life: the title is green with a live claim, a card without
+  one is grey and has no star, and `g` on its `ask` says that the session
+  ended. The star appears only with a live claim and an `ask`.
+- A due date in the past is red, and each project label has its own color.
+- `tix new --to` a column with an entry check (ready, waiting, closed) is
+  refused with code 5 before any write: create the task, add criteria, then
+  `tix move`. On the board, `n` in such a column creates the task in the inbox
+  column and keeps the title.
+- Project names are stored in lower case; the project filter ignores case.
+
 ## [0.2.0] - 2026-10-22
 
 ### Changed
@@ -99,7 +120,8 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/daniil4545/tix/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/daniil4545/tix/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daniil4545/tix/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/daniil4545/tix/releases/tag/v0.1.0

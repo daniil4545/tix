@@ -300,7 +300,7 @@ func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
 	}
 	var out []*task.Task
 	for _, t := range tasks {
-		if (proj == "" || t.Project == proj) && (status == "" || t.Status == status) {
+		if (proj == "" || strings.EqualFold(t.Project, proj)) && (status == "" || t.Status == status) {
 			out = append(out, t)
 		}
 	}

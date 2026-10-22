@@ -123,7 +123,7 @@ func (e *env) count() int {
 
 func mustCreate(t *testing.T, s *core.Store, title string) core.Result {
 	t.Helper()
-	r, err := s.Create(title, "proj", "todo", "tester")
+	r, err := s.Create(title, "proj", "idea", "tester")
 	if err != nil {
 		t.Fatalf("Create(%q): %v", title, err)
 	}
@@ -153,7 +153,7 @@ func TestStore_CreateGetComment_RevIsBlobOfFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rev != blob || tk.Title != "Alpha" || tk.Status != "todo" || tk.Project != "proj" || len(tk.Comments) != 1 {
+	if rev != blob || tk.Title != "Alpha" || tk.Status != "idea" || tk.Project != "proj" || len(tk.Comments) != 1 {
 		t.Errorf("Get: rev=%q task=%+v", rev, tk)
 	}
 	if out := e.git("cat-file", "-t", rev); strings.TrimSpace(out) != "blob" {
@@ -526,7 +526,7 @@ func TestStore_ExternalWriteBetweenRenameAndCommit_KeepsAuthor(t *testing.T) {
 			return s.Remove("T-1", "agent-x")
 		}},
 		{"new", "T-2: new", "T-2 beta.md", "title: Beta", func(s *core.Store) (core.Result, error) {
-			return s.Create("Beta", "proj", "todo", "agent-x")
+			return s.Create("Beta", "proj", "idea", "agent-x")
 		}},
 	}
 	for _, tc := range cases {
@@ -547,7 +547,7 @@ func TestStore_ExternalWriteBetweenRenameAndCommit_KeepsAuthor(t *testing.T) {
 				t.Fatal("the wrapper did not reach commit: the window is not reproduced")
 			}
 			e.checkOwnCommit(r.Commit, tc.subject, tc.file, tc.want)
-			if _, err := s.Create("Gamma", "proj", "todo", "tester"); err != nil {
+			if _, err := s.Create("Gamma", "proj", "idea", "tester"); err != nil {
 				t.Fatal(err)
 			}
 			e.checkExternalCommitted()
@@ -596,7 +596,7 @@ func TestStore_CommitFails_RemoveAndCreate_NextOpExternalEdit(t *testing.T) {
 		want string // the external edit commit line
 	}{
 		{"rm", func(s *core.Store) (core.Result, error) { return s.Remove("T-2", "a") }, "T-2: external edit"},
-		{"new", func(s *core.Store) (core.Result, error) { return s.Create("Gamma", "proj", "todo", "a") }, "T-3: external edit"},
+		{"new", func(s *core.Store) (core.Result, error) { return s.Create("Gamma", "proj", "idea", "a") }, "T-3: external edit"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

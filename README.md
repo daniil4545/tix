@@ -112,7 +112,7 @@ and the task card with its history.
 
 | Command | What it does |
 |---|---|
-| `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column |
+| `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column; a column that needs criteria or a reason is refused |
 | `tix list [--project p] [--status s] [--json]` | lists tasks |
 | `tix show T-12 [--json]` | prints the whole task with its `rev` |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
@@ -122,7 +122,7 @@ and the task card with its history.
 | `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
-| `tix set T-12 field=value...` | sets `title`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
+| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number |
 | `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask` |
 | `tix backup` | commits edits made outside `tix` and pushes `HEAD` to `origin` |
@@ -154,15 +154,21 @@ The same file has a `[projects]` table to rename a project folder.
 
 `tix` without arguments opens the board in a terminal. Columns show cards with
 the title, the project and a one-line pulse. The board refreshes when a file in
-`~/tasks` changes, so an agent's work appears live. A yellow `*` marks a task
-whose `ask` field holds a question for you.
+`~/tasks` changes, so an agent's work appears live. Color shows who is on a
+task: the title is green while an agent holds a live claim, and the whole card
+is grey when nobody does. A `*` appears only when a live agent waits for you:
+its `ask` field holds a question, yellow for a decision, blue for a review
+(`ask="review: ..."`), red for access such as a key or a login
+(`ask="access: ..."`). A card without a live claim has no star: the answer stays
+in the task for the next agent. A due date in the past is red, and each project
+label has its own muted color.
 
 | Keys | Action |
 |---|---|
 | `h j k l`, arrows | select a column and a card |
 | `space` | grab the card; arrows move it, `space` or `enter` drops it, `esc` cancels |
 | `enter` | open the card |
-| `n` | new task in the selected column: asks for a title, then opens `$EDITOR` |
+| `n` | new task in the selected column (in the inbox column if that column needs criteria): asks for a title, then opens `$EDITOR` |
 | `a` | answer the agent's question |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
 | `g` | go to the agent's session (macOS and Warp only) |

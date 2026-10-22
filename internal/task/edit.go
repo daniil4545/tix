@@ -11,11 +11,11 @@ import (
 // sections - body sections in canonical order; SetSection writes the first two.
 var sections = []string{"Abstract", "Summary", "Details"}
 
-// SetField changes a frontmatter field: title, waiting, due, tags, ask, external.
+// SetField changes a frontmatter field: title, project, waiting, due, tags, ask, external.
 // The value is one line; title is never empty; due is 2006-01-02 or empty.
 func (t *Task) SetField(name, value string) error {
 	switch name {
-	case "title", "waiting", "due", "ask", "external":
+	case "title", "project", "waiting", "due", "ask", "external":
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("%s must be one line", name)
 		}
@@ -23,7 +23,7 @@ func (t *Task) SetField(name, value string) error {
 		t.Tags = splitTags(value)
 		return nil
 	default:
-		return fmt.Errorf("field %q cannot be set: allowed title waiting due tags ask external", name)
+		return fmt.Errorf("field %q cannot be set: allowed title project waiting due tags ask external", name)
 	}
 	if name == "title" && strings.TrimSpace(value) == "" {
 		return errors.New("title is empty")

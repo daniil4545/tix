@@ -32,7 +32,7 @@ func (m *Model) dropGone() {
 	}
 	t := m.byID(m.grab.id)
 	switch {
-	case t == nil || (m.project != "" && t.Project != m.project):
+	case t == nil || (m.project != "" && !strings.EqualFold(t.Project, m.project)):
 		m.setStatus(m.grab.id+" removed", true)
 		m.grab = nil
 	case t.Status != m.grab.status:
@@ -50,7 +50,7 @@ func (m *Model) rebuild() {
 	byCol := map[string][]*task.Task{}
 	total := 0
 	for _, t := range m.tasks {
-		if m.project != "" && t.Project != m.project {
+		if m.project != "" && !strings.EqualFold(t.Project, m.project) {
 			continue
 		}
 		col := t.Status
@@ -202,10 +202,16 @@ func (m *Model) boardView() view.Board {
 func (m *Model) rows(ts []*task.Task) []view.Row {
 	out := make([]view.Row, len(ts))
 	now := m.now()
+	names := make([]string, len(m.tasks))
+	for i, t := range m.tasks {
+		names[i] = t.Project
+	}
+	colors := view.ProjectColors(names) // over all tasks: a project keeps its color under any filter
 	for i, t := range ts {
 		out[i] = view.Row{
-			ID: t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Note: m.note(t, now),
+			ProjectColor: colors[strings.ToLower(t.Project)],
+			ID:           t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
+			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Live: m.liveClaim(t), Overdue: overdue(t, now), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}
@@ -225,6 +231,15 @@ func meta(t *task.Task, now time.Time) string {
 		parts = append(parts, "@"+actor.Short(c.Actor))
 	}
 	return strings.Join(parts, " ")
+}
+
+// overdue - the due text of the meta line when the date is before the model-clock day; else empty.
+func overdue(t *task.Task, now time.Time) string {
+	d, err := time.Parse(time.DateOnly, t.Due)
+	if err != nil || d.Format(time.DateOnly) >= now.Format(time.DateOnly) {
+		return ""
+	}
+	return "due " + dueText(t.Due)
 }
 
 func checks(crit []task.Criterion) string {
@@ -251,14 +266,14 @@ func (m *Model) cycleProject() {
 	seen := map[string]bool{}
 	var list []string
 	for _, t := range m.tasks {
-		if t.Project != "" && !seen[t.Project] {
-			seen[t.Project] = true
-			list = append(list, t.Project)
+		if p := strings.ToLower(t.Project); p != "" && !seen[p] {
+			seen[p] = true
+			list = append(list, p)
 		}
 	}
 	sort.Strings(list)
 	list = append([]string{""}, list...)
-	i := slices.Index(list, m.project)
+	i := slices.Index(list, strings.ToLower(m.project))
 	m.project = list[(i+1)%len(list)]
 	m.rebuild()
 }

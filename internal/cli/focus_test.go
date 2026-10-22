@@ -39,7 +39,7 @@ func TestFocus_AgentWriteCommands_StoreURL(t *testing.T) {
 		name string
 		args []string
 	}{
-		{"new", []string{"new", "Second", "--to", "todo"}},
+		{"new", []string{"new", "Second"}},
 		{"note", []string{"note", "T-1", "progress"}},
 		{"comment", []string{"comment", "T-1", "remark"}},
 		{"take", []string{"take", "T-1"}},
@@ -49,7 +49,7 @@ func TestFocus_AgentWriteCommands_StoreURL(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			defer guard(t)
 			b := newBox(t)
-			b.ok("", "new", "First", "--to", "todo")
+			b.newTask("First", "todo")
 			b.extra = b.agentEnv(warpURL)
 			b.ok("", c.args...)
 			files := b.focusFiles()
@@ -97,7 +97,7 @@ func TestFocus_ValueOfOtherShape_NotWritten(t *testing.T) {
 			defer guard(t)
 			b := newBox(t)
 			b.extra = b.agentEnv(c.url)
-			b.ok("", "new", "Work", "--to", "todo")
+			b.newTask("Work", "todo")
 			if files := b.focusFiles(); len(files) != 0 {
 				t.Errorf("value %q written to %v", c.url, files)
 			}
@@ -110,14 +110,14 @@ func TestFocus_HumanOrNoURL_NotWritten(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.extra = b.agentEnv(warpURL)
-	b.ok("", "new", "By human", "--to", "todo", "--as", "human")
+	b.ok("", "new", "By human", "--as", "human")
 	if files := b.focusFiles(); len(files) != 0 {
 		t.Errorf("a human write left a focus file: %v", files)
 	}
 
 	b2 := newBox(t)
 	b2.extra = b2.agentEnv("")
-	b2.ok("", "new", "No url", "--to", "todo")
+	b2.newTask("No url", "todo")
 	if files := b2.focusFiles(); len(files) != 0 {
 		t.Errorf("a file appeared without WARP_FOCUS_URL: %v", files)
 	}
@@ -127,7 +127,7 @@ func TestFocus_HumanOrNoURL_NotWritten(t *testing.T) {
 func TestFocus_FileWriteFails_CommandStillSucceeds(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	b.ok("", "new", "First", "--to", "todo")
+	b.newTask("First", "todo")
 	// a regular file sits in place of the focus dir: mkdir and write are impossible
 	if err := os.WriteFile(b.focusDir(), []byte("blocker"), 0o600); err != nil {
 		t.Fatal(err)
@@ -149,12 +149,12 @@ func TestFocus_FileNeverCommittedToGit(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.extra = b.agentEnv(warpURL)
-	b.ok("", "new", "First", "--to", "todo")
+	b.newTask("First", "todo")
 	if len(b.focusFiles()) != 1 {
 		t.Fatalf("focus file not written: %v", b.focusFiles())
 	}
 	b.extra = nil
-	b.ok("", "new", "Second", "--to", "todo") // the next operation picks up foreign tree edits
+	b.newTask("Second", "todo") // the next operation picks up foreign tree edits
 	if tracked := b.git("ls-files"); strings.Contains(tracked, "focus") {
 		t.Errorf("focus file got into git: %q", tracked)
 	}

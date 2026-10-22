@@ -67,7 +67,7 @@ func ops(es []history.Entry) []string {
 func TestLoad_CommitsAndFileCommentsByTime_CommentCommitNotDuplicated(t *testing.T) {
 	s, repo := store(t)
 	clock(t, at(10, 0))
-	if _, err := s.Create("Alpha", "p", "todo", "claude:a"); err != nil {
+	if _, err := s.Create("Alpha", "p", "doing", "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	clock(t, at(10, 10))
@@ -113,7 +113,7 @@ func TestLoad_ExternalEdits_OwnAuthor_SeveralIDsInOneCommit(t *testing.T) {
 	s, repo := store(t)
 	clock(t, at(9, 0))
 	for _, title := range []string{"Alpha", "Beta"} {
-		if _, err := s.Create(title, "p", "todo", "claude:a"); err != nil {
+		if _, err := s.Create(title, "p", "idea", "claude:a"); err != nil {
 			t.Fatal(err)
 		}
 	}
