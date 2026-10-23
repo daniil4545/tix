@@ -95,3 +95,7 @@ Accepted on 2026-10-20:
   Homebrew through our own tap. tk is taken by wedow/ticket and 3-4 more trackers of the niche; the namesake Heliopsy/tix (3 stars,
   same niche) is an accepted risk. Name research and the check of tix on 2026-10-21. User
   decision 2026-10-21. Cancels the name ticket from D47.
+- D68. Development moves to the public repository daniil4545/tix: it is the `origin` of the working copy, the
+  whole history and the internal docs are public. The tix repository becomes the bench of the admitd agent farm:
+  agents send PRs, the owner reviews and merges. User decision 2026-10-23 ("tix is fully public, a pet project,
+  no reason to hide"). Cancels the snapshot from D47; `scripts/snapshot.sh` is removed.

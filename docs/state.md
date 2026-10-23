@@ -2,8 +2,8 @@
 
 Project tasks are kept in the tracker (`~/tasks`, project `tracker`): `tix list`, the board is `tix` without arguments.
 `~/bin/tk` and `~/bin/tix` both link to `bin/tix` of this repository.
-Public repository `daniil4545/tix` is a snapshot: `scripts/snapshot.sh <dir>`, copy into a clone of the public
-repository, one commit on top, push. Never push from this repository (it has no remote).
+`origin` is the public repository `daniil4545/tix` (D68): push task branches there, `main` changes by merge after
+acceptance. Before 2026-10-23 the public repository got one snapshot commit per release.
 
 ## In progress
 

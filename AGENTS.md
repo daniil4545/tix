@@ -58,7 +58,7 @@ Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 | Findings file | `docs/findings.jsonl` |
 
 - Branches: a task goes in the branch `z<N>-<name>`, the merge into `main` happens at acceptance with the user's confirmation.
-- Hosting and CI: this repository has no remote. The public repository `daniil4545/tix` is a snapshot with CI; the steps are in `docs/state.md`.
+- Hosting and CI: `origin` is the public repository `daniil4545/tix` (D68); CI runs there. Agents of the admitd farm send PRs to it.
 
 ## Critical invariants
 
