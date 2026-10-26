@@ -20,6 +20,7 @@ const (
 	rankCacheHeader = "v1"
 	rankCacheEnd    = "end"
 	rankCacheFields = 7
+	rankTmpPrefix   = tmpPrefix + "rank-"
 )
 
 // rankEntry - what the column order needs from a task file.
@@ -102,32 +103,46 @@ func (s *Store) loadRankCache() map[string]cachedRank {
 	if err != nil {
 		return nil
 	}
-	lines := strings.Split(string(data), "\n")
-	// A whole file ends with "end\n": the last element after the split is empty.
-	n := len(lines)
-	if n < 3 || lines[0] != rankCacheHeader || lines[n-2] != rankCacheEnd || lines[n-1] != "" {
+	// A whole file ends with the end line; a file cut anywhere does not.
+	body, ok := strings.CutSuffix(string(data), rankCacheEnd+"\n")
+	if !ok {
 		return nil
 	}
-	old := make(map[string]cachedRank, n)
-	for _, ln := range lines[1 : n-2] {
-		f := strings.Split(ln, "\t")
-		if len(f) != rankCacheFields {
+	lines := strings.Split(body, "\n")
+	if lines[0] != rankCacheHeader {
+		return nil
+	}
+	old := make(map[string]cachedRank, len(lines))
+	for _, ln := range lines[1:] {
+		if ln == "" {
+			continue
+		}
+		c, ok := s.parseRankLine(ln)
+		if !ok {
 			return nil
 		}
-		ino, e1 := strconv.ParseInt(f[1], 10, 64)
-		size, e2 := strconv.ParseInt(f[2], 10, 64)
-		mtime, e3 := strconv.ParseInt(f[3], 10, 64)
-		rank, e4 := strconv.ParseFloat(f[6], 64)
-		if e1 != nil || e2 != nil || e3 != nil || e4 != nil {
-			return nil
-		}
-		old[f[0]] = cachedRank{
-			sig:       fileSig{ino: ino, size: size, mtime: mtime},
-			name:      f[0],
-			rankEntry: rankEntry{id: f[4], status: f[5], path: filepath.Join(s.root, f[0]), rank: rank},
-		}
+		old[c.name] = c
 	}
 	return old
+}
+
+func (s *Store) parseRankLine(ln string) (cachedRank, bool) {
+	f := strings.Split(ln, "\t")
+	if len(f) != rankCacheFields {
+		return cachedRank{}, false
+	}
+	ino, e1 := strconv.ParseInt(f[1], 10, 64)
+	size, e2 := strconv.ParseInt(f[2], 10, 64)
+	mtime, e3 := strconv.ParseInt(f[3], 10, 64)
+	rank, e4 := strconv.ParseFloat(f[6], 64)
+	if e1 != nil || e2 != nil || e3 != nil || e4 != nil {
+		return cachedRank{}, false
+	}
+	return cachedRank{
+		sig:       fileSig{ino: ino, size: size, mtime: mtime},
+		name:      f[0],
+		rankEntry: rankEntry{id: f[4], status: f[5], path: filepath.Join(s.root, f[0]), rank: rank},
+	}, true
 }
 
 // saveRankCache writes the cache through temp and rename. A failure is not critical: the
@@ -144,7 +159,9 @@ func (s *Store) saveRankCache(keep []cachedRank) {
 	}
 	b.WriteString(rankCacheEnd + "\n")
 	path := s.rankCachePath()
-	tmp, err := os.CreateTemp(filepath.Dir(path), "tix-rank.*")
+	// The temp file lives where cleanTmp sweeps it, so a killed write leaves nothing. Same
+	// volume as .git, so the rename stays atomic.
+	tmp, err := os.CreateTemp(filepath.Join(s.root, tixDir, tmpDir), rankTmpPrefix+"*.tmp")
 	if err != nil {
 		s.log.Warn("rank cache not written", "op", "rank_cache", "err", err)
 		return
