@@ -169,6 +169,7 @@ func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	if m.showing {
 		m.setStatus("", false)
 		m.card.step(dir)
+		m.fitScroll()
 		return nil
 	}
 	hit := view.HitBoard(m.layout(), e.X, e.Y)

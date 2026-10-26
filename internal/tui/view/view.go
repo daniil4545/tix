@@ -46,8 +46,9 @@ type Board struct {
 	FirstCol, RowTop int
 }
 
-// Card - everything needed for a card frame. Scroll - the body offset in lines; the frame
-// shifts it itself so that the Cursor line (an index in History) is visible. W, H <= 0: the size is not limited.
+// Card - everything needed for a card frame. Scroll - the body offset in lines, kept by the model
+// between frames as FitScroll returned it: the window shifts only when the Cursor line leaves it.
+// W, H <= 0: the size is not limited.
 type Card struct {
 	ID, Title, Column, Fields, Ask, Abstract, Summary, Details, Checks string
 	History                                                            []history.Entry

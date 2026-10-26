@@ -26,6 +26,7 @@ type cardState struct {
 	nCrit   int             // the number of criteria before the history; updated on open and in cardView
 	open    map[string]bool // expanded "N edits" series
 	loaded  bool            // the history has arrived at least once
+	scroll  int             // the body offset in lines, as FitScroll returned it after the last cursor move
 }
 
 // shown - a history row on the screen. group - the series index in entries, -1 for a single entry.
@@ -85,6 +86,7 @@ func (m *Model) setHistoryMsg(msg historyMsg) {
 		return
 	}
 	m.card.set(msg)
+	m.fitScroll()
 	if msg.err != nil {
 		m.setStatus("history: "+firstLine(msg.err.Error()), true)
 	}
@@ -153,7 +155,7 @@ func (m *Model) cardView() view.Card {
 		m.card.nCrit = len(selectableCriteria(t))
 	}
 	m.card.cursor = min(m.card.cursor, m.card.last())
-	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, W: m.w, H: m.h}
+	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, Scroll: m.card.scroll, W: m.w, H: m.h}
 	c.Status, c.IsErr = m.statusText()
 	c.History = make([]history.Entry, len(m.card.rows))
 	for i, r := range m.card.rows {
@@ -172,6 +174,12 @@ func (m *Model) cardView() view.Card {
 		c.CritAt = selectableCriteria(t)
 	}
 	return c
+}
+
+// fitScroll fits the card body window to the cursor and stores it in cardState.scroll: after a
+// cursor move the window shifts only when the cursor left it, as the board column window does.
+func (m *Model) fitScroll() {
+	m.card.scroll = view.FitScroll(m.cardView())
 }
 
 // fields - the card fields line: project, external link, claim, wait, due, tags, modification date.

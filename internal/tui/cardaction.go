@@ -127,6 +127,7 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 	case view.CardCriterion:
 		m.setStatus("", false)
 		m.card.cursor = hit.Index
+		m.fitScroll()
 		return m.toggleCriterion(hit.Index)
 	case view.CardFields:
 		m.setStatus("", false)
@@ -164,6 +165,7 @@ func (m *Model) cardEnter() tea.Cmd {
 		return m.toggleCriterion(m.card.cursor)
 	}
 	m.card.toggle()
+	m.fitScroll()
 	return nil
 }
 

@@ -24,11 +24,18 @@ func RenderCard(c Card) string {
 	return strings.Join(layoutCard(c).lines, "\n")
 }
 
+// FitScroll returns the body offset fitted to Cursor. The model stores it in Card.Scroll between
+// frames, so the window shifts only when the cursor moves over the top or bottom edge.
+func FitScroll(c Card) int {
+	return layoutCard(c).scroll
+}
+
 // cardLay - the card frame and the lines the mouse can hit. Drawing and HitCard take it
 // from one place, so body scroll does not diverge from a click.
 type cardLay struct {
 	lines          []string
 	w              int
+	scroll         int // the body offset after the fit to Cursor
 	askFrom, askTo int // agent ask lines [askFrom, askTo); -1 if there is no ask
 	fieldsRow      int // the fields line; -1 if there is none
 	actionsRow     int
@@ -48,10 +55,9 @@ func layoutCard(c Card) cardLay {
 	body, curStart, curEnd, crits := cardBody(c, w)
 	if c.H > 0 {
 		room := max(c.H-len(head)-cardFrame, 0)
-		var offset int
-		body, offset = scrollBody(body, c.Scroll, curStart, curEnd, room)
+		body, lay.scroll = scrollBody(body, c.Scroll, curStart, curEnd, room)
 		for i := range crits {
-			crits[i][0], crits[i][1] = crits[i][0]-offset, crits[i][1]-offset
+			crits[i][0], crits[i][1] = crits[i][0]-lay.scroll, crits[i][1]-lay.scroll
 		}
 	}
 	for i, r := range crits {
@@ -225,7 +231,8 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 	return out
 }
 
-// scrollBody keeps room body lines from offset scroll; the offset is fitted to the selected entry.
+// scrollBody keeps room body lines from offset scroll; the offset shifts only when the selected
+// entry left the window: below the bottom edge or above the top one.
 func scrollBody(body []string, scroll, curStart, curEnd, room int) ([]string, int) {
 	if room <= 0 {
 		return nil, 0
