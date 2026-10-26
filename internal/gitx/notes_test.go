@@ -38,3 +38,26 @@ func TestNotes_NoCommits_EmptyNoError(t *testing.T) {
 		t.Fatalf("Notes in an empty repository: %v, %v; want empty without an error", got, err)
 	}
 }
+
+func TestTaskNotes_OnlyOwnNoteSubjects_OldToNew(t *testing.T) {
+	r := newRepo(t)
+	commitAt(t, r, "2026-10-01T10:00:00+0000", "T-1: note first", "claude:abc")
+	commitAt(t, r, "2026-10-01T10:01:00+0000", "T-12: note twelve", "claude:abc")
+	commitAt(t, r, "2026-10-01T10:02:00+0000", "T-1: move to doing", "claude:abc")
+	commitAt(t, r, "2026-10-01T10:03:00+0000", "T-1: note second", "claude:abc")
+	commitAt(t, r, "2026-10-01T10:04:00+0000", "T-4: external edit\n\nT-1: note in body", "external")
+
+	got, err := r.TaskNotes("T-1", time.Time{})
+	if err != nil {
+		t.Fatalf("TaskNotes: %v", err)
+	}
+	if len(got) != 2 || got[0].Text != "first" || got[1].Text != "second" || got[0].Actor != "claude:abc" {
+		t.Errorf("TaskNotes(T-1) = %+v; want [first second] old to new with the actor", got)
+	}
+
+	since := time.Date(2026, 10, 1, 10, 2, 0, 0, time.UTC)
+	got, err = r.TaskNotes("T-1", since)
+	if err != nil || len(got) != 1 || got[0].Text != "second" {
+		t.Errorf("TaskNotes(T-1, since 10:02) = %+v, %v; want only [second]", got, err)
+	}
+}

@@ -367,6 +367,41 @@ func TestCLI_Project_FromCwdGitFolder(t *testing.T) {
 	}
 }
 
+// A mistyped command gets the closest known command within edit distance 2;
+// on a tie the first command in the usage order wins; none close - the usage line stays.
+func TestCLI_UnknownCommand_SuggestsClosest(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	cases := []struct {
+		name string
+		cmd  string
+		want string
+	}{
+		{"one typo", "lsit", "did you mean list?"},
+		{"two typos", "shwo", "did you mean show?"},
+		{"tie takes first in usage order", "sew", "did you mean set?"},
+		{"no close command", "banana",
+			"tix ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+				"flags: -v, --as, --json; text starting with a dash goes after --"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			defer guard(t)
+			r := b.tix("", c.cmd)
+			if r.code != 6 {
+				t.Errorf("tix %s: code %d, want 6", c.cmd, r.code)
+			}
+			want := "err unknown command " + c.cmd + "; " + c.want + "\n"
+			if r.err != want {
+				t.Errorf("tix %s: stderr %q, want %q", c.cmd, r.err, want)
+			}
+			if r.out != "" {
+				t.Errorf("tix %s: stdout %q, want empty", c.cmd, r.out)
+			}
+		})
+	}
+}
+
 func TestCLI_InputErrors_ErrOneLine_FilesIntact(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
@@ -516,6 +551,23 @@ func TestCLI_Ctx_BothAgentVariables_Works(t *testing.T) {
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1"}
 	if r := b.ok("", "ctx"); !strings.Contains(r.out, "columns:") {
 		t.Errorf("ctx with both variables: stdout %q, want the context", r.out)
+	}
+}
+
+// version prints the build version as --version does and exits 0 without the store.
+func TestCLI_Version_PrintsEnvVersion(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	var o, e bytes.Buffer
+	code := cli.Run(context.Background(), []string{"version"}, cli.Env{
+		Stdout: &o, Stderr: &e, Cwd: b.cwd, Version: "1.2.3",
+		Getenv: func(string) string { return "" },
+	})
+	if code != 0 {
+		t.Fatalf("version: code %d, stderr %q", code, e.String())
+	}
+	if o.String() != "1.2.3\n" {
+		t.Errorf("version: stdout %q, want %q", o.String(), "1.2.3\n")
 	}
 }
 

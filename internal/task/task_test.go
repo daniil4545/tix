@@ -205,6 +205,22 @@ func TestTask_JSON_CreatedIsLocalLayout(t *testing.T) {
 	}
 }
 
+func TestSetBody_RejectsShowNotesHeading(t *testing.T) {
+	defer guard(t)
+	reject := []string{"a\n\n## Notes (3)\n- x\n", "a\n## Notes (last 5 of 7, -v shows all)\r\n- x\n"}
+	accept := []string{"a\n## Notes\n", "a\n## Notes (my list)\n", "a ## Notes (3)\n"}
+	for _, body := range reject {
+		if err := load(t, "valid.md").SetBody(body); err == nil {
+			t.Errorf("show notes heading in body %q accepted", body)
+		}
+	}
+	for _, body := range accept {
+		if err := load(t, "valid.md").SetBody(body); err != nil {
+			t.Errorf("body %q rejected: %v", body, err)
+		}
+	}
+}
+
 func TestSetBody_CommentsHeadingVariants(t *testing.T) {
 	defer guard(t)
 	reject := []string{commentsHeading, "a\n" + commentsHeading + " \t\r\nb", "a\n" + commentsHeading + "\r\nb", "x\n\n" + commentsHeading}

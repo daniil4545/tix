@@ -504,10 +504,16 @@ func (t *Task) sameField(key string, val *yaml.Node) bool {
 	return val.Kind == yaml.ScalarNode && scalarText(val) == *t.stringField(key)
 }
 
-// SetBody replaces the body. "## Comments" in the body is an error.
+// notesHeadingRe - the heading `tix show` prints before the notes: pasting it back would store the notes as body text.
+var notesHeadingRe = regexp.MustCompile(`(?m)^## Notes \((\d+|last \d+ of \d+, -v shows all)\)[ \t\r]*$`)
+
+// SetBody replaces the body. "## Comments" or the `show` notes heading in the body is an error.
 func (t *Task) SetBody(body string) error {
 	if findHeading(body) != nil {
 		return errors.New("body must not contain the section " + commentsHeading)
+	}
+	if notesHeadingRe.MatchString(body) {
+		return errors.New("body must not contain the notes section printed by show: cut everything after the file text")
 	}
 	body = strings.ReplaceAll(body, "\r\n", "\n")
 	if strings.TrimRight(body, "\n \t") == "" {
