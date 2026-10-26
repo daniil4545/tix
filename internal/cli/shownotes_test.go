@@ -136,3 +136,21 @@ func TestCLI_Edit_RejectsShowNotesSection(t *testing.T) {
 		t.Errorf("notes leaked into the task body:\n%s", after)
 	}
 }
+
+// The "last N of M" header is built in cli and recognized in task: this test ties the two formats.
+func TestCLI_Edit_RejectsShowOutputWithTruncatedNotes(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	for i := 1; i <= 6; i++ {
+		b.ok("", "note", "T-1", fmt.Sprintf("step %d", i))
+	}
+	shown := b.ok("", "show", "T-1").out
+	if !strings.Contains(shown, "last 5 of 6") {
+		t.Fatalf("show lacks the truncated header:\n%s", shown)
+	}
+	rev, text, _ := strings.Cut(shown, "\n")
+	if r := b.tix(text, "edit", "T-1", "--base", strings.TrimPrefix(rev, "rev ")); r.code == 0 {
+		t.Errorf("edit accepted show output with the truncated notes header:\n%s", r.out)
+	}
+}

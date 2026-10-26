@@ -90,14 +90,18 @@ func firstLine(s string) string {
 
 // TaskNotes returns up to logLimit newest notes of task id, from old to new; none - empty.
 // The limit counts notes only: other commits of the task do not push old notes out.
-func (r Repo) TaskNotes(id string) ([]Note, error) {
+// A non-zero since stops the history walk at that time (--since); zero reads the whole history.
+func (r Repo) TaskNotes(id string, since time.Time) ([]Note, error) {
 	if !logIDRe.MatchString(id) {
 		return nil, fmt.Errorf("git log: bad id %q", id)
 	}
 	prefix := id + ": note "
-	res, err := r.run(nil, true, "log", "-n", fmt.Sprint(logLimit), "-z",
-		"--fixed-strings", "--grep="+prefix,
-		"--format=%H%x1f%aI%x1f%s%x1f%(trailers:key=Actor,valueonly)")
+	args := []string{"log", "-n", fmt.Sprint(logLimit), "-z", "--fixed-strings", "--grep=" + prefix,
+		"--format=%H%x1f%aI%x1f%s%x1f%(trailers:key=Actor,valueonly)"}
+	if !since.IsZero() {
+		args = append(args, "--since="+since.Format(time.RFC3339))
+	}
+	res, err := r.run(nil, true, args...)
 	if err != nil {
 		return nil, err
 	}

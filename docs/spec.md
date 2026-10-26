@@ -291,7 +291,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Operation | Target |
 |---|---|
-| `ctx`, `list`, `show` | up to 15 ms (`show` reads the notes with one `git log` beside the file read: measured 7.8 ms without it, 16.2 ms in sequence, 11.9 ms in parallel, 1000 tasks); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
+| `ctx`, `list`, `show` | up to 15 ms (`show` reads the notes with one `git log --since=<created - 1 day>` run beside the rev step. Live store, 1546 commits, median of 40: 7.6 ms without notes; 14.7 ms for T-79 (4 days old), 15.2 ms for T-5 (6 days old, the oldest), 10.7 ms for T-157 (hours old). The bound helps only young tasks; an old task still scans the whole history, so its cost grows with the store (about 275 commits a day)); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 

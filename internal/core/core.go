@@ -334,6 +334,11 @@ func (s *Store) Get(id string) (*task.Task, string, error) {
 
 // Show - Get plus the file as read: rev is computed over the same bytes.
 func (s *Store) Show(id string) (*task.Task, string, []byte, error) {
+	return s.show(id, nil)
+}
+
+// show reads the task; parsed, if set, is called once the file is parsed, before the slow rev step.
+func (s *Store) show(id string, parsed func(*task.Task)) (*task.Task, string, []byte, error) {
 	path, err := s.findPath(id)
 	if err != nil {
 		return nil, "", nil, err
@@ -345,6 +350,9 @@ func (s *Store) Show(id string) (*task.Task, string, []byte, error) {
 	t, err := task.Parse(path, data)
 	if err != nil {
 		return nil, "", nil, err
+	}
+	if parsed != nil {
+		parsed(t)
 	}
 	rev := blobID(data)
 	if repo, err := s.git(); err != nil {
