@@ -208,24 +208,60 @@ func (a *app) cmdShow(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	t, rev, data, err := a.store.Show(id)
+	if !p.set["json"] {
+		sh, err := a.store.ShowNotes(id)
+		if err != nil {
+			return wrap(id, err)
+		}
+		// The file as is: Obsidian may have written it in a non-canonical form.
+		a.out("rev %s", sh.Rev)
+		_, _ = a.env.Stdout.Write(sh.Data)
+		a.printNotes(id, sh, p.set["v"])
+		return nil
+	}
+	t, rev, _, err := a.store.Show(id)
 	if err != nil {
 		return wrap(id, err)
 	}
 	t.Rev = rev
-	if p.set["json"] {
-		if t.Tags == nil {
-			t.Tags = []string{}
-		}
-		if t.Comments == nil {
-			t.Comments = []task.Comment{}
-		}
-		return a.printJSON(t)
+	if t.Tags == nil {
+		t.Tags = []string{}
 	}
-	// The file as is: Obsidian may have written it in a non-canonical form.
-	a.out("rev %s", rev)
-	_, _ = a.env.Stdout.Write(data)
-	return nil
+	if t.Comments == nil {
+		t.Comments = []task.Comment{}
+	}
+	return a.printJSON(t)
+}
+
+// showNotesDefault - how many latest notes `show` prints without -v.
+const showNotesDefault = 5
+
+// printNotes appends the note section after the file: the last showNotesDefault notes, all with -v.
+// Notes live in the store history, not in the file. A history read failure is a warning, show goes on.
+func (a *app) printNotes(id string, sh core.Shown, all bool) {
+	notes := sh.Notes
+	if sh.NotesErr != nil {
+		a.warn("notes of %s not read: %s", id, firstLine(sh.NotesErr.Error()))
+		return
+	}
+	if len(notes) == 0 {
+		return
+	}
+	head := fmt.Sprintf("Notes (%d)", len(notes))
+	if !all && len(notes) > showNotesDefault {
+		head = fmt.Sprintf("Notes (last %d of %d, -v shows all)", showNotesDefault, len(notes))
+		notes = notes[len(notes)-showNotesDefault:]
+	}
+	var sb strings.Builder
+	sb.WriteString("\n## " + head + "\n")
+	for _, n := range notes {
+		actor := n.Actor
+		if actor == "" {
+			actor = "-"
+		}
+		fmt.Fprintf(&sb, "- %s %s: %s\n", n.At.Format("2006-01-02 15:04"), actor, n.Text)
+	}
+	_, _ = a.env.Stdout.Write([]byte(sb.String()))
 }
 
 func (a *app) printJSON(v any) error {

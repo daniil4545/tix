@@ -1,14 +1,17 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/project"
+	"github.com/daniil4545/tix/internal/task"
 )
 
 // gcEvery - the number of commits between gc runs (docs/api/git.md, section 5: 200-500).
@@ -81,4 +84,57 @@ func (s *Store) countCommits(n int) bool {
 		s.log.Warn("gc counter not written", "op", "gc_counter", "err", err)
 	}
 	return due
+}
+
+// noteSinceMargin - how far before `created` the note search starts.
+const noteSinceMargin = 24 * time.Hour
+
+// TaskNotes returns the notes of task id from old to new. They live only in commit subjects,
+// so the store format stays as is.
+func (s *Store) TaskNotes(id string, created time.Time) ([]gitx.Note, error) {
+	repo, err := s.git()
+	if err != nil {
+		return nil, err
+	}
+	// A note cannot predate its task: git stops the walk there. The margin covers clock skew.
+	var since time.Time
+	if !created.IsZero() {
+		since = created.Add(-noteSinceMargin)
+	}
+	notes, err := repo.TaskNotes(id, since)
+	if err != nil {
+		return nil, fmt.Errorf("notes of %s: %w", id, err)
+	}
+	return notes, nil
+}
+
+// Note - a task note from the history, as gitx reads it.
+type Note = gitx.Note
+
+// Shown - the result of ShowNotes: Show output plus the notes, or the error of reading them.
+type Shown struct {
+	Task     *task.Task
+	Rev      string
+	Data     []byte
+	Notes    []Note
+	NotesErr error
+}
+
+// ShowNotes is Show plus TaskNotes. The notes query starts as soon as the file is parsed (it needs
+// `created`) and runs beside the rev step: both spawn git, together they fit the 15 ms budget of show.
+func (s *Store) ShowNotes(id string) (Shown, error) {
+	var sh Shown
+	done := make(chan struct{})
+	t, rev, data, err := s.show(id, func(t *task.Task) {
+		go func() {
+			defer close(done)
+			sh.Notes, sh.NotesErr = s.TaskNotes(id, t.Created)
+		}()
+	})
+	if err != nil {
+		return Shown{}, err // no goroutine started: parsed is called only after a successful parse
+	}
+	<-done
+	sh.Task, sh.Rev, sh.Data = t, rev, data
+	return sh, nil
 }

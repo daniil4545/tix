@@ -23,10 +23,11 @@ var logIDRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
 // noteSubjectRe - the subject of a note commit: "<id>: note <text>".
 var noteSubjectRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9]*-[0-9]+): note (.+)$`)
 
-// Note - the latest note of a task: author time and text.
+// Note - a note of a task: author time, text and, for TaskNotes, the Actor trailer.
 type Note struct {
-	At   time.Time
-	Text string
+	At    time.Time
+	Text  string
+	Actor string
 }
 
 // Commit - a history record of one task: hash, author time, subject and the value of the Actor trailer.
@@ -85,6 +86,43 @@ func parseLog(out []byte) ([]Commit, error) {
 func firstLine(s string) string {
 	s, _, _ = strings.Cut(strings.TrimSpace(s), "\n")
 	return strings.TrimSpace(s)
+}
+
+// TaskNotes returns up to logLimit newest notes of task id, from old to new; none - empty.
+// The limit counts notes only: other commits of the task do not push old notes out.
+// A non-zero since stops the history walk at that time (--since); zero reads the whole history.
+func (r Repo) TaskNotes(id string, since time.Time) ([]Note, error) {
+	if !logIDRe.MatchString(id) {
+		return nil, fmt.Errorf("git log: bad id %q", id)
+	}
+	prefix := id + ": note "
+	args := []string{"log", "-n", fmt.Sprint(logLimit), "-z", "--fixed-strings", "--grep=" + prefix,
+		"--format=%H%x1f%aI%x1f%s%x1f%(trailers:key=Actor,valueonly)"}
+	if !since.IsZero() {
+		args = append(args, "--since="+since.Format(time.RFC3339))
+	}
+	res, err := r.run(nil, true, args...)
+	if err != nil {
+		return nil, err
+	}
+	if res.code != 0 {
+		if strings.Contains(string(res.errOut), "does not have any commits") {
+			return nil, nil
+		}
+		return nil, &Error{Op: "log", Code: res.code, Stderr: string(res.errOut)}
+	}
+	commits, err := parseLog(res.out)
+	if err != nil {
+		return nil, err
+	}
+	var notes []Note
+	for i := len(commits) - 1; i >= 0; i-- { // git prints the new ones first
+		// The match may come from the message body (an external edit commit): only the subject counts.
+		if text, ok := strings.CutPrefix(commits[i].Subject, prefix); ok {
+			notes = append(notes, Note{At: commits[i].At, Actor: commits[i].Actor, Text: text})
+		}
+	}
+	return notes, nil
 }
 
 // Notes returns, by task id, the newest note among the latest noteLimit note commits.

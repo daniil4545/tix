@@ -175,7 +175,7 @@ var commandHelp = map[string]string{
 	"inbox":   "inbox [--hook]",
 	"new":     "new <title> [--to column|role] [--project P]",
 	"list":    "list [--project P] [--status column] [--json]",
-	"show":    "show <id> [--json]",
+	"show":    "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":    "edit <id> --base <rev> < body.md",
 	"comment": "comment <id> <text>",
 	"note":    "note <id> <text>",
