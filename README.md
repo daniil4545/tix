@@ -144,8 +144,9 @@ writes only a commit, not the file). Without notes the section is absent. Format
 ```
 
 The default is the last 5 notes, oldest first; `-v` prints all (`Notes (7)`).
-Notes survive renames and moves. The history read is capped at 500 commits per
-task, and `--json` output has no notes.
+Notes survive renames and moves. The history read keeps the newest 500 notes per
+task, and `--json` output has no notes. The section is output only: `tix edit`
+refuses a body that contains its heading, so cut it before pasting a task back.
 
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,
 5 rule refused, 6 bad input.

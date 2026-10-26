@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/gitx"
@@ -85,29 +84,19 @@ func (s *Store) countCommits(n int) bool {
 	return due
 }
 
-// TaskNote - a note of a task from the store history: author time, actor and text.
-type TaskNote struct {
-	At          time.Time
-	Actor, Text string
-}
-
-// Notes returns the notes of task id from old to new. They live only in commit subjects
-// "<id>: note <text>", so the store format stays as is. The history read is capped by gitx.Log.
-func (s *Store) Notes(id string) ([]TaskNote, error) {
+// TaskNotes returns the notes of task id from old to new. They live only in commit subjects,
+// so the store format stays as is.
+func (s *Store) TaskNotes(id string) ([]gitx.Note, error) {
 	repo, err := s.git()
 	if err != nil {
 		return nil, err
 	}
-	commits, err := repo.Log(id)
+	notes, err := repo.TaskNotes(id)
 	if err != nil {
 		return nil, fmt.Errorf("notes of %s: %w", id, err)
 	}
-	prefix := id + ": note "
-	var notes []TaskNote
-	for i := len(commits) - 1; i >= 0; i-- { // Log returns the new ones first
-		if text, ok := strings.CutPrefix(commits[i].Subject, prefix); ok {
-			notes = append(notes, TaskNote{At: commits[i].At, Actor: commits[i].Actor, Text: text})
-		}
-	}
 	return notes, nil
 }
+
+// Note - a task note from the history, as gitx reads it.
+type Note = gitx.Note

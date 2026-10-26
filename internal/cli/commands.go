@@ -208,6 +208,15 @@ func (a *app) cmdShow(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
+	// The history read runs beside Show: both spawn git, together they fit the 15 ms budget of show.
+	var pending chan notesResult
+	if !p.set["json"] {
+		pending = make(chan notesResult, 1)
+		go func() {
+			notes, err := a.store.TaskNotes(id)
+			pending <- notesResult{notes, err}
+		}()
+	}
 	t, rev, data, err := a.store.Show(id)
 	if err != nil {
 		return wrap(id, err)
@@ -225,8 +234,13 @@ func (a *app) cmdShow(args []string) error {
 	// The file as is: Obsidian may have written it in a non-canonical form.
 	a.out("rev %s", rev)
 	_, _ = a.env.Stdout.Write(data)
-	a.printNotes(id, p.set["v"])
+	a.printNotes(id, <-pending, p.set["v"])
 	return nil
+}
+
+type notesResult struct {
+	notes []core.Note
+	err   error
 }
 
 // showNotesDefault - how many latest notes `show` prints without -v.
@@ -234,10 +248,10 @@ const showNotesDefault = 5
 
 // printNotes appends the note section after the file: the last showNotesDefault notes, all with -v.
 // Notes live in the store history, not in the file. A history read failure is a warning, show goes on.
-func (a *app) printNotes(id string, all bool) {
-	notes, err := a.store.Notes(id)
-	if err != nil {
-		a.warn("notes of %s not read: %s", id, firstLine(err.Error()))
+func (a *app) printNotes(id string, r notesResult, all bool) {
+	notes := r.notes
+	if r.err != nil {
+		a.warn("notes of %s not read: %s", id, firstLine(r.err.Error()))
 		return
 	}
 	if len(notes) == 0 {
