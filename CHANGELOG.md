@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-26
+
+### Added
+
+- `tix version` prints the same version as `tix --version` and exits with 0.
+- A mistyped command gets the closest known command: `tix lsit` prints
+  `unknown command lsit; did you mean list?`. With no command within two edits
+  the message keeps the usage line. The exit code is unchanged.
+- The task card works by mouse: a click on a criterion or a history entry
+  selects it, a click on the `[ ]` / `[x]` box toggles the criterion, and the
+  wheel scrolls the list without moving the selection.
+
+### Changed
+
+- The card list scrolls only when the cursor crosses the top or bottom edge,
+  in both directions, like a board column.
+- `take` and `move` keep a cache of the column order in `.git/tix-rank`: an
+  unchanged task file is not parsed again. A missing, stale or broken cache
+  falls back to reading the files.
+
 ## [0.4.0] - 2026-10-26
 
 ### Added
@@ -133,7 +153,8 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/daniil4545/tix/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/daniil4545/tix/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/daniil4545/tix/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/daniil4545/tix/compare/v0.1.1...v0.2.0
