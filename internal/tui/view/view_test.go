@@ -252,7 +252,7 @@ func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		c.History = append(c.History, history.Entry{At: c.History[0].At, Actor: "claude", Op: "note", Text: fmt.Sprintf("n%d", i)})
 	}
-	c.Cursor, c.Scroll = 0, 7 // the cursor is visible in the window that starts at its line
+	c.Cursor, c.Scroll = 0, 8 // the cursor line is above the window
 	c.H = 14                  // 8 body lines: the preamble and the first criterion take lines 0-7
 	c.Scroll = view.CardScroll(c, true)
 	if c.Scroll != 0 {
@@ -261,7 +261,12 @@ func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
 	if !strings.Contains(plain(view.RenderCard(c)), "abstract text") {
 		t.Errorf("preamble hidden although it fits:\n%s", plain(view.RenderCard(c)))
 	}
+	c.Scroll = 1 // the cursor line is visible in a slightly scrolled window: it stands
+	if got := view.CardScroll(c, true); got != 1 {
+		t.Errorf("cursor already visible on the first line: offset %d, expected 1", got)
+	}
 	c.H = 11 // 5 body lines: the preamble and the criterion do not fit together
+	c.Scroll = 8
 	c.Scroll = view.CardScroll(c, true)
 	if out := plain(view.RenderCard(c)); !strings.Contains(out, "- [ ] a") {
 		t.Errorf("the cursor line left the window (offset %d):\n%s", c.Scroll, out)

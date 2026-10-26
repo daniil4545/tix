@@ -90,6 +90,8 @@ func (m *Model) setHistoryMsg(msg historyMsg) {
 	// A reload that changed nothing must not pull a wheel-scrolled view back to the cursor.
 	if first || rows != len(m.card.rows) || cursor != m.card.cursor {
 		m.fitScroll()
+	} else {
+		m.card.scroll = view.CardScroll(m.cardView(), false) // the body may have got shorter
 	}
 	if msg.err != nil {
 		m.setStatus("history: "+firstLine(msg.err.Error()), true)

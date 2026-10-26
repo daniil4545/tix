@@ -298,21 +298,22 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 
 // scrollBody keeps room body lines from offset scroll. With fit the offset shifts only when the
 // selected line (cur = start, end, start of the first selectable line) left the window: below the
-// bottom edge or above the top one. On the first selectable line the preamble (abstract, summary)
-// shows from the top while it fits.
+// bottom edge or above the top one. When the cursor reaches the first selectable line from above the
+// window, the preamble (abstract, summary) shows from the top while it fits.
 func scrollBody(body []string, scroll int, cur [3]int, room int, fit bool) ([]string, int) {
 	curStart, curEnd, first := cur[0], cur[1], cur[2]
 	if room <= 0 {
 		return nil, 0
 	}
 	if fit && curStart >= 0 {
+		leftTop := curStart < scroll
 		if curEnd > scroll+room {
 			scroll = curEnd - room
 		}
-		if curStart < scroll {
+		if leftTop {
 			scroll = curStart
 		}
-		if curStart == first && curEnd <= room {
+		if leftTop && curStart == first && curEnd <= room {
 			scroll = 0
 		}
 	}
