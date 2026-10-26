@@ -168,12 +168,9 @@ func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	}
 	if m.showing {
 		m.setStatus("", false)
-		base := m.card.scroll
-		if m.card.follow {
-			// The view position right now: the state offset is behind the fit while it follows.
-			base = view.CardScroll(m.cardView())
-		}
-		m.card.scrollBy(base, dir)
+		m.syncCardScroll()
+		m.card.scrollBy(m.card.scroll, dir)
+		m.syncCardScroll() // clamps: the offset never leaves the body
 		return nil
 	}
 	hit := view.HitBoard(m.layout(), e.X, e.Y)

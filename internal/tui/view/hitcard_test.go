@@ -121,3 +121,18 @@ func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 		t.Error("no button is clickable in the cut line: the check is empty")
 	}
 }
+
+// A wrapped criterion whose first line is scrolled out has no box on the screen: a click on the
+// columns where the box would be selects the criterion, never toggles it.
+func TestHitCard_WrappedCriterionTopCut_ContinuationIsNotBox(t *testing.T) {
+	c := card()
+	c.W, c.H = 30, 12
+	c.Details = "- [ ] first words of a long criterion that wraps over lines"
+	c.CritAt = []int{0}
+	c.Scroll = 8 // body line 7 is the criterion head, line 8 its continuation
+	const firstBodyRow = 3
+	got := view.HitCard(c, 4, firstBodyRow)
+	if got.Kind != view.CardCriterion || got.Index != 0 {
+		t.Errorf("click on the continuation line at the box columns = %+v, expected CardCriterion 0", got)
+	}
+}

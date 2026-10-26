@@ -159,6 +159,12 @@ func (c *cardState) toggle() {
 	}
 }
 
+// syncCardScroll stores the body offset of the frame on the screen: the fit while the view follows
+// the cursor, else the clamped scroll.
+func (m *Model) syncCardScroll() {
+	m.card.scroll = view.CardScroll(m.cardView())
+}
+
 // cardView builds the card frame from the current task file.
 func (m *Model) cardView() view.Card {
 	if t := m.byID(m.card.id); t != nil {

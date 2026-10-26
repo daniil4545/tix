@@ -75,7 +75,7 @@ func layoutCard(c Card) cardLay {
 		}
 		sp := frameSpan{from: from, to: to, index: i, boxLine: -1}
 		if cr.piece >= 0 {
-			if bl := max(sh0+cr.piece, 0) + len(head); bl < to {
+			if bl := sh0 + cr.piece + len(head); sh0+cr.piece >= 0 && bl < to {
 				sp.boxLine, sp.boxFrom, sp.boxTo = bl, cr.boxFrom, cr.boxTo
 			}
 		}

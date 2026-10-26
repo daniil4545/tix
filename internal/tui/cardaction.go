@@ -148,9 +148,7 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 // follows it again. A click only selects: the criterion is toggled by its box. The explicit move
 // keeps the first history load from shifting the cursor like it does after plain openCard.
 func (m *Model) selectCardLine(row int) {
-	if row < 0 {
-		return
-	}
+	m.syncCardScroll() // the view stands where the user sees it
 	m.card.cursor = row
 	m.card.moved = true
 	m.card.follow = true

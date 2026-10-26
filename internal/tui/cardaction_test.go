@@ -448,6 +448,53 @@ func TestCard_Wheel_ScrollsByLines_SelectionStays(t *testing.T) {
 	}
 }
 
+// remarkEnv - a task with 30 comments, the card open at the newest entry on a short screen.
+func remarkEnv(t *testing.T) (*mvEnv, *Model) {
+	t.Helper()
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	for i := 1; i <= 30; i++ {
+		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newMouseModel(t, e, 100, 14)
+	m.selectTask(id)
+	caOpenCard(m)
+	return e, m
+}
+
+// The wheel past the bottom does not pile up a hidden offset: one wheel-up moves the view at once.
+func TestCard_WheelPastBottom_NextWheelUpMovesAtOnce(t *testing.T) {
+	_, m := remarkEnv(t)
+	for i := 0; i < 5; i++ {
+		feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelDown)))
+	}
+	bottom := caLines(m)
+	feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelUp)))
+	if sameFrame(caLines(m), bottom) {
+		t.Error("one wheel-up after 5 wheel-downs at the bottom did not move the view")
+	}
+}
+
+// A click on a visible history entry selects it where it is: the view does not jump under the mouse.
+func TestCard_ClickOnVisibleEntry_ViewStaysPut(t *testing.T) {
+	_, m := remarkEnv(t)
+	var x, y int
+	for i, ln := range caLines(m) {
+		if j := strings.Index(ln, "remark-"); j >= 0 {
+			x, y = j, i
+			break
+		}
+	}
+	want := strings.TrimSpace(caLines(m)[y][x:])
+	leftClick(m, x, y)
+	got := caLines(m)
+	if y >= len(got) || !strings.Contains(got[y], want[:9]) {
+		t.Errorf("the clicked entry moved from line %d, want %q there:\n%s", y, want[:9], strings.Join(got, "\n"))
+	}
+}
+
 func sameFrame(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
