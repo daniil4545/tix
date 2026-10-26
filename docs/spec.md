@@ -186,7 +186,9 @@ flowchart TD
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
      `n` and `+` new task (a column with an entry check gets it in the inbox column), `a` reply, `g` agent session, `e`, `c`, `o` due date, `p` project,
      Delete with `y/n`, `?` help, `q`; card - up-down arrows over criteria and history
-     (`enter` and click check an item), left-right the neighbor task, `f` field, `esc`.
+     (`enter` checks an item or unfolds an entry), left-right the neighbor task, `f` field,
+     `esc`. The mouse in the card: a click on a criterion or a history line selects it, the
+     `[ ]`/`[x]` box of a criterion toggles it, the wheel scrolls the list, the selection stays.
      The hints of the board and the card are rows of buttons.
 4. Critical rules:
    - `$EDITOR` edits a copy of the body in `.tix/tmp/`; unchanged - cancel; changed - `edit` with

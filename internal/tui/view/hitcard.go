@@ -39,18 +39,20 @@ type CardHitKind int
 
 // Card hit kinds.
 const (
-	CardNone      CardHitKind = iota // empty space, history, body
+	CardNone      CardHitKind = iota // empty space, body headings
+	CardHistory                      // a history entry line; the zero-based entry number is in CardHit.Index
 	CardAsk                          // the agent ask line `* needs you:`
 	CardFields                       // the fields line
 	CardAction                       // an actions-line button; the key is in CardHit.Key
-	CardCriterion                    // a criterion line; the zero-based number is in CardHit.Index
+	CardCriterion                    // a criterion line (the text); the zero-based number is in CardHit.Index
+	CardBox                          // the `[ ]`/`[x]` box of a criterion; the number is in CardHit.Index
 )
 
 // CardHit - the HitCard result. Key - the button key (`e`, `c`, `esc`), empty outside CardAction.
 type CardHit struct {
 	Kind CardHitKind
 	Key  string
-	// Index - the zero-based criterion number for CardCriterion.
+	// Index - the zero-based criterion or history-entry number.
 	Index int
 }
 
@@ -61,15 +63,21 @@ func HitCard(c Card, x, y int) CardHit {
 	if x < 0 || x >= lay.w || y < 0 || y >= len(lay.lines) {
 		return CardHit{}
 	}
-	switch {
-	case y == lay.actionsRow:
+	if y == lay.actionsRow {
 		for _, a := range lay.actions {
 			if x >= a.from && x < a.to && a.to <= lay.w {
 				return CardHit{Kind: CardAction, Key: a.key}
 			}
 		}
-	case lay.critAt(y) >= 0:
-		return CardHit{Kind: CardCriterion, Index: lay.critAt(y)}
+		return CardHit{}
+	}
+	if hit, ok := lay.histHit(y); ok {
+		return hit
+	}
+	if hit, ok := lay.critHit(y, x); ok {
+		return hit
+	}
+	switch {
 	case y == lay.fieldsRow:
 		return CardHit{Kind: CardFields}
 	case y >= lay.askFrom && y < lay.askTo:
@@ -78,12 +86,26 @@ func HitCard(c Card, x, y int) CardHit {
 	return CardHit{}
 }
 
-// critAt - the criterion number on frame line y or -1.
-func (l cardLay) critAt(y int) int {
-	for _, r := range l.crits {
+// histHit - what lies on a history line of the frame.
+func (l cardLay) histHit(y int) (CardHit, bool) {
+	for _, r := range l.hists {
 		if y >= r.from && y < r.to {
-			return r.index
+			return CardHit{Kind: CardHistory, Index: r.index}, true
 		}
 	}
-	return -1
+	return CardHit{}, false
+}
+
+// critHit - what lies on a criterion line of the frame: the box toggles, the rest of the line selects.
+func (l cardLay) critHit(y, x int) (CardHit, bool) {
+	for _, r := range l.crits {
+		if y < r.from || y >= r.to {
+			continue
+		}
+		if y == r.boxLine && x >= r.boxFrom && x < r.boxTo {
+			return CardHit{Kind: CardBox, Index: r.index}, true
+		}
+		return CardHit{Kind: CardCriterion, Index: r.index}, true
+	}
+	return CardHit{}, false
 }

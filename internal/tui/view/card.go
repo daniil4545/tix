@@ -33,11 +33,26 @@ type cardLay struct {
 	fieldsRow      int // the fields line; -1 if there is none
 	actionsRow     int
 	actions        []actionSpan
-	crits          []critSpan // visible criterion lines
+	bodyOff        int         // the body offset the frame is drawn at: the fit or the clamped scroll
+	crits          []frameSpan // visible criterion lines
+	hists          []frameSpan // visible history entry lines
 }
 
-// critSpan - frame lines [from, to) taken by the criterion with number index (zero-based).
-type critSpan struct{ from, to, index int }
+// frameSpan - frame lines [from, to) of a criterion (index - the criterion number) or of a history
+// entry (index - the entry number; boxLine -1). For a criterion boxLine - the line of its box with
+// frame columns [boxFrom, boxTo); -1 - there is no box on the visible lines.
+type frameSpan struct {
+	from, to, index         int
+	boxLine, boxFrom, boxTo int
+}
+
+// critDraw - the drawn criterion: its lines [from, to) in the returned body lines and the place of
+// the box: the wrapped piece with `[x]` and frame columns [boxFrom, boxTo); piece -1 - no box.
+type critDraw struct {
+	from, to       int
+	piece          int
+	boxFrom, boxTo int
+}
 
 func layoutCard(c Card) cardLay {
 	w := c.W
@@ -45,19 +60,31 @@ func layoutCard(c Card) cardLay {
 		w = cardWidth
 	}
 	head, lay := cardHead(c, w)
-	body, curStart, curEnd, crits := cardBody(c, w)
+	body, curStart, curEnd, crits, hists := cardBody(c, w)
+	offset := 0
 	if c.H > 0 {
 		room := max(c.H-len(head)-cardFrame, 0)
-		var offset int
-		body, offset = scrollBody(body, c.Scroll, curStart, curEnd, room)
-		for i := range crits {
-			crits[i][0], crits[i][1] = crits[i][0]-offset, crits[i][1]-offset
-		}
+		body, offset = scrollBody(body, c.Scroll, curStart, curEnd, room, c.Follow)
 	}
-	for i, r := range crits {
-		from, to := max(r[0], 0)+len(head), min(r[1], len(body))+len(head)
+	lay.bodyOff = offset
+	for i, cr := range crits {
+		sh0, sh1 := cr.from-offset, cr.to-offset
+		from, to := max(sh0, 0)+len(head), min(sh1, len(body))+len(head)
+		if from >= to {
+			continue
+		}
+		sp := frameSpan{from: from, to: to, index: i, boxLine: -1}
+		if cr.piece >= 0 {
+			if bl := sh0 + cr.piece + len(head); sh0+cr.piece >= 0 && bl < to {
+				sp.boxLine, sp.boxFrom, sp.boxTo = bl, cr.boxFrom, cr.boxTo
+			}
+		}
+		lay.crits = append(lay.crits, sp)
+	}
+	for i, h := range hists {
+		from, to := max(h[0]-offset, 0)+len(head), min(h[1]-offset, len(body))+len(head)
 		if from < to {
-			lay.crits = append(lay.crits, critSpan{from: from, to: to, index: i})
+			lay.hists = append(lay.hists, frameSpan{from: from, to: to, index: i})
 		}
 	}
 	lines := append(head, body...)
@@ -66,6 +93,13 @@ func layoutCard(c Card) cardLay {
 	lay.lines, lay.w = lines, w
 	lay.actionsRow, lay.actions = len(lines)-1, spans
 	return lay
+}
+
+// CardScroll - the body offset of the frame RenderCard(c) draws: the fit when Follow is on, else
+// the clamped Scroll. The model folds it in before a manual scroll, so the wheel starts from the
+// position the user sees, not from the state offset the fit has left behind.
+func CardScroll(c Card) int {
+	return layoutCard(c).bodyOff
 }
 
 // cardHead builds the header and marks its lines in cardLay: the fields and the agent ask.
@@ -89,8 +123,8 @@ func cardHead(c Card, w int) ([]string, cardLay) {
 }
 
 // cardBody builds the body lines, the bounds of the selected line (a criterion or a history entry; -1
-// if there is none) and the lines of each criterion in the body.
-func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits [][2]int) {
+// if there is none), the lines of each criterion in the body and the lines of each history entry.
+func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits []critDraw, hists [][2]int) {
 	curStart, curEnd = -1, -1
 	section := func(title, right string) {
 		if len(lines) > 0 {
@@ -111,25 +145,31 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits [][2]i
 		base := len(lines)
 		dl, rel := detailLines(c, w)
 		lines = append(lines, dl...)
-		for k, r := range rel {
-			crits = append(crits, [2]int{base + r[0], base + r[1]})
+		for k, cr := range rel {
+			cr.from, cr.to = cr.from+base, cr.to+base
+			crits = append(crits, cr)
 			if k == c.Cursor {
-				curStart, curEnd = base+r[0], base+r[1]
+				curStart, curEnd = cr.from, cr.to
 			}
 		}
 	}
 	section(historyHead, "")
 	base := len(lines)
-	hl, from, to := historyLines(c, w)
+	hl, from, to, rel := historyLines(c, w)
 	lines = append(lines, hl...)
 	if from >= 0 {
 		curStart, curEnd = base+from, base+to
 	}
-	return lines, curStart, curEnd, crits
+	for i := range rel {
+		rel[i][0], rel[i][1] = rel[i][0]+base, rel[i][1]+base
+	}
+	hists = rel
+	return lines, curStart, curEnd, crits, hists
 }
 
-// historyLines draws the history entries; from, to - the lines of the selected entry inside the result (-1 if there is none).
-func historyLines(c Card, w int) (lines []string, from, to int) {
+// historyLines draws the history entries; rel - the lines of each entry inside the result, from, to -
+// the lines of the selected entry (-1 if there is none).
+func historyLines(c Card, w int) (lines []string, from, to int, rel [][2]int) {
 	from, to = -1, -1
 	if len(c.History) == 0 {
 		lines = append(lines, dimStyle.Render("  no history"))
@@ -138,11 +178,12 @@ func historyLines(c Card, w int) (lines []string, from, to int) {
 		start := len(lines)
 		selected := i == c.Cursor-len(c.CritAt)
 		lines = append(lines, entryLines(e, selected, w)...)
+		rel = append(rel, [2]int{start, len(lines)})
 		if selected {
 			from, to = start, len(lines)
 		}
 	}
-	return lines, from, to
+	return lines, from, to, rel
 }
 
 // indentLines prints the section text with an indent; dimRest dims all text lines after the first.
@@ -159,9 +200,9 @@ func indentLines(text string, dimRest bool, w int) []string {
 	return out
 }
 
-// detailLines draws the Details section; the selected criterion (Cursor) is highlighted. rel - the lines of each
-// criterion inside the returned lines.
-func detailLines(c Card, w int) (lines []string, rel [][2]int) {
+// detailLines draws the Details section; the selected criterion (Cursor) is highlighted. rel - the
+// lines of each criterion inside the returned lines, with the place of its box.
+func detailLines(c Card, w int) (lines []string, rel []critDraw) {
 	critOf := map[int]int{}
 	for k, at := range c.CritAt {
 		critOf[at] = k
@@ -169,7 +210,8 @@ func detailLines(c Card, w int) (lines []string, rel [][2]int) {
 	for i, src := range strings.Split(c.Details, "\n") {
 		k, isCrit := critOf[i]
 		start := len(lines)
-		for _, l := range wrap(src, w-2) {
+		pieces := wrap(src, w-2)
+		for _, l := range pieces {
 			l = "  " + l
 			if isCrit && k == c.Cursor {
 				l = selStyle.Render(fit(l, w))
@@ -177,10 +219,33 @@ func detailLines(c Card, w int) (lines []string, rel [][2]int) {
 			lines = append(lines, l)
 		}
 		if isCrit {
-			rel = append(rel, [2]int{start, len(lines)})
+			cd := critDraw{from: start, to: len(lines), piece: -1}
+			if p, from, to := boxPlace(pieces); p >= 0 {
+				cd.piece, cd.boxFrom, cd.boxTo = p, boxIndent+from, boxIndent+to
+			}
+			rel = append(rel, cd)
 		}
 	}
 	return lines, rel
+}
+
+// boxIndent - the frame columns before a wrapped Details piece: two spaces of the indent.
+const boxIndent = 2
+
+// boxPlace - the columns [from, to) of the `[ ]`/`[x]` box in the wrapped pieces (of the piece with
+// the box); not found - piece -1.
+func boxPlace(pieces []string) (piece, from, to int) {
+	for j, p := range pieces {
+		for i := 0; i+2 < len(p); i++ {
+			if p[i] != '[' {
+				continue
+			}
+			if (p[i+1] == ' ' || p[i+1] == 'x' || p[i+1] == 'X') && p[i+2] == ']' {
+				return j, lipgloss.Width(p[:i]), lipgloss.Width(p[:i+3])
+			}
+		}
+	}
+	return -1, 0, 0
 }
 
 // entryLines draws a history entry; a comment - a heading and the text under it, others - one line with wrapping.
@@ -225,12 +290,13 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 	return out
 }
 
-// scrollBody keeps room body lines from offset scroll; the offset is fitted to the selected entry.
-func scrollBody(body []string, scroll, curStart, curEnd, room int) ([]string, int) {
+// scrollBody keeps room body lines from offset scroll; follow - the offset is shifted so that the
+// selected entry is visible, else only inside the body.
+func scrollBody(body []string, scroll, curStart, curEnd, room int, follow bool) ([]string, int) {
 	if room <= 0 {
 		return nil, 0
 	}
-	if curStart >= 0 {
+	if follow && curStart >= 0 {
 		if curEnd > scroll+room {
 			scroll = curEnd - room
 		}
