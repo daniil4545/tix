@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-26
+
+### Added
+
+- `tix show` prints the `tix note` entries of a task after the file, read from
+  the store history: the last 5 by default, all with `-v`. Notes written before
+  this version show up as well, no migration. `--json` output is unchanged.
+
+### Changed
+
+- `tix edit` refuses a body that contains the `## Notes (...)` heading printed
+  by `show`, so pasting `show` output back does not store the notes in the file.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added
@@ -120,7 +133,8 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/daniil4545/tix/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/daniil4545/tix/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/daniil4545/tix/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/daniil4545/tix/compare/v0.1.0...v0.1.1
