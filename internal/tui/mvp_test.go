@@ -566,8 +566,9 @@ func TestMouse_Wheel_OtherColumn_SelectsColumnThenSteps(t *testing.T) {
 	e.selectedIs("Beta2", "Alpha", "Beta1", "Beta3")
 }
 
-// On the card screen the wheel down and up = j and k; a click does nothing.
-func TestMouse_CardScreen_WheelScrollsLikeJK_ClickIgnored(t *testing.T) {
+// On the card screen the wheel scrolls the view and the selection stays; a click on a history
+// line selects it.
+func TestMouse_CardScreen_WheelScrolls_SelectionStays_ClickSelects(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	for i := 1; i <= 30; i++ {
@@ -581,32 +582,40 @@ func TestMouse_CardScreen_WheelScrollsLikeJK_ClickIgnored(t *testing.T) {
 	e.opened("Alpha")
 	e.screenHas("remark-")
 	e.settle()
+	// markerAbove: the ">" marker on the entry whose remark text is under it.
+	markerAbove := func(remark string) bool {
+		y := e.yOf(remark)
+		return y > 0 && strings.HasPrefix(strings.TrimSpace(e.lines()[y-1]), ">")
+	}
+	e.until("the marker on the newest entry", func() bool { return markerAbove("remark-30") })
 	s0 := e.text()
 
-	e.key(strings.Repeat("k", 15)) // the history opens on the newest entry: k goes up
+	before := e.commits()
+	for i := 0; i < 15; i++ {
+		e.wheel(10, 6, false) // up: the view goes up, the selection stays on remark-30
+	}
 	e.settle()
 	s1 := e.text()
 	if s1 == s0 {
-		t.Fatal("15 presses of k did not move the history: the scenario does not check scrolling")
+		t.Fatal("15 wheel-ups did not scroll the card")
 	}
-	for i := 0; i < 15; i++ {
-		e.wheel(10, 6, true) // down = j
+	for _, ln := range e.lines() {
+		if strings.HasPrefix(ln, ">") {
+			t.Errorf("the wheel moved the selection: %q", ln)
+		}
 	}
-	e.settle()
-	if got := e.text(); got != s0 {
-		t.Errorf("15 wheel-downs did not return the screen to the start (like 15 j):\n%s\nexpected:\n%s", got, s0)
+	if strings.Contains(s1, "remark-30") {
+		t.Errorf("15 wheel-ups left the selected remark-30 on the screen:\n%s", s1)
 	}
-	for i := 0; i < 15; i++ {
-		e.wheel(10, 6, false) // up = k
+	// remark-20 is fully visible after the scroll: a click on its line selects it.
+	y := e.yOf("remark-20")
+	if y <= 0 {
+		t.Fatalf("remark-20 did not come into view after the scroll:\n%s", s1)
 	}
-	e.settle()
-	if got := e.text(); got != s1 {
-		t.Errorf("15 wheel-ups did not repeat 15 presses of k:\n%s\nexpected:\n%s", got, s1)
-	}
-	e.click(10, 6)
-	e.settle()
-	if got := e.text(); got != s1 {
-		t.Errorf("click in the card changed the screen:\n%s", got)
+	e.click(10, y)
+	e.until("the marker on remark-20", func() bool { return markerAbove("remark-20") })
+	if after := e.commits(); after != before {
+		t.Errorf("the wheel and the click wrote a commit: %s -> %s", before, after)
 	}
 }
 

@@ -140,7 +140,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.fitWindow()
-		m.fitScroll()
+		if m.showing {
+			m.fitScroll()
+		}
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	case tea.MouseMsg:

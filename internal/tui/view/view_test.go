@@ -234,12 +234,37 @@ func TestFitScroll_CursorInside_KeepsWindow_LeftEdgeFits(t *testing.T) {
 		{"down inside the window stays", 3, 3, 3},
 		{"one step down past the bottom edge shifts", 5, 3, 4},
 		{"back at the bottom edge stays", 5, 4, 4},
-		{"the first entry above the top edge shifts", 0, 4, 1},
+		{"the first entry shows the history heading above it", 0, 4, 0},
 	} {
 		c.Cursor, c.Scroll = tc.cur, tc.in
-		if got := view.FitScroll(c); got != tc.want {
+		if got := view.CardScroll(c, true); got != tc.want {
 			t.Errorf("%s: cursor %d, scroll in %d: got offset %d, want %d", tc.name, tc.cur, tc.in, got, tc.want)
 		}
+	}
+}
+
+// On the first selectable line the card shows its preamble (abstract, summary) from the top while
+// the preamble and the line fit; when they do not fit, the cursor line stays visible.
+func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
+	c := card()
+	c.Details = "- [ ] a\n- [ ] b"
+	c.CritAt = []int{0, 1}
+	for i := 0; i < 8; i++ {
+		c.History = append(c.History, history.Entry{At: c.History[0].At, Actor: "claude", Op: "note", Text: fmt.Sprintf("n%d", i)})
+	}
+	c.Cursor, c.Scroll = 0, 7 // the cursor is visible in the window that starts at its line
+	c.H = 14                  // 8 body lines: the preamble and the first criterion take lines 0-7
+	c.Scroll = view.CardScroll(c, true)
+	if c.Scroll != 0 {
+		t.Errorf("room for the preamble: offset %d, expected 0", c.Scroll)
+	}
+	if !strings.Contains(plain(view.RenderCard(c)), "abstract text") {
+		t.Errorf("preamble hidden although it fits:\n%s", plain(view.RenderCard(c)))
+	}
+	c.H = 11 // 5 body lines: the preamble and the criterion do not fit together
+	c.Scroll = view.CardScroll(c, true)
+	if out := plain(view.RenderCard(c)); !strings.Contains(out, "- [ ] a") {
+		t.Errorf("the cursor line left the window (offset %d):\n%s", c.Scroll, out)
 	}
 }
 

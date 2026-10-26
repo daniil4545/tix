@@ -116,19 +116,24 @@ func (m *Model) editField(id string, f fieldSpec) tea.Cmd {
 	return nil
 }
 
-// cardClick handles a click on the open card: the ask line, the fields line or a button of the
-// actions line. The rest of the card does nothing.
+// cardClick handles a click on the open card: a line selects (a criterion, a history entry), the box
+// of a criterion toggles it, the ask line, the fields line and the buttons of the actions line run.
 func (m *Model) cardClick(x, y int) tea.Cmd {
 	hit := view.HitCard(m.cardView(), x, y)
 	switch hit.Kind {
 	case view.CardAsk:
 		m.setStatus("", false)
 		return m.startAnswer()
+	case view.CardBox:
+		m.setStatus("", false)
+		m.selectCardLine(hit.Index)
+		return m.toggleCriterion(hit.Index)
+	case view.CardHistory:
+		m.setStatus("", false)
+		m.selectCardLine(m.card.nCrit + hit.Index)
 	case view.CardCriterion:
 		m.setStatus("", false)
-		m.card.cursor = hit.Index
-		m.fitScroll()
-		return m.toggleCriterion(hit.Index)
+		m.selectCardLine(hit.Index)
 	case view.CardFields:
 		m.setStatus("", false)
 		return m.startField()
@@ -137,6 +142,15 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 		return m.cardButton(hit.Key)
 	}
 	return nil
+}
+
+// selectCardLine puts the card cursor on a row of the card: criteria, then history entries; the window
+// stays while the row is visible. A click only selects: the criterion is toggled by its box. The explicit move
+// keeps the first history load from shifting the cursor like it does after plain openCard.
+func (m *Model) selectCardLine(row int) {
+	m.card.cursor = row
+	m.card.moved = true
+	m.fitScroll()
 }
 
 // startDelete asks for confirmation with one key: `y` deletes the task through the write queue,

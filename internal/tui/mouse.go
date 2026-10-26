@@ -154,8 +154,8 @@ func (m *Model) selectTask(id string) bool {
 	return false
 }
 
-// mouseWheel: in a task card - a step over history, like j and k; on the board - choose the column under
-// the cursor (as h and l before it), then a step by one card, like j and k.
+// mouseWheel: in a task card - a scroll of the list by lines, the selection stays; on the board -
+// choose the column under the cursor (as h and l before it), then a step by one card, like j and k.
 func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	var dir int
 	switch e.Button {
@@ -168,8 +168,7 @@ func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	}
 	if m.showing {
 		m.setStatus("", false)
-		m.card.step(dir)
-		m.fitScroll()
+		m.wheelScroll(dir)
 		return nil
 	}
 	hit := view.HitBoard(m.layout(), e.X, e.Y)
