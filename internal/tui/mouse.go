@@ -168,9 +168,7 @@ func (m *Model) mouseWheel(e tea.Mouse) tea.Cmd {
 	}
 	if m.showing {
 		m.setStatus("", false)
-		m.syncCardScroll()
-		m.card.scrollBy(m.card.scroll, dir)
-		m.syncCardScroll() // clamps: the offset never leaves the body
+		m.wheelScroll(dir)
 		return nil
 	}
 	hit := view.HitBoard(m.layout(), e.X, e.Y)

@@ -59,7 +59,7 @@ type CardHit struct {
 // HitCard finds what lies under cell (x, y) of the RenderCard(c) frame: the same lines and scroll
 // as in drawing. A button cut by the width is not clickable.
 func HitCard(c Card, x, y int) CardHit {
-	lay := layoutCard(c)
+	lay := layoutCard(c, false)
 	if x < 0 || x >= lay.w || y < 0 || y >= len(lay.lines) {
 		return CardHit{}
 	}

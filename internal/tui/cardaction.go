@@ -144,14 +144,13 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 	return nil
 }
 
-// selectCardLine puts the card cursor on a row of the card: criteria, then history entries; the view
-// follows it again. A click only selects: the criterion is toggled by its box. The explicit move
+// selectCardLine puts the card cursor on a row of the card: criteria, then history entries; the window
+// stays while the row is visible. A click only selects: the criterion is toggled by its box. The explicit move
 // keeps the first history load from shifting the cursor like it does after plain openCard.
 func (m *Model) selectCardLine(row int) {
-	m.syncCardScroll() // the view stands where the user sees it
 	m.card.cursor = row
 	m.card.moved = true
-	m.card.follow = true
+	m.fitScroll()
 }
 
 // startDelete asks for confirmation with one key: `y` deletes the task through the write queue,
@@ -180,6 +179,7 @@ func (m *Model) cardEnter() tea.Cmd {
 		return m.toggleCriterion(m.card.cursor)
 	}
 	m.card.toggle()
+	m.fitScroll()
 	return nil
 }
 

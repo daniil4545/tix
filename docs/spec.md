@@ -143,7 +143,7 @@ flowchart TD
 | Command | What it does |
 |---|---|
 | `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; up to 2000 characters |
-| `list`, `show` | list with filters; the whole task, with `rev`. `show` then prints the `## Notes (...)` section: `tix note` entries read from the store history, the last 5, all with `-v`, none for `--json`. The section is output only: `edit` refuses a body that contains its heading |
+| `list`, `show` | list with filters; the whole task, with `rev` |
 | `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; a column with an entry check of 2.5 (`ready`, `waiting`, `closed`) refuses with code 5 before any write: create, add criteria, then `move` |
 | `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
@@ -189,6 +189,9 @@ flowchart TD
      (`enter` checks an item or unfolds an entry), left-right the neighbor task, `f` field,
      `esc`. The mouse in the card: a click on a criterion or a history line selects it, the
      `[ ]`/`[x]` box of a criterion toggles it, the wheel scrolls the list, the selection stays.
+     The body window is sticky: it stands while the cursor (keys, click, `enter`, history load,
+     resize) is visible, else shifts by the least lines to the edge; on the first selectable line
+     the abstract and summary show from the top if they fit. The wheel only moves the window.
      The hints of the board and the card are rows of buttons.
 4. Critical rules:
    - `$EDITOR` edits a copy of the body in `.tix/tmp/`; unchanged - cancel; changed - `edit` with
@@ -293,7 +296,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Operation | Target |
 |---|---|
-| `ctx`, `list`, `show` | up to 15 ms (`show` reads the notes with one `git log --since=<created - 1 day>` run beside the rev step. Live store, 1546 commits, median of 40: 7.6 ms without notes; 14.7 ms for T-79 (4 days old), 15.2 ms for T-5 (6 days old, the oldest), 10.7 ms for T-157 (hours old). The bound helps only young tasks; an old task still scans the whole history, so its cost grows with the store (about 275 commits a day)); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
+| `ctx`, `list`, `show` | up to 15 ms; without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 

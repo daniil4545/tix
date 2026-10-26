@@ -89,8 +89,10 @@ func (m *Model) cardKey(k string) tea.Cmd {
 		m.showing = false
 	case "j", "down":
 		m.card.step(1)
+		m.fitScroll()
 	case "k", "up":
 		m.card.step(-1)
+		m.fitScroll()
 	case "enter":
 		return m.cardEnter()
 	case "left", "h":

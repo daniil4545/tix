@@ -207,6 +207,72 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 	}
 }
 
+// stepCard - a card of six one-line history entries; the body takes the "history" line plus the
+// entries, H is such that exactly three body lines fit.
+func stepCard() view.Card {
+	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	c := view.Card{ID: "T-1", Title: "Steps", Column: "doing", W: 60, H: 8}
+	for i := 0; i < 6; i++ {
+		c.History = append(c.History, history.Entry{At: at, Actor: "claude", Op: "note", Text: fmt.Sprintf("step %d", i)})
+	}
+	return c
+}
+
+// A sticky body window: while the cursor is inside, the stored scroll stays; when the cursor
+// crosses the top or bottom edge, the offset puts it back on that edge (as RowTop on the board).
+func TestFitScroll_CursorInside_KeepsWindow_LeftEdgeFits(t *testing.T) {
+	c := stepCard()
+	for _, tc := range []struct {
+		name    string
+		cur, in int
+		want    int
+	}{
+		{"the newest entry opens the bottom window", 5, 0, 4},
+		{"one step up from the bottom stays", 4, 4, 4},
+		{"up to the top edge stays", 3, 4, 4},
+		{"one step up past the top edge shifts", 2, 4, 3},
+		{"down inside the window stays", 3, 3, 3},
+		{"one step down past the bottom edge shifts", 5, 3, 4},
+		{"back at the bottom edge stays", 5, 4, 4},
+		{"the first entry shows the history heading above it", 0, 4, 0},
+	} {
+		c.Cursor, c.Scroll = tc.cur, tc.in
+		if got := view.CardScroll(c, true); got != tc.want {
+			t.Errorf("%s: cursor %d, scroll in %d: got offset %d, want %d", tc.name, tc.cur, tc.in, got, tc.want)
+		}
+	}
+}
+
+// On the first selectable line the card shows its preamble (abstract, summary) from the top while
+// the preamble and the line fit; when they do not fit, the cursor line stays visible.
+func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
+	c := card()
+	c.Details = "- [ ] a\n- [ ] b"
+	c.CritAt = []int{0, 1}
+	for i := 0; i < 8; i++ {
+		c.History = append(c.History, history.Entry{At: c.History[0].At, Actor: "claude", Op: "note", Text: fmt.Sprintf("n%d", i)})
+	}
+	c.Cursor, c.Scroll = 0, 8 // the cursor line is above the window
+	c.H = 14                  // 8 body lines: the preamble and the first criterion take lines 0-7
+	c.Scroll = view.CardScroll(c, true)
+	if c.Scroll != 0 {
+		t.Errorf("room for the preamble: offset %d, expected 0", c.Scroll)
+	}
+	if !strings.Contains(plain(view.RenderCard(c)), "abstract text") {
+		t.Errorf("preamble hidden although it fits:\n%s", plain(view.RenderCard(c)))
+	}
+	c.Scroll = 1 // the cursor line is visible in a slightly scrolled window: it stands
+	if got := view.CardScroll(c, true); got != 1 {
+		t.Errorf("cursor already visible on the first line: offset %d, expected 1", got)
+	}
+	c.H = 11 // 5 body lines: the preamble and the criterion do not fit together
+	c.Scroll = 8
+	c.Scroll = view.CardScroll(c, true)
+	if out := plain(view.RenderCard(c)); !strings.Contains(out, "- [ ] a") {
+		t.Errorf("the cursor line left the window (offset %d):\n%s", c.Scroll, out)
+	}
+}
+
 func TestRenderInput_PromptAndTailOfLongText(t *testing.T) {
 	short := plain(view.RenderInput("waiting for:", "vendor", 60))
 	if !strings.Contains(short, "waiting for:") || !strings.Contains(short, "vendor") {

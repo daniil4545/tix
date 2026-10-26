@@ -21,7 +21,14 @@ const (
 // RenderCard draws the card: header, body with history, state, actions line. The body
 // scrolls, the header and the bottom stay.
 func RenderCard(c Card) string {
-	return strings.Join(layoutCard(c).lines, "\n")
+	return strings.Join(layoutCard(c, false).lines, "\n")
+}
+
+// CardScroll - the body offset of the frame for c. With fit the window first shifts to the Cursor
+// line (only when it left the window); without, the Scroll is only clamped to the body. The model
+// stores the result in Card.Scroll, so the stored offset always equals the frame on the screen.
+func CardScroll(c Card, fit bool) int {
+	return layoutCard(c, fit).bodyOff
 }
 
 // cardLay - the card frame and the lines the mouse can hit. Drawing and HitCard take it
@@ -54,7 +61,7 @@ type critDraw struct {
 	boxFrom, boxTo int
 }
 
-func layoutCard(c Card) cardLay {
+func layoutCard(c Card, fit bool) cardLay {
 	w := c.W
 	if w <= 0 {
 		w = cardWidth
@@ -64,7 +71,13 @@ func layoutCard(c Card) cardLay {
 	offset := 0
 	if c.H > 0 {
 		room := max(c.H-len(head)-cardFrame, 0)
-		body, offset = scrollBody(body, c.Scroll, curStart, curEnd, room, c.Follow)
+		first := -1
+		if len(crits) > 0 {
+			first = crits[0].from
+		} else if len(hists) > 0 {
+			first = hists[0][0]
+		}
+		body, offset = scrollBody(body, c.Scroll, [3]int{curStart, curEnd, first}, room, fit)
 	}
 	lay.bodyOff = offset
 	for i, cr := range crits {
@@ -93,13 +106,6 @@ func layoutCard(c Card) cardLay {
 	lay.lines, lay.w = lines, w
 	lay.actionsRow, lay.actions = len(lines)-1, spans
 	return lay
-}
-
-// CardScroll - the body offset of the frame RenderCard(c) draws: the fit when Follow is on, else
-// the clamped Scroll. The model folds it in before a manual scroll, so the wheel starts from the
-// position the user sees, not from the state offset the fit has left behind.
-func CardScroll(c Card) int {
-	return layoutCard(c).bodyOff
 }
 
 // cardHead builds the header and marks its lines in cardLay: the fields and the agent ask.
@@ -290,18 +296,25 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 	return out
 }
 
-// scrollBody keeps room body lines from offset scroll; follow - the offset is shifted so that the
-// selected entry is visible, else only inside the body.
-func scrollBody(body []string, scroll, curStart, curEnd, room int, follow bool) ([]string, int) {
+// scrollBody keeps room body lines from offset scroll. With fit the offset shifts only when the
+// selected line (cur = start, end, start of the first selectable line) left the window: below the
+// bottom edge or above the top one. When the cursor reaches the first selectable line from above the
+// window, the preamble (abstract, summary) shows from the top while it fits.
+func scrollBody(body []string, scroll int, cur [3]int, room int, fit bool) ([]string, int) {
+	curStart, curEnd, first := cur[0], cur[1], cur[2]
 	if room <= 0 {
 		return nil, 0
 	}
-	if follow && curStart >= 0 {
+	if fit && curStart >= 0 {
+		leftTop := curStart < scroll
 		if curEnd > scroll+room {
 			scroll = curEnd - room
 		}
-		if curStart < scroll {
+		if leftTop {
 			scroll = curStart
+		}
+		if leftTop && curStart == first && curEnd <= room {
+			scroll = 0
 		}
 	}
 	scroll = min(max(scroll, 0), max(len(body)-room, 0))

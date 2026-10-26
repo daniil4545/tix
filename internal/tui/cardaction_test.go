@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -437,9 +438,6 @@ func TestCard_Wheel_ScrollsByLines_SelectionStays(t *testing.T) {
 	}
 	// A cursor move returns the view to the selection again.
 	feed(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
-	if !m.card.follow {
-		t.Error("the view did not follow the cursor again after j")
-	}
 	if !sameFrame(caLines(m), before) {
 		t.Errorf("after j the view is not at the selection again:\n%v", caLines(m))
 	}
@@ -474,6 +472,110 @@ func TestCard_WheelPastBottom_NextWheelUpMovesAtOnce(t *testing.T) {
 	feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelUp)))
 	if sameFrame(caLines(m), bottom) {
 		t.Error("one wheel-up after 5 wheel-downs at the bottom did not move the view")
+	}
+}
+
+// Shrinking the window of an open card keeps the cursor entry in the frame.
+func TestCard_Resize_KeepsCursorInFrame(t *testing.T) {
+	_, m := remarkEnv(t)
+	feed(m, tea.WindowSizeMsg{Width: 100, Height: 9})
+	if !strings.Contains(strings.Join(caLines(m), "\n"), "remark-30") {
+		t.Errorf("the cursor entry left the frame after the resize:\n%s", strings.Join(caLines(m), "\n"))
+	}
+}
+
+// An external edit that shortens the body must not leave a stored offset past its end: the next
+// wheel-up moves the view at once.
+func TestCard_BodyShortenedExternally_WheelUpMovesAtOnce(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	long := "## Details\n" + strings.Repeat("line\n", 12)
+	e.caBody(id, long)
+	for i := 1; i <= 30; i++ {
+		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newMouseModel(t, e, 100, 14)
+	m.selectTask(id)
+	caOpenCard(m)
+	e.caBody(id, "## Details\nshort\n")
+	caReload(m)
+	feed(m, historyMsg{id: id, entries: m.card.entries}) // the reload brings the same history
+	before := caLines(m)
+	feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelUp)))
+	if sameFrame(caLines(m), before) {
+		t.Error("one wheel-up after the body got shorter did not move the view")
+	}
+}
+
+// A click on the first selectable line that is already visible does not move the frame, even if
+// the wheel has scrolled the window a little.
+func TestCard_ClickOnVisibleFirstLine_ViewStaysPut(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	e.caBody(id, "## Abstract\nabs\n\n## Summary\nsum\n\n## Details\n- [ ] first\n- [ ] second\n")
+	for i := 1; i <= 30; i++ {
+		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newMouseModel(t, e, 100, 14)
+	m.selectTask(id)
+	caOpenCard(m)
+	for i := 0; i < 200; i++ { // to the top, then one line down
+		feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelUp)))
+	}
+	feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelDown)))
+	x, y := caXY(t, m, "first")
+	before := caLines(m)
+	leftClick(m, x, y)
+	got := caLines(m)
+	if len(got) <= y || strings.TrimSpace(got[y]) == "" || !strings.Contains(got[y], "first") || !strings.Contains(before[y], "first") {
+		t.Errorf("the frame moved under the click on the first criterion:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+var remarkNo = regexp.MustCompile(`remark-(\d+)`)
+
+// firstRemark - the number of the first comment on the screen.
+func firstRemark(t *testing.T, m *Model) int {
+	t.Helper()
+	sm := remarkNo.FindStringSubmatch(strings.Join(caLines(m), "\n"))
+	if sm == nil {
+		t.Fatalf("no comment on the screen:\n%s", strings.Join(caLines(m), "\n"))
+	}
+	n, _ := strconv.Atoi(sm[1])
+	return n
+}
+
+// j and k keep the window while the cursor is inside and shift it by one entry past an edge, in
+// both directions.
+func TestCard_StepKeys_WindowShiftsOnlyPastEdge(t *testing.T) {
+	_, m := remarkEnv(t)
+	k := func(n int, key rune) {
+		for i := 0; i < n; i++ {
+			feed(m, tea.KeyPressMsg{Code: key, Text: string(key)})
+		}
+	}
+	top := firstRemark(t, m)
+	steps := []struct {
+		name string
+		n    int
+		key  rune
+		want int
+	}{
+		{"up to the top edge: window stands", 3, 'k', top},
+		{"one more up: shifts by one entry", 1, 'k', top - 1},
+		{"down inside the window: stands", 1, 'j', top - 1},
+		{"down to the bottom edge: stands", 2, 'j', top - 1},
+		{"one more down: shifts by one entry", 1, 'j', top},
+	}
+	for _, s := range steps {
+		k(s.n, s.key)
+		if got := firstRemark(t, m); got != s.want {
+			t.Fatalf("%s: first comment on the screen remark-%d, expected remark-%d", s.name, got, s.want)
+		}
 	}
 }
 

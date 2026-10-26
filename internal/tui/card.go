@@ -23,11 +23,10 @@ type cardState struct {
 	mtime   time.Time
 	cursor  int             // criterion rows, then history entries
 	moved   bool            // the user moved the cursor: the first history load does not shift it
-	scroll  int             // body scroll in lines: the wheel folds the frame offset in first
-	follow  bool            // the view fits the window to the cursor; a wheel stops it until the cursor moves
 	nCrit   int             // the number of criteria before the history; updated on open and in cardView
 	open    map[string]bool // expanded "N edits" series
 	loaded  bool            // the history has arrived at least once
+	scroll  int             // the body offset in lines, equal to the frame on the screen; see fitScroll, wheelScroll
 }
 
 // shown - a history row on the screen. group - the series index in entries, -1 for a single entry.
@@ -51,7 +50,7 @@ func (m *Model) openCard() tea.Cmd {
 		return nil
 	}
 	m.showing = true
-	m.card = cardState{id: t.ID, open: map[string]bool{}, nCrit: len(selectableCriteria(t)), follow: true}
+	m.card = cardState{id: t.ID, open: map[string]bool{}, nCrit: len(selectableCriteria(t))}
 	return m.historyCmd(t)
 }
 
@@ -77,7 +76,6 @@ func (c *cardState) set(msg historyMsg) {
 	c.rebuild()
 	if !c.loaded && !c.moved {
 		c.cursor = c.nCrit + max(len(c.rows)-1, 0)
-		c.follow = true
 	}
 	c.loaded = true
 	c.cursor = min(c.cursor, c.last())
@@ -87,7 +85,14 @@ func (m *Model) setHistoryMsg(msg historyMsg) {
 	if !m.showing || m.card.id != msg.id {
 		return
 	}
+	first, rows, cursor := !m.card.loaded, len(m.card.rows), m.card.cursor
 	m.card.set(msg)
+	// A reload that changed nothing must not pull a wheel-scrolled view back to the cursor.
+	if first || rows != len(m.card.rows) || cursor != m.card.cursor {
+		m.fitScroll()
+	} else {
+		m.card.scroll = view.CardScroll(m.cardView(), false) // the body may have got shorter
+	}
 	if msg.err != nil {
 		m.setStatus("history: "+firstLine(msg.err.Error()), true)
 	}
@@ -125,18 +130,10 @@ func (c *cardState) changed() time.Time {
 // last - the index of the last selectable row: criteria and history.
 func (c *cardState) last() int { return max(c.nCrit+len(c.rows)-1, 0) }
 
-// step moves the cursor over criteria and history; the view follows it again.
+// step moves the cursor over criteria and history;
 func (c *cardState) step(d int) {
 	c.moved = true
-	c.follow = true
 	c.cursor = min(max(c.cursor+d, 0), c.last())
-}
-
-// scrollBy scrolls the body from base by d lines by hand: the view stops following the cursor
-// until it moves.
-func (c *cardState) scrollBy(base, d int) {
-	c.follow = false
-	c.scroll = base + d
 }
 
 // toggle expands the edit series under the cursor or collapses an expanded one. A criterion row
@@ -152,17 +149,10 @@ func (c *cardState) toggle() {
 	c.rebuild()
 	for i, r := range c.rows {
 		if r.group == g {
-			c.follow = true
 			c.cursor = c.nCrit + i
 			return
 		}
 	}
-}
-
-// syncCardScroll stores the body offset of the frame on the screen: the fit while the view follows
-// the cursor, else the clamped scroll.
-func (m *Model) syncCardScroll() {
-	m.card.scroll = view.CardScroll(m.cardView())
 }
 
 // cardView builds the card frame from the current task file.
@@ -171,8 +161,7 @@ func (m *Model) cardView() view.Card {
 		m.card.nCrit = len(selectableCriteria(t))
 	}
 	m.card.cursor = min(m.card.cursor, m.card.last())
-	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, W: m.w, H: m.h,
-		Scroll: m.card.scroll, Follow: m.card.follow}
+	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, Scroll: m.card.scroll, W: m.w, H: m.h}
 	c.Status, c.IsErr = m.statusText()
 	c.History = make([]history.Entry, len(m.card.rows))
 	for i, r := range m.card.rows {
@@ -191,6 +180,18 @@ func (m *Model) cardView() view.Card {
 		c.CritAt = selectableCriteria(t)
 	}
 	return c
+}
+
+// fitScroll fits the card body window to the cursor and stores it in cardState.scroll: after a
+// cursor move the window stays while the cursor is visible, else shifts to the nearest edge.
+func (m *Model) fitScroll() {
+	m.card.scroll = view.CardScroll(m.cardView(), true)
+}
+
+// wheelScroll scrolls the body window by d lines, clamped to the body; the cursor stays.
+func (m *Model) wheelScroll(d int) {
+	m.card.scroll += d
+	m.card.scroll = view.CardScroll(m.cardView(), false)
 }
 
 // fields - the card fields line: project, external link, claim, wait, due, tags, modification date.

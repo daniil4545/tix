@@ -619,6 +619,45 @@ func TestMouse_CardScreen_WheelScrolls_SelectionStays_ClickSelects(t *testing.T)
 	}
 }
 
+// In the open card the history window shifts only when the cursor moves over the top or bottom
+// edge, as a board column does (RowTop). The card opens with the cursor on the newest entry.
+func TestCard_StepUpFromBottom_KeepsWindow(t *testing.T) {
+	e := mvNewEnv(t, "")
+	e.create("Alpha", "idea")
+	for i := 1; i <= 30; i++ {
+		if _, err := e.store.Comment("T-1", fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.start(100, 14)
+	e.screenHas("Alpha")
+	e.key("enter")
+	e.opened("Alpha")
+	e.screenHas("remark-")
+	e.settle()
+	s0 := e.text()
+	first0 := e.lines()[3:5] // the first body entry: heading and text
+
+	e.key("k") // one step up: the cursor is still inside the window
+	e.settle()
+	if got := e.lines()[3:5]; got[0] != first0[0] || got[1] != first0[1] {
+		t.Errorf("one step up from the bottom shifted the first visible entry from %q, %q to %q, %q:\n%s",
+			first0[0], first0[1], got[0], got[1], e.text())
+	}
+
+	e.key(strings.Repeat("k", 30)) // up to the top: the window follows
+	e.settle()
+	if got := e.lines()[4]; got == first0[1] {
+		t.Errorf("30 steps up did not move the window from the bottom edge fit: the scenario does not exercise the other view:\n%s", e.text())
+	}
+
+	e.key(strings.Repeat("j", 30)) // down again: the window shifts back at the edge, cursor on the bottom edge
+	e.settle()
+	if got := e.text(); got != s0 {
+		t.Errorf("30 steps down did not restore the bottom fit:\n%s\nexpected:\n%s", got, s0)
+	}
+}
+
 // A drag to waiting asks for a reason; esc - the task stays; input - the task is moved.
 func TestMouse_Drag_ToWaiting_AsksReason(t *testing.T) {
 	t.Run("esc leaves the task in place", func(t *testing.T) {
