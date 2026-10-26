@@ -114,7 +114,7 @@ and the task card with its history.
 |---|---|
 | `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column; a column that needs criteria or a reason is refused |
 | `tix list [--project p] [--status s] [--json]` | lists tasks |
-| `tix show T-12 [--json]` | prints the whole task with its `rev` |
+| `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
 | `tix note T-12 "text"` | logs a step in the history |
@@ -134,6 +134,18 @@ the name comes from `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID` or `TIX_ACTOR`.
 When both agent variables are set (one agent started inside another), a write
 asks for `--as`.
 Text that starts with a dash goes after `--`.
+
+`tix show` ends with the notes of the task, read from the store history (`tix note`
+writes only a commit, not the file). Without notes the section is absent. Format:
+
+```
+## Notes (last 5 of 7, -v shows all)
+- 2026-10-24 14:03 claude:abc: text of the note
+```
+
+The default is the last 5 notes, oldest first; `-v` prints all (`Notes (7)`).
+Notes survive renames and moves. The history read is capped at 500 commits per
+task, and `--json` output has no notes.
 
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,
 5 rule refused, 6 bad input.

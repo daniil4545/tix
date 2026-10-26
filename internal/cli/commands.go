@@ -225,7 +225,39 @@ func (a *app) cmdShow(args []string) error {
 	// The file as is: Obsidian may have written it in a non-canonical form.
 	a.out("rev %s", rev)
 	_, _ = a.env.Stdout.Write(data)
+	a.printNotes(id, p.set["v"])
 	return nil
+}
+
+// showNotesDefault - how many latest notes `show` prints without -v.
+const showNotesDefault = 5
+
+// printNotes appends the note section after the file: the last showNotesDefault notes, all with -v.
+// Notes live in the store history, not in the file. A history read failure is a warning, show goes on.
+func (a *app) printNotes(id string, all bool) {
+	notes, err := a.store.Notes(id)
+	if err != nil {
+		a.warn("notes of %s not read: %s", id, firstLine(err.Error()))
+		return
+	}
+	if len(notes) == 0 {
+		return
+	}
+	head := fmt.Sprintf("Notes (%d)", len(notes))
+	if !all && len(notes) > showNotesDefault {
+		head = fmt.Sprintf("Notes (last %d of %d, -v shows all)", showNotesDefault, len(notes))
+		notes = notes[len(notes)-showNotesDefault:]
+	}
+	var sb strings.Builder
+	sb.WriteString("\n## " + head + "\n")
+	for _, n := range notes {
+		actor := n.Actor
+		if actor == "" {
+			actor = "-"
+		}
+		fmt.Fprintf(&sb, "- %s %s: %s\n", n.At.Format("2006-01-02 15:04"), actor, n.Text)
+	}
+	_, _ = a.env.Stdout.Write([]byte(sb.String()))
 }
 
 func (a *app) printJSON(v any) error {
