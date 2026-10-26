@@ -40,6 +40,8 @@ func run() int {
 		Stderr: os.Stderr,
 		Getenv: os.Getenv,
 		Cwd:    cwd,
+		// The same value that --version prints: main.version set by the build.
+		Version: version,
 	}
 	if len(os.Args) == 1 && (isTerminal(os.Stdout) || env.Getenv("TIX_TUI_ONESHOT") == "1") {
 		return runTUI(ctx, env)

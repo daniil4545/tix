@@ -25,6 +25,7 @@ type Env struct {
 	Stdout, Stderr io.Writer
 	Getenv         func(string) string
 	Cwd            string
+	Version        string
 }
 
 const (
@@ -165,6 +166,9 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdDone(args)
 	case "backup":
 		return a.cmdBackup(ctx, args)
+	case "version":
+		a.out("%s", a.env.Version)
+		return nil
 	}
 	return inputf("unknown command %s; %s", a.cmd, usage)
 }

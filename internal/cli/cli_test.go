@@ -519,6 +519,23 @@ func TestCLI_Ctx_BothAgentVariables_Works(t *testing.T) {
 	}
 }
 
+// version prints the build version as --version does and exits 0 without the store.
+func TestCLI_Version_PrintsEnvVersion(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	var o, e bytes.Buffer
+	code := cli.Run(context.Background(), []string{"version"}, cli.Env{
+		Stdout: &o, Stderr: &e, Cwd: b.cwd, Version: "1.2.3",
+		Getenv: func(string) string { return "" },
+	})
+	if code != 0 {
+		t.Fatalf("version: code %d, stderr %q", code, e.String())
+	}
+	if o.String() != "1.2.3\n" {
+		t.Errorf("version: stdout %q, want %q", o.String(), "1.2.3\n")
+	}
+}
+
 // --help prints the usage of the command and writes nothing; after "--" it is plain text.
 func TestCLI_CommandHelp_PrintsUsageWritesNothing(t *testing.T) {
 	defer guard(t)
