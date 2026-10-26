@@ -46,12 +46,14 @@ type Board struct {
 	FirstCol, RowTop int
 }
 
-// Card - everything needed for a card frame. Scroll - the body offset in lines; the frame
-// shifts it itself so that the Cursor line (an index in History) is visible. W, H <= 0: the size is not limited.
+// Card - everything needed for a card frame. Scroll - the body offset in lines. Follow - the frame
+// shifts it itself so that the Cursor line (an index in History) is visible; without Follow the
+// offset stands where the wheel left it. W, H <= 0: the size is not limited.
 type Card struct {
 	ID, Title, Column, Fields, Ask, Abstract, Summary, Details, Checks string
 	History                                                            []history.Entry
 	Cursor, Scroll, W, H                                               int
+	Follow                                                             bool
 	CritAt                                                             []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
 	Status                                                             string
 	IsErr                                                              bool

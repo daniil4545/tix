@@ -4,6 +4,7 @@ package tui
 // The model is driven directly through Update, without a terminal.
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -317,7 +318,8 @@ func TestCriteria_SelectedByCursor_EnterChecksAndUnchecks(t *testing.T) {
 	}
 }
 
-func TestCriteria_ClickOnRowToggles(t *testing.T) {
+// A click on the criterion text only selects: the mark is moved by the box.
+func TestCriteria_ClickOnText_SelectsWithoutToggle(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("job", "todo")
 	e.caBody(id, "## Details\n- [ ] first\n")
@@ -325,11 +327,137 @@ func TestCriteria_ClickOnRowToggles(t *testing.T) {
 	m.selectTask(id)
 	caOpenCard(m)
 	x, y := caXY(t, m, "- [ ] first")
+	before := e.commits()
 	leftClick(m, x, y)
 	tk, _, _ := e.store.Get(id)
-	if !tk.Criteria()[0].Done {
-		t.Errorf("click on the criterion did not check it: %q", tk.Body)
+	if tk.Criteria()[0].Done {
+		t.Errorf("the click on the text checked the criterion: %q", tk.Body)
 	}
+	if m.card.cursor != 0 {
+		t.Errorf("click on the criterion: cursor %d, expected 0 (selected)", m.card.cursor)
+	}
+	if e.commits() != before {
+		t.Errorf("the click wrote a commit: %s -> %s", before, e.commits())
+	}
+}
+
+// A click on the box of the criterion toggles the mark, anywhere inside the pair `[ ]`.
+func TestCriteria_ClickOnBox_Toggles(t *testing.T) {
+	for _, dx := range []int{0, 1, 2} { // the columns `[`, ` `/`x`, `]`
+		e := mvNewEnv(t, "")
+		id := e.create("job", "todo")
+		e.caBody(id, "## Details\n- [ ] first\n")
+		m := newMouseModel(t, e, 120, 30)
+		m.selectTask(id)
+		caOpenCard(m)
+		x, y := caXY(t, m, "[ ] first") // caXY looks for the first character - the `[`
+		leftClick(m, x+dx, y)
+		tk, _, _ := e.store.Get(id)
+		if !tk.Criteria()[0].Done {
+			t.Fatalf("the click in the box at +%d did not check the criterion: %q", dx, tk.Body)
+		}
+	}
+}
+
+// A click on the box of the checked criterion removes the mark.
+func TestCriteria_ClickOnBox_Unchecks(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	e.caBody(id, "## Details\n- [x] first\n")
+	m := newMouseModel(t, e, 120, 30)
+	m.selectTask(id)
+	caOpenCard(m)
+	x, y := caXY(t, m, "[x] first")
+	leftClick(m, x, y)
+	tk, _, _ := e.store.Get(id)
+	if tk.Criteria()[0].Done {
+		t.Errorf("the click on the box did not uncheck the criterion: %q", tk.Body)
+	}
+}
+
+// A click on a history entry selects it without writing anything.
+func TestCard_ClickOnHistory_Selects(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	for i := 1; i <= 6; i++ {
+		if _, err := e.store.Comment(id, fmt.Sprintf("remark-0%d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newMouseModel(t, e, 120, 30)
+	m.selectTask(id)
+	caOpenCard(m)
+	x, y := caXY(t, m, "remark-02")
+	before, was := e.commits(), m.card.cursor
+	leftClick(m, x, y)
+	row := -1 // the number of the entry remark-02 in the laid-out history
+	for i, r := range m.card.rows {
+		if strings.Contains(r.entry.Text, "remark-02") {
+			row = i
+		}
+	}
+	if row < 0 {
+		t.Fatal("remark-02 is not in the laid-out history")
+	}
+	if m.card.cursor != m.card.nCrit+row {
+		t.Errorf("click on the history: cursor %d, expected %d", m.card.cursor, m.card.nCrit+row)
+	}
+	if m.card.cursor == was {
+		t.Errorf("the click did not change the selection: %d", was)
+	}
+	if e.commits() != before {
+		t.Errorf("the click wrote a commit: %s -> %s", before, e.commits())
+	}
+}
+
+// The wheel scrolls the card body by lines: the selection stays, the view goes away and returns
+// when the cursor moves again.
+func TestCard_Wheel_ScrollsByLines_SelectionStays(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	for i := 1; i <= 30; i++ {
+		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := newMouseModel(t, e, 100, 14)
+	m.selectTask(id)
+	caOpenCard(m)
+	before := caLines(m)
+	wheelCommits := e.commits()
+	cursor := m.card.cursor
+	for i := 0; i < 5; i++ {
+		feed(m, tea.MouseWheelMsg(mvM(10, 6, tea.MouseWheelUp)))
+	}
+	if sameFrame(caLines(m), before) {
+		t.Fatal("5 wheel-ups did not scroll the card")
+	}
+	if m.card.cursor != cursor {
+		t.Errorf("the wheel moved the selection: %d, expected %d", m.card.cursor, cursor)
+	}
+	// A cursor move returns the view to the selection again.
+	feed(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if !m.card.follow {
+		t.Error("the view did not follow the cursor again after j")
+	}
+	if !sameFrame(caLines(m), before) {
+		t.Errorf("after j the view is not at the selection again:\n%v", caLines(m))
+	}
+	if e.commits() != wheelCommits {
+		t.Errorf("the wheel wrote a commit: %s -> %s", wheelCommits, e.commits())
+	}
+}
+
+func sameFrame(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, l := range a {
+		if l != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCriteria_ChangedMeanwhile_NotToggled(t *testing.T) {

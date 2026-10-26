@@ -49,6 +49,54 @@ func TestHitCard_RowsAndButtons(t *testing.T) {
 	}
 }
 
+// The columns of the box are exactly the bracket pair `[ ]`/[x]`: the box toggles,
+// the marker and the text only select.
+func TestHitCard_CriterionBoxSeparateFromText(t *testing.T) {
+	c := critCard()
+	fx, fy := cardRow(t, c, "- [ ] first")  // the line and the marker
+	bx, by := cardRow(t, c, "[ ] first")    // the box columns
+	tx, _ := cardRow(t, c, "first")         // the text
+	chx, chy := cardRow(t, c, "[x] second") // the box of the second criterion
+	sx, sy := cardRow(t, c, "second")
+	if by != fy || chy != sy {
+		t.Fatalf("the box and the text are not on one frame line: %d %d and %d %d", fy, by, chy, sy)
+	}
+	cases := []struct {
+		x, y int
+		want view.CardHit
+	}{
+		{fx, fy, view.CardHit{Kind: view.CardCriterion, Index: 0}},
+		{bx, by, view.CardHit{Kind: view.CardBox, Index: 0}},
+		{bx + 2, by, view.CardHit{Kind: view.CardBox, Index: 0}},
+		{tx, fy, view.CardHit{Kind: view.CardCriterion, Index: 0}},
+		{chx, chy, view.CardHit{Kind: view.CardBox, Index: 1}},
+		{sx, sy, view.CardHit{Kind: view.CardCriterion, Index: 1}},
+	}
+	for _, tc := range cases {
+		if got := view.HitCard(c, tc.x, tc.y); got != tc.want {
+			t.Errorf("HitCard at (%d,%d) = %+v, expected %+v", tc.x, tc.y, got, tc.want)
+		}
+	}
+}
+
+// A history entry is clickable on every line of it; the index is the entry number.
+func TestHitCard_HistoryRowsReported(t *testing.T) {
+	c := card()
+	_, y := cardRow(t, c, "history")
+	hist, hy := cardRow(t, c, "10:00") // the first entry line
+	if hy < 0 || hy <= y {
+		t.Fatalf("the first entry %d is not after the history heading %d", hy, y)
+	}
+	for i := 0; i < 4; i++ {
+		if got := view.HitCard(c, hist, hy+i); got.Kind != view.CardHistory {
+			t.Errorf("HitCard on history line %d = %+v, expected a history line", i, got)
+		}
+	}
+	if got := view.HitCard(c, hist, y); got.Kind == view.CardHistory {
+		t.Errorf("the section heading is clickable: %+v", got)
+	}
+}
+
 // A criterion scrolled out is not clickable; a cut button too.
 func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 	c := critCard()
