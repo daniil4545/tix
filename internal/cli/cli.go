@@ -170,7 +170,54 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		a.out("%s", a.env.Version)
 		return nil
 	}
+	if s := suggest(a.cmd); s != "" {
+		return inputf("unknown command %s; did you mean %s?", a.cmd, s)
+	}
 	return inputf("unknown command %s; %s", a.cmd, usage)
+}
+
+// usageCmds - the commands of the usage line in usage order.
+var usageCmds = []string{
+	"ctx", "inbox", "take", "move", "set", "check", "done", "backup",
+	"new", "list", "show", "edit", "comment", "note", "rm",
+}
+
+// suggest returns the closest command within edit distance 2 of a word,
+// the first one in the usage order on a tie.
+func suggest(word string) string {
+	best, bestDist := "", 3
+	for _, c := range usageCmds {
+		if d := editDistance(word, c); d < bestDist {
+			best, bestDist = c, d
+		}
+	}
+	return best
+}
+
+// editDistance is the Damerau-Levenshtein (optimal string alignment) distance
+// of two words: a swap of two adjacent letters counts as one edit.
+func editDistance(a, b string) int {
+	prev2 := make([]int, len(b)+1)
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		for j := 1; j <= len(b); j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			cur[j] = min(min(cur[j-1]+1, prev[j]+1), prev[j-1]+cost)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				cur[j] = min(cur[j], prev2[j-2]+1)
+			}
+		}
+		prev2, prev, cur = prev, cur, prev2
+	}
+	return prev[len(b)]
 }
 
 // commandHelp - the usage line of each command for `tix <command> --help`.
