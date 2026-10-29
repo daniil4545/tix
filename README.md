@@ -124,7 +124,7 @@ and the task card with its history.
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number |
-| `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask` |
+| `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask`; a task whose body starts with `Epic: T-M` ticks its line in that epic |
 | `tix backup` | commits edits made outside `tix` and pushes `HEAD` to `origin` |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
 

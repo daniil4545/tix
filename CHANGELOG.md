@@ -14,6 +14,10 @@ All notable changes to this project are documented here. The format follows
   keeps its lines and an open stdin does not hang `new`.
 - `tix list --grep TEXT` matches the title and the `## Summary` section,
   case-insensitive. `tix ls` is an alias of `tix list`.
+- Epics: a task whose body starts with `Epic: T-M` ticks its `- [ ] T-N` line
+  in that epic when `tix done` closes it, in a separate commit. When every line
+  is ticked, `done` prints `epic T-M ready for acceptance`; the epic stays open.
+  A missing epic or line never fails `done`.
 
 ### Changed
 
