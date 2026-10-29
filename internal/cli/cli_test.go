@@ -246,6 +246,78 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 	}
 }
 
+func TestCLI_ListClosedAliasGrep(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Alpha")
+	b.ok("", "set", "T-1", "summary=MiXeD result\nSecond line", "abstract=hidden phrase")
+	b.ok("", "comment", "T-1", "hidden comment")
+	b.ok("", "new", "Beta", "--project", "other")
+	b.ok("", "set", "T-2", "summary=alpha result")
+	b.ok("", "new", "Closed Alpha")
+	b.ok("", "done", "T-3", "-m", "finished", "--as", "test:list")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"default", nil, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
+		{"all", []string{"--all"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\ndone T-3 Closed Alpha\n"},
+		{"title and summary", []string{"--grep", "ALPHA"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
+		{"summary case", []string{"--grep", "mixed"}, "idea T-1 Alpha | MiXeD result\n"},
+		{"summary second line", []string{"--grep", "SECOND"}, "idea T-1 Alpha | MiXeD result\n"},
+		{"literal", []string{"--grep", "A.*"}, "no tasks\n"},
+		{"excluded sections", []string{"--grep", "hidden"}, "no tasks\n"},
+		{"project", []string{"--grep", "alpha", "--project", "other"}, "idea T-2 Beta | alpha result\n"},
+		{"closed by status", []string{"--status", "done"}, "done T-3 Closed Alpha\n"},
+		{"closed explicit", []string{"--all", "--status", "done", "--grep", "alpha"}, "done T-3 Closed Alpha\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, cmd := range []string{"list", "ls"} {
+				if got := b.ok("", append([]string{cmd}, tc.args...)...).out; got != tc.want {
+					t.Errorf("%s %v: %q, want %q", cmd, tc.args, got, tc.want)
+				}
+			}
+		})
+	}
+	for _, cmd := range []string{"list", "ls"} {
+		var items []struct{ ID string }
+		if err := json.Unmarshal([]byte(b.ok("", cmd, "--json", "--all", "--grep", "closed").out), &items); err != nil {
+			t.Fatal(err)
+		}
+		if len(items) != 1 || items[0].ID != "T-3" {
+			t.Errorf("%s --json --all --grep closed: %+v", cmd, items)
+		}
+		if got := b.tix("", cmd, "--grep"); got.code != 6 {
+			t.Errorf("%s --grep without value: %+v", cmd, got)
+		}
+		if got := b.ok("", cmd, "--help").out; !strings.Contains(got, "--all") || !strings.Contains(got, "--grep TEXT") {
+			t.Errorf("%s help: %q", cmd, got)
+		}
+	}
+}
+
+func TestCLI_ListRenamedClosedColumn(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Closed Alpha")
+	path := filepath.Join(b.home, ".tix", "config.toml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = bytes.ReplaceAll(data, []byte(`name = "done"`), []byte(`name = "archived"`))
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.ok("", "move", "T-1", "archived", "-m", "finished", "--as", "test:list")
+	if got := b.ok("", "list", "--grep", "closed").out; got != "no tasks\n" {
+		t.Errorf("renamed closed column: %q", got)
+	}
+	if got := b.ok("", "ls", "--all", "--grep", "closed").out; got != "archived T-1 Closed Alpha\n" {
+		t.Errorf("renamed closed column with --all: %q", got)
+	}
+}
+
 func TestCLI_Show_RevThenFileAsIs_JSON(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
