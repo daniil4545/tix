@@ -227,7 +227,7 @@ func editDistance(a, b string) int {
 var commandHelp = map[string]string{
 	"ctx":     "ctx [--project P] [--json] [--hook]",
 	"inbox":   "inbox [--hook]",
-	"new":     "new <title> [--to column|role] [--project P]",
+	"new":     "new <title> [--to column|role] [--project P] [--body-file FILE|-]",
 	"list":    "list [--project P] [--status column] [--all] [--grep TEXT] [--json]; alias: ls",
 	"show":    "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":    "edit <id> --base <rev> < body.md",
