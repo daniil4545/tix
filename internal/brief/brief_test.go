@@ -75,6 +75,31 @@ func TestBuild_SevenReady_FiveRowsTwoMore_NextIsFirst(t *testing.T) {
 	}
 }
 
+func TestBuild_AllProjects_CountsOtherColumns(t *testing.T) {
+	in := input(
+		mk("T-1", "idea", "idea", 1), mk("T-2", "ready", "todo", 1),
+		mk("T-3", "active", "doing", 1), mk("T-4", "waiting", "blocked", 1),
+		mk("T-5", "closed", "done", 1), mk("T-6", "custom", "later", 1),
+		mk("T-7", "ready too", "todo", 2),
+	)
+	in.Project = ""
+	in.Cfg.Columns = append(in.Cfg.Columns, config.Column{Name: "later"})
+	b := brief.Build(in)
+	want := "project all   rules: /h/RULES.md\n" +
+		"- take: tix take; step: tix note; end: tix set summary=\n" +
+		"- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed\n" +
+		"idea    1 more\ntodo    2 more\ndoing   T-3 active\nblocked T-4 waiting\ndone    1 more\nlater   1 more\nnext T-2"
+	if got := b.Text(); got != want {
+		t.Fatalf("all projects:\n%s\nwant:\n%s", got, want)
+	}
+	for _, col := range []string{"idea", "todo", "done", "later"} {
+		s, ok := section(b, col)
+		if !ok || len(s.Rows) != 0 || s.More == 0 {
+			t.Errorf("column %s: want count only, got %+v", col, s)
+		}
+	}
+}
+
 func TestBuild_ClaimAndDetail(t *testing.T) {
 	defer guard(t)
 	own := mk("T-1", "mine", "doing", 1)
