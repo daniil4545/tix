@@ -271,6 +271,7 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 
 	n := e.count()
 	before := e.text(ready)
+	inboxBefore := e.text(inbox)
 	for _, c := range []struct{ name, id string }{{"inbox", inbox}, {"closed", closed}, {"column without a role", norole}} {
 		_, err := s.Take(c.id, core.Take, "claude:a")
 		wantRule(t, "Take from "+c.name, err, "tix move")
@@ -289,10 +290,39 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 	if err != nil && (!strings.Contains(err.Error(), "tix edit") || !strings.Contains(err.Error(), "tix take "+inbox)) {
 		t.Errorf("text %q, want the hint `tix edit ... tix take %s`", err, inbox)
 	}
-	crit := mkCrit(t, s, "Planned", "idea")
-	_, err = s.Take(crit, core.Take, "claude:a")
-	if err == nil || strings.Contains(err.Error(), "no criteria") {
-		t.Errorf("Take from inbox with criteria = %v, want the short hint `tix move`", err)
+	if e.count() != n || e.text(inbox) != inboxBefore {
+		t.Error("Take from inbox without criteria changed the history or the file")
+	}
+}
+
+func TestTake_InboxWithCriterion(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	clk := newClock()
+	s := e.openAt(clk)
+	id := mkIn(t, s, "Planned", "idea")
+	_, rev, err := s.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Edit(id, rev, "## Details\n- [ ] Ship it\n", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	n := e.count()
+	r, err := s.Take(id, core.Take, "codex:a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tk := get(t, s, id)
+	claim, has := tk.ClaimInfo()
+	if tk.Status != "doing" || !has || claim.Actor != "codex:a" || !claim.Until.Equal(clk.now().Add(3*time.Hour)) {
+		t.Errorf("Take from inbox: status %q, claim %+v, want doing with a three-hour claim", tk.Status, claim)
+	}
+	if e.count() != n+1 || !strings.Contains(r.Info, "idea > doing") {
+		t.Errorf("Take from inbox: commits %d (was %d), info %q", e.count(), n, r.Info)
+	}
+	if _, err := s.Take(id, core.Take, "codex:a"); err != nil || e.count() != n+1 {
+		t.Errorf("repeated Take: err %v, commits %d (was %d)", err, e.count(), n+1)
 	}
 }
 
