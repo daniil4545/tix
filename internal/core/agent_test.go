@@ -693,6 +693,36 @@ func TestSet_Rules(t *testing.T) {
 	}
 }
 
+func TestCheckAt_ConcurrentReorderRefused(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	id := mkCrit(t, s, "Epic", "doing")
+	_, rev, err := s.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reordered := strings.Replace(critBody, "one\n- [ ] two", "two\n- [ ] one", 1)
+	core.SetAfterRead(s, func(path string, _ int) {
+		if err := os.WriteFile(path, []byte(strings.Replace(e.text(id), critBody, reordered, 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		core.SetAfterRead(s, nil)
+	})
+	if _, err := s.CheckAt(id, []int{1}, "x:1", rev); !errors.Is(err, core.ErrConflict) {
+		t.Fatalf("concurrent reorder: %v, want conflict", err)
+	}
+	ensure(t, strings.Contains(e.text(id), reordered), "reordered criteria must stay unchecked")
+	_, rev, err = s.Get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.CheckAt(id, []int{2}, "x:1", rev)
+	if err != nil || r.Info != "1/3" {
+		t.Fatalf("fresh revision: info %q, err %v", r.Info, err)
+	}
+}
+
 func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)

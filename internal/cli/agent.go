@@ -379,7 +379,57 @@ func (a *app) cmdDone(args []string) error {
 		return wrap(id, err)
 	}
 	a.reply(p, res, id, what(res, "done"))
+	a.checkEpic(id, who)
 	return nil
+}
+
+func (a *app) checkEpic(id, who string) {
+	child, _, err := a.store.Get(id)
+	if err != nil {
+		a.warn("epic for %s: %s", id, firstLine(err.Error()))
+		return
+	}
+	line := strings.SplitN(strings.TrimSpace(child.Body), "\n", 2)[0]
+	if !strings.HasPrefix(line, "Epic: T-") {
+		return
+	}
+	epicID, err := taskID([]string{strings.TrimPrefix(strings.TrimSuffix(line, "\r"), "Epic: ")})
+	if err != nil {
+		return
+	}
+	epic, rev, err := a.store.Get(epicID)
+	if errors.Is(err, core.ErrNotFound) {
+		return
+	}
+	if err != nil {
+		a.warn("epic %s: %s", epicID, firstLine(err.Error()))
+		return
+	}
+	var nums []int
+	criteria := epic.Criteria()
+	for _, c := range criteria {
+		if c.Done {
+			continue
+		}
+		if c.Text == id || strings.HasPrefix(c.Text, id+" ") {
+			nums = append(nums, c.N)
+		}
+	}
+	if len(nums) == 0 {
+		return
+	}
+	res, err := a.store.CheckAt(epicID, nums, who, rev)
+	if err != nil {
+		a.warn("epic %s: %s", epicID, firstLine(err.Error()))
+		return
+	}
+	if res.Warning != "" {
+		a.warn("epic %s: %s", epicID, res.Warning)
+	}
+	counts := strings.Split(res.Info, "/")
+	if len(counts) == 2 && counts[0] == counts[1] {
+		a.out("epic %s ready for acceptance", epicID)
+	}
 }
 
 func (a *app) cmdBackup(ctx context.Context, args []string) error {
