@@ -135,7 +135,11 @@ func (s *Store) release(t *task.Task, cfg *config.Config, actor string) (string,
 
 func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool, op *opInfo) (string, error) {
 	role := cfg.RoleOf(t.Status)
-	if role != roleReady && role != roleWaiting && role != roleActive {
+	canTake := slices.Contains([]string{roleReady, roleWaiting, roleActive}, role)
+	if role == "inbox" {
+		canTake = len(t.Criteria()) > 0
+	}
+	if !canTake {
 		hint := "<ready column>"
 		if c, ok := cfg.ByRole(roleReady); ok {
 			hint = c.Name
