@@ -130,6 +130,9 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return inputf("command required: %s", usage)
 	}
 	a.cmd, args = args[0], args[1:]
+	if a.cmd == "ls" {
+		a.cmd = "list"
+	}
 	if h, ok := commandHelp[a.cmd]; ok && wantsHelp(args) {
 		a.out("tix %s; flags of every command: -v, --as agent:id", h)
 		return nil
@@ -225,7 +228,7 @@ var commandHelp = map[string]string{
 	"ctx":     "ctx [--project P] [--json] [--hook]",
 	"inbox":   "inbox [--hook]",
 	"new":     "new <title> [--to column|role] [--project P]",
-	"list":    "list [--project P] [--status column] [--json]",
+	"list":    "list [--project P] [--status column] [--all] [--grep TEXT] [--json]; alias: ls",
 	"show":    "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":    "edit <id> --base <rev> < body.md",
 	"comment": "comment <id> <text>",
