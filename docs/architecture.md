@@ -138,7 +138,7 @@ Failures at each step: section 6.
 
 Other scenarios:
 
-- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the columns `active`, `waiting`, `ready`; the text is trimmed to 2000 runes. Git and the lock are not involved.
+- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the columns `active`, `waiting`, `ready` (outside a project: `active` and `waiting`, the rest as counts); the text is trimmed to 2000 runes. Git and the lock are not involved.
 - `move`, `done`, `set`, `check` follow the same path; only the rule at step 5 differs (section 4).
 
 ## 3. Processes

@@ -27,7 +27,7 @@ Status: version 0.1, the file format may still change before 1.0.
 | Safe writes | lock, temporary file, rename; an unparsable file is never overwritten |
 | Edits outside `tix` survive | a change made in Obsidian is committed by the next operation |
 | Claim | `tix take` claims a task for 3 hours; another session needs `--steal` |
-| Short brief | `tix ctx` prints the active, waiting and ready tasks in under 2000 characters |
+| Short brief | `tix ctx` prints the active, waiting and ready tasks of the project in under 2000 characters; outside a project, active and waiting tasks and counts of the rest |
 | Comments reach the agent | a hook hands your new comments to the agent that holds the task |
 | Board | `tix` without arguments opens a terminal board: keys, mouse, drag between columns |
 
@@ -112,14 +112,14 @@ and the task card with its history.
 
 | Command | What it does |
 |---|---|
-| `tix new "title" [--to column] [--project p]` | creates a task, by default in the `inbox` column; a column that needs criteria or a reason is refused |
-| `tix list [--project p] [--status s] [--json]` | lists tasks |
+| `tix new "title" [--to column] [--project p] [--body-file f]` | creates a task, by default in the `inbox` column, with the body of file `f` (`-` is stdin); `--to ready` needs criteria in the body, a column that needs a reason is refused |
+| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists open tasks; `--all` or `--status` of the closed column adds closed ones, `--grep` matches title and summary; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
 | `tix note T-12 "text"` | logs a step in the history |
 | `tix rm T-12` | deletes a task |
-| `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task |
+| `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task; outside a project active and waiting, the rest as counts |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
