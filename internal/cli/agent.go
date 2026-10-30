@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -398,9 +399,9 @@ func (a *app) checkEpic(id, who string) {
 		return
 	}
 	// one retry: two children of one epic closed at once both read the same revision
-	res, err := a.tickEpic(epicID, id, who)
+	res, ready, err := a.tickEpic(epicID, id, who)
 	if errors.Is(err, core.ErrConflict) {
-		res, err = a.tickEpic(epicID, id, who)
+		res, ready, err = a.tickEpic(epicID, id, who)
 	}
 	if errors.Is(err, core.ErrNotFound) || errors.Is(err, errNoEpicLine) {
 		return
@@ -412,30 +413,39 @@ func (a *app) checkEpic(id, who string) {
 	if res.Warning != "" {
 		a.warn("epic %s: %s", epicID, res.Warning)
 	}
-	counts := strings.Split(res.Info, "/")
-	if len(counts) == 2 && counts[0] == counts[1] {
+	if ready {
 		a.out("epic %s ready for acceptance", epicID)
 	}
 }
 
-var errNoEpicLine = errors.New("no open line of the task in the epic")
+var (
+	errNoEpicLine = errors.New("no open line of the task in the epic")
+	// taskLine - an epic criterion that names a task: "T-12" or "T-12 gist"
+	taskLine = regexp.MustCompile(`^T-\d+(\s|$)`)
+)
 
 // tickEpic ticks the open "- [ ] <id>" lines of the epic, guarded by the revision it read them from.
-func (a *app) tickEpic(epicID, id, who string) (core.Result, error) {
+// ready: every task line of the epic is ticked now; other criteria, as the acceptance one, do not count.
+func (a *app) tickEpic(epicID, id, who string) (core.Result, bool, error) {
 	epic, rev, err := a.store.Get(epicID)
 	if err != nil {
-		return core.Result{}, err
+		return core.Result{}, false, err
 	}
 	var nums []int
+	ready := true
 	for _, c := range epic.Criteria() {
-		if !c.Done && (c.Text == id || strings.HasPrefix(c.Text, id+" ")) {
+		mine := !c.Done && (c.Text == id || strings.HasPrefix(c.Text, id+" "))
+		if mine {
 			nums = append(nums, c.N)
+		} else if !c.Done && taskLine.MatchString(c.Text) {
+			ready = false
 		}
 	}
 	if len(nums) == 0 {
-		return core.Result{}, errNoEpicLine
+		return core.Result{}, false, errNoEpicLine
 	}
-	return a.store.CheckAt(epicID, nums, who, rev)
+	res, err := a.store.CheckAt(epicID, nums, who, rev)
+	return res, ready && err == nil, err
 }
 
 func (a *app) cmdBackup(ctx context.Context, args []string) error {
