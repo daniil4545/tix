@@ -1,3 +1,5 @@
+# Commands
+
 
 See also: [how it works](how-it-works.md), [README](../README.md).
 
