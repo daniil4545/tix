@@ -11,7 +11,7 @@ func TestCLI_DoneEpic_CounterAndAcceptance(t *testing.T) {
 	b := newBox(t)
 	epic := b.newTask("Epic", "todo")
 	child := b.newTask("Child", "todo")
-	b.edit(epic, "## Details\n- [ ] "+child+" child\n- [ ] acceptance\n")
+	b.edit(epic, "## Details\n- [ ] "+child+" child\n- [ ] T-99 other\n- [ ] acceptance\n")
 	b.edit(child, "\n\nEpic: "+epic+"\n\n## Details\n- [x] shipped\n")
 	n := b.commitCount()
 	r := b.ok("", "done", child)
@@ -20,9 +20,10 @@ func TestCLI_DoneEpic_CounterAndAcceptance(t *testing.T) {
 	ensure(t, strings.Contains(b.git("show", "HEAD~1:"+strings.TrimPrefix(b.taskFile(child), b.home+"/")), "status: done"), "child closes first")
 	ensure(t, strings.Contains(b.git("show", "HEAD~1:"+strings.TrimPrefix(b.taskFile(epic), b.home+"/")), "- [ ] "+child), "epic checked only after done")
 	out := b.ok("", "ctx", "--project", "personal").out
-	ensure(t, strings.Contains(out, "Epic | 1/2"), "ctx counter: %q", out)
+	ensure(t, strings.Contains(out, "Epic | 1/3"), "ctx counter: %q", out)
 	b.noCommit("done", child)
-	b.edit(epic, "## Details\n- [ ] "+child+"\n")
+	// the open acceptance criterion does not hold the message: it is what the message asks for
+	b.edit(epic, "## Details\n- [ ] "+child+"\n- [ ] acceptance\n")
 	r = b.ok("", "done", child)
 	ensure(t, strings.Contains(r.out, "epic "+epic+" ready for acceptance\n"), "ready message: %q", r.out)
 	ensure(t, strings.Contains(b.ok("", "show", epic).out, "status: todo"), "epic stays open")
