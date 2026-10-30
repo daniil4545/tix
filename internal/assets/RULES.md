@@ -30,14 +30,15 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- `take` works from ready, waiting and active columns. From any other column move the task first: `tix move T-12 ready`. `tix <command> --help` prints the flags of a command. `move` takes a column name or a role; `tix ctx` prints which column has which role.
+- `take` works from ready, waiting and active columns, and from the inbox when the task has a criterion. From any other column move the task first: `tix move T-12 ready`. `tix <command> --help` prints the flags of a command. `move` takes a column name or a role; `tix ctx` prints which column has which role.
 
 ## Checks
 
 - Into ready: at least one criterion.
 - Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field. Waiting is for an external resource; it drops your hold. Waiting for the human is an `ask` on the task you hold.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
-- `tix new --to` a column that needs a check (ready, waiting, closed) is refused. Create the task in the inbox, add criteria, then `tix move`.
+- `tix new "title" --to ready --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to ready` is refused; `--to` waiting or closed is refused: create the task, then `tix move` or `tix done`.
+- `tix list` hides closed tasks; `--all` or `--status <closed column>` shows them, `--grep TEXT` matches title and summary.
 - A column without a role is not yours.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
 - `set` takes: title, project, waiting, due, tags, ask, external, abstract, summary.
@@ -47,6 +48,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Scope
 
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
+- Bigger work is an epic: a task tagged `epic` whose `## Details` lists its tasks as `- [ ] T-N <gist>` plus the acceptance criterion. Each child task starts its body with `Epic: T-N`. `tix done` of a child ticks its line in the epic and says when all task lines are ticked (the acceptance criterion does not count); the epic stays open for acceptance.
 - Frozen work stays in the inbox column with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.

@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `tix new "title" --body-file body.md` creates a task with its body in one
+  call; `--body-file -` reads stdin. With criteria in the body, `--to ready`
+  lands in ready at once. Without the flag stdin is never read, so a shell loop
+  keeps its lines and an open stdin does not hang `new`.
+- `tix list --grep TEXT` matches the title and the `## Summary` section,
+  case-insensitive. `tix ls` is an alias of `tix list`.
+- Epics: a task whose body starts with `Epic: T-M` ticks its `- [ ] T-N` line
+  in that epic when `tix done` closes it, in a separate commit. When every task
+  line (`- [ ] T-N ...`) is ticked, `done` prints `epic T-M ready for
+  acceptance`; other criteria, as the acceptance one, do not hold it. The epic
+  stays open.
+  A missing epic or line never fails `done`.
+
+### Changed
+
+- `tix list` and `tix list --json` no longer print tasks of the closed column.
+  `--all` brings them back; `--status <closed column>` shows that column.
+- `tix take` of an inbox task with at least one criterion moves it straight
+  into work with a claim; an inbox task without criteria is refused as before.
+- `tix ctx` outside a project lists active and waiting tasks (up to 5 per
+  column, then "K more") and prints only a count for every other column, the
+  closed one included. `ctx` of one project is unchanged.
+- The refusal of `tix new --to ready` without criteria names `--body-file`.
+
 ## [0.5.0] - 2026-10-26
 
 ### Added
