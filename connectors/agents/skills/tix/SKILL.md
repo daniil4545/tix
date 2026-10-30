@@ -20,6 +20,7 @@ Remaining or new scope is a new task: `tix new`. Frozen work stays in inbox with
 
 ## Rules
 
+- Run `tix` as a single command. No `;`, `&&`, `|`, `cd` (Codex sandbox).
 - Find a task with `tix list --grep TEXT` (title and summary; closed tasks need `--all`), read it with `tix show T-12`; do not grep `~/tasks`.
 - Outside a project (home session in `~/tasks`), an idea is `tix new "title"`: it goes to `inbox`, project `personal`.
 - Errors name the fix; follow it. Do not edit files in `~/tasks` by hand.

@@ -150,7 +150,7 @@ flowchart TD
 | `set` | only `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix (`word: `) is refused with code 5, a link like `http://` is text |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask`; a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all ticked prints "epic T-M ready for acceptance" |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask`; a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all `T-N` lines ticked (other criteria do not count) prints "epic T-M ready for acceptance" |
 | `rm`, `backup` | delete; commit of edits that bypass the core (step 2 of 2.1), then `git push` |
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,
