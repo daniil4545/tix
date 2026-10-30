@@ -217,7 +217,7 @@ Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task
 
 ## 8. Environments and configuration
 
-There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOCK_TIMEOUT`, `TIX_GIT` are in `README.md`. Two more settings:
+There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOCK_TIMEOUT`, `TIX_GIT` are in `commands.md`. Two more settings:
 
 | Variable or mode | What it enables | Where set |
 |---|---|---|
