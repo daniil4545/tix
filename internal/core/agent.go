@@ -135,7 +135,11 @@ func (s *Store) release(t *task.Task, cfg *config.Config, actor string) (string,
 
 func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool, op *opInfo) (string, error) {
 	role := cfg.RoleOf(t.Status)
-	if role != roleReady && role != roleWaiting && role != roleActive {
+	canTake := slices.Contains([]string{roleReady, roleWaiting, roleActive}, role)
+	if role == "inbox" {
+		canTake = len(t.Criteria()) > 0
+	}
+	if !canTake {
 		hint := "<ready column>"
 		if c, ok := cfg.ByRole(roleReady); ok {
 			hint = c.Name
@@ -413,6 +417,11 @@ func setField(t *task.Task, role string, f Field) error {
 
 // Check marks criteria with numbers nums.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
+	return s.CheckAt(id, nums, actor, "")
+}
+
+// CheckAt marks criteria only if baseRev still matches; empty baseRev accepts any revision.
+func (s *Store) CheckAt(id string, nums []int, actor, baseRev string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
@@ -426,7 +435,10 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	}
 	op := &opInfo{kind: "check", subject: "check " + strings.Join(parts, " ")}
 	var info string
-	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
+	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, rev string) error {
+		if baseRev != "" && baseRev != rev {
+			return ErrConflict
+		}
 		if _, err := t.Check(nums...); err != nil {
 			return err
 		}

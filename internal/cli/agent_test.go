@@ -446,7 +446,12 @@ func TestCLI_Ctx_SevenReady_FiveRowsTwoMore(t *testing.T) {
 func TestCLI_Ctx_OutsideProjectFlagJSON(t *testing.T) {
 	defer guard(t)
 	b, proj := seedProject(t)
-	ensure(t, strings.HasPrefix(b.ok("", "ctx").out, "project all"), "ctx outside a project: want `project all`")
+	all := b.ok("", "ctx").out
+	ensure(t, strings.HasPrefix(all, "project all"), "ctx outside a project: want `project all`")
+	ensure(t, regexp.MustCompile(`(?m)^todo\s+8 more$`).MatchString(all) &&
+		regexp.MustCompile(`(?m)^idea\s+1 more$`).MatchString(all) &&
+		!strings.Contains(all, "Ready 1") && !strings.Contains(all, "Other project") &&
+		strings.Contains(all, "next T-1"), "ctx all should count ready and inbox tasks:\n%s", all)
 	out := b.ok("", "ctx", "--project", "other").out
 	ensure(t, strings.Contains(out, "Other project") && !strings.Contains(out, "Ready 1"), "ctx --project other:\n%s", out)
 	var js struct {
@@ -459,6 +464,13 @@ func TestCLI_Ctx_OutsideProjectFlagJSON(t *testing.T) {
 	}
 	err := json.Unmarshal([]byte(b.runIn(proj, "", "ctx", "--json").out), &js)
 	ensure(t, err == nil && js.Project == "myproj" && js.Next == "T-1" && len(js.Sections) > 0, "ctx --json: %v, %+v", err, js)
+	err = json.Unmarshal([]byte(b.ok("", "ctx", "--json").out), &js)
+	ensure(t, err == nil && js.Project == "all" && js.Next == "T-1" && len(js.Sections) == 2,
+		"ctx all --json: %v, %+v", err, js)
+	for _, s := range js.Sections {
+		want := map[string]int{"idea": 1, "todo": 8}[s.Column]
+		ensure(t, len(s.Rows) == 0 && s.More == want && want > 0, "ctx all JSON section: %+v", s)
+	}
 }
 
 // A broken file: warn, code 0, the rest is shown.

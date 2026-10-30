@@ -127,7 +127,8 @@ func benches(home string, tasks int) []bench {
 	ext := filepath.Join(home, taskFile(externalTask))
 	return []bench{
 		{
-			name: "list", targetMS: 15, args: []string{"list"},
+			// --all: the bare list hides the closed tasks of the store, the worst case prints them all
+			name: "list", targetMS: 15, args: []string{"list", "--all"},
 			check: func(_ int, out string) error {
 				if n := strings.Count(out, "\n"); n < tasks {
 					return fmt.Errorf("%d lines in reply, expected at least %d", n, tasks)

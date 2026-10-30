@@ -142,15 +142,15 @@ flowchart TD
 
 | Command | What it does |
 |---|---|
-| `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; up to 2000 characters |
-| `list`, `show` | list with filters; the whole task, with `rev` |
-| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; a column with an entry check of 2.5 (`ready`, `waiting`, `closed`) refuses with code 5 before any write: create, add criteria, then `move` |
-| `take` | into `active` and `claim`; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
+| `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; outside a project (`all`) tasks in `active` and `waiting`, every other column as a count; up to 2000 characters |
+| `list`, `show` | list with filters, without the `closed` column unless `--all` or `--status` names it; `--grep` matches title and `## Summary`, case-insensitive; alias `ls`; the whole task, with `rev` |
+| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
+| `take` | into `active` and `claim`, also from `inbox` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix (`word: `) is refused with code 5, a link like `http://` is text |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask` |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask`; a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all `T-N` lines ticked (other criteria do not count) prints "epic T-M ready for acceptance" |
 | `rm`, `backup` | delete; commit of edits that bypass the core (step 2 of 2.1), then `git push` |
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,

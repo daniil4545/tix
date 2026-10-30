@@ -41,7 +41,7 @@ type Row struct {
 	Claim  string `json:"claim"`
 }
 
-// Section - a column with role active, waiting or ready; More - how many tasks are hidden.
+// Section - a column of tasks; More - how many tasks are hidden.
 type Section struct {
 	Column string `json:"column"`
 	Rows   []Row  `json:"rows"`
@@ -57,18 +57,25 @@ type Brief struct {
 	Next     string    `json:"next"`
 }
 
-// Build builds a Brief: roles active, waiting, ready; compression down to Limit. The tasks in Input
-// are already selected by project. An empty Project prints as "all".
+// Build builds a Brief with compression down to Limit. The tasks in Input are already selected
+// by project. An empty Project counts tasks outside active and waiting instead of listing them.
 func Build(in Input) Brief {
 	b := Brief{Project: in.Project, Rules: in.RulesPath, Columns: in.Cfg.Roles(), Sections: []Section{}}
 	if b.Project == "" {
 		b.Project = "all"
 	}
-	for _, role := range ctxRoles {
-		col, ok := in.Cfg.ByRole(role)
-		if !ok {
-			continue
+	var columns []config.Column
+	if in.Project == "" {
+		columns = in.Cfg.Columns
+	} else {
+		for _, role := range ctxRoles {
+			if col, ok := in.Cfg.ByRole(role); ok {
+				columns = append(columns, col)
+			}
 		}
+	}
+	for _, col := range columns {
+		role := col.Role
 		tasks := ranked(in.Tasks, col.Name)
 		if role == "ready" {
 			b.Next = nextID(tasks, in)
@@ -77,6 +84,11 @@ func Build(in Input) Brief {
 			continue
 		}
 		sec := Section{Column: col.Name, Rows: make([]Row, 0, len(tasks))}
+		if in.Project == "" && role != "active" && role != "waiting" {
+			sec.More = len(tasks)
+			b.Sections = append(b.Sections, sec)
+			continue
+		}
 		for _, t := range tasks[:min(len(tasks), cmp.Or(in.PerColumn, len(tasks)))] {
 			sec.Rows = append(sec.Rows, makeRow(t, role, in))
 		}

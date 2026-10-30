@@ -135,6 +135,11 @@ func (s *Store) git() (gitx.Repo, error) {
 
 // Create creates a task in column project/column on behalf of actor.
 func (s *Store) Create(title, project, column, actor string) (Result, error) {
+	return s.CreateWithBody(title, project, column, "", actor)
+}
+
+// CreateWithBody creates a task with its body and checks the destination before writing.
+func (s *Store) CreateWithBody(title, project, column, body, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
@@ -152,14 +157,14 @@ func (s *Store) Create(title, project, column, actor string) (Result, error) {
 		if err := s.syncExternal(tx); err != nil {
 			return err
 		}
-		r, err := s.create(tx, title, project, column, actor)
+		r, err := s.create(tx, title, project, column, body, actor)
 		res = r
 		return err
 	})
 	return res, err
 }
 
-func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result, error) {
+func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (Result, error) {
 	cfg, err := config.Load(filepath.Join(s.root, tixDir, configFile))
 	if err != nil {
 		return Result{}, err
@@ -168,7 +173,11 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	if err != nil {
 		return Result{}, err
 	}
-	if err := s.checkNewEntry(cfg, column); err != nil {
+	t := &task.Task{Title: title, Project: project, Status: column}
+	if err := t.SetBody(body); err != nil {
+		return Result{}, err
+	}
+	if err := s.checkNewEntry(cfg, t); err != nil {
 		return Result{}, err
 	}
 	files, err := s.taskFiles()
@@ -187,10 +196,8 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 		}
 	}
 	id := fmt.Sprintf("T-%d", num)
-	t := &task.Task{
-		ID: id, Title: title, Project: project, Status: column, Rank: rank,
-		Created: time.Now().Truncate(time.Second),
-	}
+	t.ID, t.Rank = id, rank
+	t.Created = time.Now().Truncate(time.Second)
 	name := task.FileName(id, title)
 	path := filepath.Join(s.root, name)
 	if _, err := os.Stat(path); err == nil {
@@ -214,12 +221,14 @@ func (s *Store) create(tx *txEnv, title, project, column, actor string) (Result,
 	return res, nil
 }
 
-// checkNewEntry applies the entry check of the column to a new task, which has no criteria and no
-// waiting reason yet. The message names the path: create, fill, then move.
-func (s *Store) checkNewEntry(cfg *config.Config, column string) error {
+// checkNewEntry applies the destination entry check before the task is written.
+func (s *Store) checkNewEntry(cfg *config.Config, t *task.Task) error {
+	column := t.Status
 	role := cfg.RoleOf(column)
-	if _, err := s.enter(&task.Task{Status: column}, role, "", MoveOpts{}, ""); err == nil {
-		return nil
+	if role != roleClosed {
+		if _, err := s.enter(t, role, "", MoveOpts{}, ""); err == nil {
+			return nil
+		}
 	}
 	switch role {
 	case roleWaiting:
@@ -227,7 +236,7 @@ func (s *Store) checkNewEntry(cfg *config.Config, column string) error {
 	case roleClosed:
 		return rule("a new task cannot start closed; create it, then run: tix done <id> -m <result>")
 	}
-	return rule("a new task has no criteria; create it, add criteria with tix edit, then run: tix move <id> %s", column)
+	return rule("a new task has no criteria; pass a body with `- [ ]` lines under ## Details: tix new <title> --to %s --body-file body.md", column)
 }
 
 // Edit replaces the body; baseRev - the version the caller read.

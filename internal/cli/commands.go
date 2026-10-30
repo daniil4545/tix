@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -38,7 +39,7 @@ func wrap(id string, err error) error {
 }
 
 func (a *app) cmdNew(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"to": true, "project": true}))
+	p, err := parseArgs(args, withCommon(flagSpec{"to": true, "project": true, "body-file": true}))
 	if err != nil {
 		return err
 	}
@@ -64,12 +65,40 @@ func (a *app) cmdNew(args []string) error {
 			proj = personalProject
 		}
 	}
-	res, err := a.store.Create(title, proj, column, actor)
+	body, err := a.newBody(p.vals["body-file"])
+	if err != nil {
+		return err
+	}
+	res, err := a.store.CreateWithBody(title, proj, column, body, actor)
 	if err != nil {
 		return err
 	}
 	a.reply(p, res, "", column)
 	return nil
+}
+
+// newBody reads --body-file, "-" being stdin (as gh issue create --body-file). Stdin is never read
+// without the flag: an agent shell may hold it open with no writer, and a shell loop feeds its own lines.
+func (a *app) newBody(path string) (string, error) {
+	var data []byte
+	var err error
+	switch {
+	case path == "":
+		return "", nil
+	case path == "-" && a.env.Stdin != nil:
+		data, err = io.ReadAll(a.env.Stdin)
+	case path == "-":
+		return "", nil
+	default:
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(a.env.Cwd, path)
+		}
+		data, err = os.ReadFile(path) //nolint:gosec // the caller names its own body file
+	}
+	if err != nil {
+		return "", inputf("body file: %v", err)
+	}
+	return string(data), nil
 }
 
 // column returns the column of a new task: --to by name or role, else the inbox role column, else the first.
@@ -292,7 +321,9 @@ type listItem struct {
 }
 
 func (a *app) cmdList(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"project": true, "status": true, "json": false}))
+	p, err := parseArgs(args, withCommon(flagSpec{
+		"project": true, "status": true, "json": false, "all": false, "grep": true,
+	}))
 	if err != nil {
 		return err
 	}
@@ -318,7 +349,38 @@ func (a *app) cmdList(args []string) error {
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
 	}
-	return a.printTasks(p, a.filter(tasks, proj, p.vals["status"]))
+	// an explicit --status shows its column even when it is the closed one
+	closed, hasClosed := a.store.Config().ByRole("closed")
+	hide := hasClosed && !p.set["all"] && !p.set["status"]
+	needle := strings.ToLower(p.vals["grep"])
+	var matched []*task.Task
+	for _, t := range tasks {
+		if hide && t.Status == closed.Name {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(t.Title), needle) &&
+			!summaryContains(t.Body, needle) {
+			continue
+		}
+		matched = append(matched, t)
+	}
+	return a.printTasks(p, a.filter(matched, proj, p.vals["status"]))
+}
+
+func summaryContains(body, needle string) bool {
+	inSummary := false
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "## ") {
+			if inSummary {
+				return false
+			}
+			inSummary = line == "## Summary"
+		} else if inSummary && strings.Contains(strings.ToLower(line), needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // filter keeps the tasks of the project and column (an empty value means no filter)
