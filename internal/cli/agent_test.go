@@ -309,9 +309,10 @@ func TestCLI_Set_RulesRepeatFirstEquals(t *testing.T) {
 	b := ruleBox(t)
 	ensure(t, strings.Contains(b.rule("set", "T-3", "status=closed"), "tix move"), "set status=: want the hint `tix move`")
 	b.rule("set", "T-3", "title=")
-	r := b.ok("", "set", "T-2", "summary=a=b")
-	ensure(t, r.out == "ok T-2 summary\n", "set: %q", r.out)
-	b.noCommit("set", "T-2", "summary=a=b")
+	r := b.ok("", "set", "T-2", "abstract=a=b")
+	ensure(t, r.out == "ok T-2 abstract\n", "set: %q", r.out)
+	b.noCommit("set", "T-2", "abstract=a=b")
+	b.rule("set", "T-2", "summary=x")
 	ensure(t, strings.Contains(string(mustRead(t, b.taskFile("T-2"))), "a=b"), "the value after the first `=` is lost")
 }
 
@@ -533,4 +534,14 @@ func TestCLI_RulesFile_CreatedByWriteNeverOverwritten(t *testing.T) {
 	if got, _ := os.ReadFile(rules); string(got) != custom {
 		t.Errorf("the user's RULES.md was overwritten:\n%s", got)
 	}
+}
+
+// note over 300 characters: code 5 and a hint; comment and done -m have no limit.
+func TestCLI_Note_TooLongRefused(t *testing.T) {
+	defer guard(t)
+	b := ruleBox(t)
+	msg := b.rule("note", "T-3", strings.Repeat("ж", 301))
+	ensure(t, strings.Contains(msg, "file") && strings.Contains(msg, "path"), "note hint: %q", msg)
+	b.ok("", "note", "T-3", strings.Repeat("ж", 300))
+	b.ok("", "comment", "T-3", strings.Repeat("ж", 301))
 }

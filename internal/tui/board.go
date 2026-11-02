@@ -175,7 +175,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	for i, t := range ts {
 		out[i] = view.Row{
 			ProjectColor: colors[strings.ToLower(t.Project)],
-			ID:           t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
+			ID:           t.ID, Project: t.Project, Title: t.Title,
 			Star: t.Status == config.Blocked, Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}

@@ -83,7 +83,7 @@ func TestBuild_AllProjects_CountsOtherColumns(t *testing.T) {
 	in.Project = ""
 	b := brief.Build(in)
 	want := "project all   rules: /h/RULES.md\n" +
-		"- take: tix take; step: tix note; end: tix set summary=\n" +
+		"- take: tix take; step: tix note; end: tix done\n" +
 		"idea        1 more\nopen        2 more\nin_progress T-3 active\nblocked     T-4 waiting\nclosed      1 more\nnext T-2"
 	if got := b.Text(); got != want {
 		t.Fatalf("all projects:\n%s\nwant:\n%s", got, want)
@@ -106,12 +106,10 @@ func TestBuild_ClaimAndDetail(t *testing.T) {
 	expired.Claim = "ghost:old until 2026-10-20T11:00"
 	waiting := mk("T-4", "stuck", "blocked", 1)
 	waiting.Waiting = "need key"
-	withSummary := mk("T-5", "sum", "open", 1)
-	withSummary.Body = "## Summary\nFirst line.\nSecond.\n"
 	crit := mk("T-6", "crit", "open", 2)
 	crit.Body = "## Details\n- [x] a\n- [ ] b\n- [ ] c\n"
 
-	b := brief.Build(input(own, other, expired, waiting, withSummary, crit))
+	b := brief.Build(input(own, other, expired, waiting, crit))
 	rows := map[string]brief.Row{}
 	for _, s := range b.Sections {
 		for _, r := range s.Rows {
@@ -133,9 +131,6 @@ func TestBuild_ClaimAndDetail(t *testing.T) {
 	if d := rows["T-4"].Detail; !strings.Contains(d, "Waiting: need key") {
 		t.Errorf("Detail waiting = %q", d)
 	}
-	if d := rows["T-5"].Detail; d != "First line." {
-		t.Errorf("Detail with summary = %q, want the first line", d)
-	}
 	if d := rows["T-6"].Detail; !strings.Contains(d, "1/3") {
 		t.Errorf("Detail with criteria = %q, want 1/3", d)
 	}
@@ -149,7 +144,6 @@ func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 	for i := 1; i <= 40; i++ {
 		st := []string{"open", "in_progress", "blocked"}[i%3]
 		tk := mk(fmt.Sprintf("T-%d", i), long, st, float64(i))
-		tk.Body = "## Summary\n" + long + "\n"
 		tasks = append(tasks, tk)
 	}
 	b := brief.Build(input(tasks...))

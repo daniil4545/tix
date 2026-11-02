@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/gitx"
@@ -279,6 +280,9 @@ func (s *Store) Comment(id, text, actor string) (Result, error) {
 	})
 }
 
+// MaxNote - the longest note in characters: a long text goes to a file, the note keeps the path.
+const MaxNote = 300
+
 // Note writes an empty commit T-N: note <text>.
 func (s *Store) Note(id, text, actor string) (Result, error) {
 	actor, err := checkActor(actor)
@@ -288,6 +292,9 @@ func (s *Store) Note(id, text, actor string) (Result, error) {
 	text = strings.Join(strings.Fields(text), " ")
 	if text == "" {
 		return Result{}, errors.New("note text is empty")
+	}
+	if n := utf8.RuneCountInString(text); n > MaxNote {
+		return Result{}, rule("note is %d characters, the limit is %d; put long text in a file and keep the path in the note", n, MaxNote)
 	}
 	var res Result
 	err = s.withLock(false, func(tx *txEnv) error {

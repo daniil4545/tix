@@ -212,7 +212,7 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 	for _, l := range lines {
 		m := re.FindStringSubmatch(l)
 		if m == nil {
-			t.Fatalf("list line %q does not match the format `<column> T-N <title> | <summary>`", l)
+			t.Fatalf("list line %q does not match the format `<column> T-N <title>`", l)
 		}
 		order = append(order, m[1]+" "+m[2])
 	}
@@ -249,10 +249,9 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 func TestCLI_ListClosedAliasGrep(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
-	b.ok("", "set", "T-1", "summary=MiXeD result\nSecond line", "abstract=hidden phrase")
+	b.ok("", "set", "T-1", "abstract=hidden phrase")
 	b.ok("", "comment", "T-1", "hidden comment")
 	b.ok("", "new", "Beta", "--project", "other")
-	b.ok("", "set", "T-2", "summary=alpha result")
 	b.ok("", "new", "Closed Alpha")
 	b.ok("", "done", "T-3", "-m", "finished", "--as", "test:list")
 	cases := []struct {
@@ -260,14 +259,12 @@ func TestCLI_ListClosedAliasGrep(t *testing.T) {
 		args []string
 		want string
 	}{
-		{"default", nil, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
-		{"all", []string{"--all"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\nclosed T-3 Closed Alpha\n"},
-		{"title and summary", []string{"--grep", "ALPHA"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
-		{"summary case", []string{"--grep", "mixed"}, "idea T-1 Alpha | MiXeD result\n"},
-		{"summary second line", []string{"--grep", "SECOND"}, "idea T-1 Alpha | MiXeD result\n"},
+		{"default", nil, "idea T-1 Alpha\nidea T-2 Beta\n"},
+		{"all", []string{"--all"}, "idea T-1 Alpha\nidea T-2 Beta\nclosed T-3 Closed Alpha\n"},
+		{"title case", []string{"--grep", "ALPHA"}, "idea T-1 Alpha\n"},
 		{"literal", []string{"--grep", "A.*"}, "no tasks\n"},
 		{"excluded sections", []string{"--grep", "hidden"}, "no tasks\n"},
-		{"project", []string{"--grep", "alpha", "--project", "other"}, "idea T-2 Beta | alpha result\n"},
+		{"project", []string{"--grep", "beta", "--project", "other"}, "idea T-2 Beta\n"},
 		{"closed by status", []string{"--status", "closed"}, "closed T-3 Closed Alpha\n"},
 		{"closed explicit", []string{"--all", "--status", "closed", "--grep", "alpha"}, "closed T-3 Closed Alpha\n"},
 	}

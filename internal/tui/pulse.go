@@ -6,7 +6,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -38,11 +37,8 @@ func (m *Model) setNotes(msg notesLoaded) {
 	m.rebuild()
 }
 
-// note - the note line for the board: age and text; only for a task in in_progress.
+// note - the note line for the board: age and text of the latest note; no note - empty.
 func (m *Model) note(t *task.Task, now time.Time) string {
-	if t.Status != config.InProgress {
-		return ""
-	}
 	n, ok := m.notes[t.ID]
 	if !ok {
 		return ""

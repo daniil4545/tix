@@ -55,9 +55,6 @@ func TestParse_ValidFile_Fields(t *testing.T) {
 	if tk.Path != "testdata/valid.md" {
 		t.Errorf("Path %q", tk.Path)
 	}
-	if got := tk.Summary(); got != "First summary line." {
-		t.Errorf("Summary %q, want the first line of the summary section", got)
-	}
 }
 
 func TestParse_Broken_ErrorHasPathAndLine(t *testing.T) {

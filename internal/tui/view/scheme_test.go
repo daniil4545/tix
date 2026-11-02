@@ -72,7 +72,7 @@ func TestRenderBoard_Title_ColorByState(t *testing.T) {
 
 // A grey card without a claim and with an expired one: title, meta, pulse.
 func TestRenderBoard_IdleCard_AllLinesGrey(t *testing.T) {
-	row := view.Row{Summary: "look at it", Meta: "1/3 28.10"}
+	row := view.Row{Note: "look at it", Meta: "1/3 28.10"}
 	lines := cardLinesOf(t, row, false)
 	grey := view.TitleSGR(view.StateIdle)
 	for i, want := range []string{"T-7", "Task", "look at it", "1/3 28.10"} {

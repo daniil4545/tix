@@ -650,18 +650,20 @@ func TestSet_Rules(t *testing.T) {
 		t.Fatal("Set refusals changed the history or the file")
 	}
 
-	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}, {Name: "tags", Value: "a,b"}, {Name: "summary", Value: "x=y"}}, "x:1"); err != nil {
+	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}, {Name: "tags", Value: "a,b"}, {Name: "abstract", Value: "x=y"}}, "x:1"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 	tk := get(t, s, id)
-	if tk.Title != "New" || strings.Join(tk.Tags, ",") != "a,b" || tk.Summary() != "x=y" {
-		t.Errorf("after Set: title %q tags %v summary %q", tk.Title, tk.Tags, tk.Summary())
+	if tk.Title != "New" || strings.Join(tk.Tags, ",") != "a,b" || !strings.Contains(tk.Body, "x=y") {
+		t.Errorf("after Set: title %q tags %v body %q", tk.Title, tk.Tags, tk.Body)
 	}
 	subj := e.subject()
-	if !strings.HasPrefix(subj, id+": set ") || !strings.Contains(subj, "title") || !strings.Contains(subj, "summary") {
-		t.Errorf("subject %q, want `%s: set title tags summary`", subj, id)
+	if !strings.HasPrefix(subj, id+": set ") || !strings.Contains(subj, "title") || !strings.Contains(subj, "abstract") {
+		t.Errorf("subject %q, want `%s: set title tags abstract`", subj, id)
 	}
 	n = e.count()
+	_, err = s.Set(id, []core.Field{{Name: "summary", Value: "x"}}, "x:1")
+	wantRule(t, "summary is gone", err, "")
 	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}}, "x:1"); err != nil || e.count() != n {
 		t.Errorf("Set with the same value: err %v, commits %d, was %d", err, e.count(), n)
 	}

@@ -10,7 +10,7 @@ import (
 const (
 	colWidth   = 24
 	colGap     = 2
-	cardLines  = 5   // ID and project, title, summary, meta, empty
+	cardLines  = 5   // ID and project, title, note, meta, empty
 	boardFrame = 7   // header, line, column names, column lines, line, state, hint
 	plusMark   = "+" // the last character of a column name cell: the new task button
 )
@@ -215,7 +215,7 @@ func rowCells(row Row, selected bool) []string {
 		marker = ">"
 	}
 	title := " " + clean(row.Title)
-	summary := pulseLine(row)
+	pulse := pulseLine(row)
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected || row.Grabbed {
@@ -228,13 +228,13 @@ func rowCells(row Row, selected bool) []string {
 		return []string{
 			first,
 			sel.Render(fit(title, colWidth)),
-			sel.Render(fit(summary, colWidth)),
+			sel.Render(fit(pulse, colWidth)),
 			sel.Render(fit(" "+clean(row.Meta), colWidth)),
 			blank,
 		}
 	}
 	first := headLine(marker, row, look, colWidth)
-	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(summary, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
+	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(pulse, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
 }
 
 // star is the mark before the number of a blocked card.
@@ -257,12 +257,9 @@ func headLine(marker string, row Row, look cardLook, width int) string {
 	return look.Head.Render(id) + projectStyle(row.ProjectColor).Render(label) + strings.Repeat(" ", len(rest)-len(label))
 }
 
-// pulseLine picks the third card line: note, then summary.
+// pulseLine is the third card line: the latest note with its age, empty without a note.
 func pulseLine(row Row) string {
-	if strings.TrimSpace(row.Note) != "" {
-		return " " + clean(firstLine(strings.TrimSpace(row.Note)))
-	}
-	return " " + clean(firstLine(row.Summary))
+	return " " + clean(firstLine(strings.TrimSpace(row.Note)))
 }
 
 func firstLine(s string) string {

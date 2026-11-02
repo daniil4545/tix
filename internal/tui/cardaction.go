@@ -21,7 +21,6 @@ var cardFields = []fieldSpec{
 	{"t", "title", "title", func(t *task.Task) string { return t.Title }},
 	{"g", "tags", "tags", func(t *task.Task) string { return strings.Join(t.Tags, ",") }},
 	{"w", "waiting", "waiting", func(t *task.Task) string { return t.Waiting }},
-	{"s", "summary", "summary", func(t *task.Task) string { return section(t.Body, "Summary") }},
 	{"x", "external", "external", func(t *task.Task) string { return t.External }},
 }
 

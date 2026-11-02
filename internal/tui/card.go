@@ -173,7 +173,7 @@ func (m *Model) cardView() view.Card {
 	}
 	c.Title, c.Column = t.Title, t.Status
 	c.Fields = fields(t, time.Now(), m.card.changed())
-	c.Abstract, c.Summary = section(t.Body, "Abstract"), section(t.Body, "Summary")
+	c.Abstract = section(t.Body, "Abstract")
 	c.Details = section(t.Body, "Details")
 	if crit := t.Criteria(); len(crit) > 0 {
 		c.Checks = checks(crit)

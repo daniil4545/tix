@@ -10,7 +10,7 @@ import (
 )
 
 // bodyTemplate - the body of a new task in the editor: the template from RULES.md, section "Ticket template".
-const bodyTemplate = "## Abstract\n\n## Summary\n\n## Details\n\n- [ ] \n"
+const bodyTemplate = "## Abstract\n\n## Details\n\n- [ ] \n"
 
 // defaultProject - the project of a new task if there is no filter and no launch project.
 const defaultProject = "personal"

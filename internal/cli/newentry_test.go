@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const newBody = "## Summary\n\nOne call\n\n## Details\n\n- [ ] Works\n"
+const newBody = "## Abstract\n\nOne call\n\n## Details\n\n- [ ] Works\n"
 
 func showBody(t *testing.T, b *box, id string) (body, status string) {
 	t.Helper()

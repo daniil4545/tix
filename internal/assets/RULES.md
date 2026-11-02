@@ -7,9 +7,8 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 1. `tix take T-12`: the task moves to in_progress and you hold it for 3 hours.
 2. Work. Log progress with `tix note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
 3. `tix check T-12 1 2`: mark finished criteria.
-4. `tix set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
-5. `tix comment T-12 "text"`: comments are only appended.
-6. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
+4. `tix comment T-12 "text"`: comments are only appended.
+5. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
 When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open.
 
@@ -17,7 +16,7 @@ When a session ends without closing, write the comment `Done / Decided / Waiting
 
 The human reads the task instead of your session. Keep it short and current.
 
-- Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
+- Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command. A note is up to 300 characters; longer text goes to a file and the note keeps its path. The board shows the latest note.
 - New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
 - A task should fit one session. It grew past that: create tasks for the rest, then `tix done T-12 --force -m "rest in T-15, T-16"`.
 
@@ -38,9 +37,9 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Into blocked: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving blocked clears the field. Blocked drops your hold; the board marks it with `*` for the human.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
 - `tix new "title" --to open --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to open` is refused; `--to` blocked or closed is refused: create the task, then `tix move` or `tix done`.
-- `tix list` hides closed tasks; `--all` or `--status closed` shows them, `--grep TEXT` matches title and summary.
+- `tix list` hides closed tasks; `--all` or `--status closed` shows them, `--grep TEXT` matches the title.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
-- `set` takes: title, project, waiting, tags, external, abstract, summary.
+- `set` takes: title, project, waiting, tags, external, abstract.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
 - Exit codes: 2 held by another, 3 conflict, 4 not found, 5 rule refusal, 6 bad input.
 
@@ -60,10 +59,6 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Abstract
 
 What the task is and why.
-
-## Summary
-
-What is next, in the first line.
 
 ## Details
 

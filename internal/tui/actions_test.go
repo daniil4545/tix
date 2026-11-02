@@ -22,7 +22,7 @@ import (
 
 const (
 	acHint     = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
-	acFieldRow = "t title  g tags  w waiting  s summary  x external"
+	acFieldRow = "t title  g tags  w waiting  x external"
 	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
 )
 
@@ -612,7 +612,7 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 
 func acCheckTemplate(t *testing.T, seen string) {
 	t.Helper()
-	for _, part := range []string{"## Abstract", "## Summary", "## Details", "- [ ] "} {
+	for _, part := range []string{"## Abstract", "## Details", "- [ ] "} {
 		if !strings.Contains(seen, part) {
 			t.Errorf("body template in the editor without %q:\n%s", part, seen)
 		}
@@ -736,35 +736,6 @@ func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
 	e.tm.Type("X")
 	e.key("enter")
 	e.until("title AlphaX", func() bool { return e.acTask("T-1").Title == "AlphaX" })
-}
-
-// A multi-line field is not edited through the line; a one-line one is.
-func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
-	t.Run("several lines", func(t *testing.T) {
-		e := mvNewEnv(t, "")
-		e.create("Alpha", "idea")
-		e.summary("T-1", "first line\nsecond line")
-		e.start(140, 30)
-		e.screenHas("Alpha")
-		e.acOpenCard("Alpha")
-		before := e.acCommitCount()
-		e.key("f", "s")
-		e.screenHas("T-1: summary has several lines, use e")
-		e.settle()
-		if strings.Contains(e.text(), "summary:") || e.acCommitCount() != before {
-			t.Errorf("the line opened or wrote, commits %d -> %d", before, e.acCommitCount())
-		}
-	})
-	t.Run("one line", func(t *testing.T) {
-		e := mvNewEnv(t, "")
-		e.create("Alpha", "idea")
-		e.summary("T-1", "only line")
-		e.start(140, 30)
-		e.screenHas("Alpha")
-		e.acOpenCard("Alpha")
-		e.key("f", "s")
-		e.screenHas("summary:")
-	})
 }
 
 // Field choice - by a click on a pair; a click on the card fields line opens the same choice.

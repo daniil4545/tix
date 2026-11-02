@@ -37,7 +37,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | CLI `tix`: 14 commands (2.2) | yes | | |
 | TUI `ascii`: board, card with history, `$EDITOR`, move, order, filter, live refresh, mouse and touchpad, key hint line (2.3) | yes | | |
 | Pulse on the board row: last note with its age (2.3) | yes | priority field, filters by date and priority | |
-| Work log in the task (`RULES.md`): a note for each decision, question and stage change; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
+| Work log in the task (`RULES.md`): a note for each decision, question and stage change; a note is up to 300 characters, long text goes to a file; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
 | Five fixed statuses; fields `waiting`, `claim`, `tags` | yes | custom fields, theme choice, theme `cards` | |
 | Board colors: green title with a live claim, grey card without a live claim, project colors (2.3) | yes | reply to the agent from the card | |
@@ -141,11 +141,11 @@ flowchart TD
 | Command | What it does |
 |---|---|
 | `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters |
-| `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches title and `## Summary`, case-insensitive; alias `ls`; the whole task, with `rev` |
+| `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, case-insensitive; alias `ls`; the whole task, with `rev` |
 | `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open` |
 | `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
-| `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary`; any other field is refused |
+| `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`; a failed epic write is a Warning; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
@@ -170,9 +170,9 @@ flowchart TD
      card grey. The project
      label has its own muted color from a palette of 6 by a hash of the lower-cased name. The scheme is
      one table in `internal/tui/view/scheme.go`;
-   - board: number, project, title, first line of the summary, criteria, `claim`;
+   - board: number, project, title, the latest note with its age, criteria, `claim`;
      a status outside the five is the column `?`; a card in `blocked` has `*` before its number;
-   - card: title and column, fields in one line, abstract, summary, details,
+   - card: title and column, fields in one line, abstract, details,
      history: moves, closes, takes, releases, notes and comments are always visible; two or more
      edits in a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
      `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
@@ -185,7 +185,7 @@ flowchart TD
      `[ ]`/`[x]` box of a criterion toggles it, the wheel scrolls the list, the selection stays.
      The body window is sticky: it stands while the cursor (keys, click, `enter`, history load,
      resize) is visible, else shifts by the least lines to the edge; on the first selectable line
-     the abstract and summary show from the top if they fit. The wheel only moves the window.
+     the abstract shows from the top if they fit. The wheel only moves the window.
      The hints of the board and the card are rows of buttons.
 4. Critical rules:
    - `$EDITOR` edits a copy of the body in `.tix/tmp/`; unchanged - cancel; changed - `edit` with
@@ -244,7 +244,7 @@ and `[[column]]` leaves `config.toml`, in one commit. A status in no column stay
 
 | Scenario | Steps | Result |
 |---|---|---|
-| Happy path | The hook gave `ctx`; the agent runs `take`, `note`, `check`, `set summary=`, `comment`, `done -m` | The task is in `closed`, the history of steps is in git |
+| Happy path | The hook gave `ctx`; the agent runs `take`, `note`, `check`, `comment`, `done -m` | The task is in `closed`, the history of steps is in git |
 | Idea | The user in the home session: "write down an idea" | A task in `idea`, project `personal` |
 | Two agents, different tasks | They write at the same time | The lock queues the writes |
 | Foreign claim | A second session runs `take` | Refusal with the owner and the deadline; `--steal` takes over, the takeover is in history |
@@ -270,7 +270,7 @@ See section 8.
 
 - Task: frontmatter `id`, `title`, `project`, `status`, `rank` (fractional), `created`,
   `external`, `waiting`, `claim`, `tags`. Body (D23, D25): `## Abstract`,
-  `## Summary` (the first line is on the board), `## Details` (criteria as checkboxes, links),
+  `## Details` (criteria as checkboxes, links),
   `## Comments` (append only).
 - `claim`: `actor until ISO`; only `take` checks it; the owner's writes to the file extend it by 3 h
   (`note` does not); it is dropped by `take --release`, `done`, a move out of `active`, expiry (D36, D39).

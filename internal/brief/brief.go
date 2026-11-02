@@ -18,7 +18,7 @@ import (
 const maxLine = 160
 
 // howto - the second line of ctx: the three commands of the agent cycle.
-const howto = "- take: tix take; step: tix note; end: tix set summary="
+const howto = "- take: tix take; step: tix note; end: tix done"
 
 // ctxStatuses - the statuses a project ctx lists, in display order.
 var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}
@@ -32,7 +32,7 @@ type Input struct {
 	PerColumn, Limit          int
 }
 
-// Row - a task line. Detail: summary, "Waiting: ...", "k/n"; own claim - "@you".
+// Row - a task line. Detail: "Waiting: ...", "k/n"; own claim - "@you".
 type Row struct {
 	ID     string `json:"id"`
 	Title  string `json:"title"`
@@ -161,7 +161,7 @@ func makeRow(t *task.Task, status string, in Input) Row {
 	return r
 }
 
-// detail: for blocked - the reason, for open - checked/total, otherwise the summary.
+// detail: for blocked - the reason, for open - checked/total, otherwise empty.
 func detail(t *task.Task, status string) string {
 	switch status {
 	case config.Blocked:
@@ -179,7 +179,7 @@ func detail(t *task.Task, status string) string {
 			return fmt.Sprintf("%d/%d", done, len(cs))
 		}
 	}
-	return oneLine(t.Summary())
+	return ""
 }
 
 // oneLine collapses spaces and line breaks into one space.

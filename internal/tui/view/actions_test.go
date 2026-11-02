@@ -78,7 +78,7 @@ func TestRenderCard_ActionRowLastStatusAbove(t *testing.T) {
 		for _, h := range []int{24, 10} {
 			t.Run(fmt.Sprintf("status=%q/h=%d", status, h), func(t *testing.T) {
 				c := view.Card{ID: "T-1", Title: "Alpha", Column: "in_progress", W: 120, H: h, Status: status,
-					Summary: "s1\ns2\ns3\ns4\ns5\ns6\ns7\ns8\ns9\ns10\ns11\ns12"}
+					Details: "s1\ns2\ns3\ns4\ns5\ns6\ns7\ns8\ns9\ns10\ns11\ns12"}
 				out := view.RenderCard(c)
 				fits(t, "card", out, 120, h)
 				ls := strings.Split(plain(out), "\n")

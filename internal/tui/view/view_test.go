@@ -49,7 +49,7 @@ func bigBoard(rowsPerCol int) view.Board {
 			n++
 			c.Rows = append(c.Rows, view.Row{
 				ID: fmt.Sprintf("T-%d", n), Project: "proj", Title: fmt.Sprintf("Заголовок %d 日本語 long long title", n),
-				Summary: "первая строка сводки, довольно длинная", Meta: "1/3 до 28.10 @claude",
+				Note: "2h первая строка заметки, довольно длинная", Meta: "1/3 до 28.10 @claude",
 			})
 		}
 		b.Cols = append(b.Cols, c)
@@ -72,7 +72,7 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 40, Cols: []view.Col{
 		{Name: "idea"},
 		{Name: "open", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3 28.10"},
 		}},
 		{Name: "in_progress"}, {Name: "blocked"}, {Name: "closed"},
 	}}
@@ -152,7 +152,7 @@ func card() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
 	return view.Card{
 		ID: "T-12", Title: "Report on calls", Column: "in_progress", Fields: "alpha   #a   @claude",
-		Abstract: "abstract text", Summary: "summary text", Details: "details text", Checks: "1/3",
+		Abstract: "abstract text", Details: "details text", Checks: "1/3",
 		History: []history.Entry{
 			{At: at, Actor: "claude", Op: "new"},
 			{At: at.Add(time.Hour), Actor: "claude", Op: "set", Text: "3 edits", Folded: []history.Entry{
@@ -165,7 +165,7 @@ func card() view.Card {
 
 func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 	out := plain(view.RenderCard(card()))
-	for _, want := range []string{"T-12", "Report on calls", "in_progress", "alpha", "abstract text", "summary text",
+	for _, want := range []string{"T-12", "Report on calls", "in_progress", "alpha", "abstract text",
 		"details text", "claude", "new", "3 edits", "daniil", "use a dash for empty values"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("card without %q:\n%s", want, out)
@@ -179,7 +179,7 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 		for _, n := range []int{0, 5, 200} {
 			c := card()
 			c.W, c.H = sz.w, sz.h
-			c.Title, c.Abstract, c.Summary, c.Details, c.Fields = long, long, long, long+"\n"+long, long
+			c.Title, c.Abstract, c.Details, c.Fields = long, long, long+"\n"+long, long
 			c.Status = long
 			c.History = nil
 			for i := 0; i < n; i++ {
@@ -229,7 +229,7 @@ func TestFitScroll_CursorInside_KeepsWindow_LeftEdgeFits(t *testing.T) {
 	}
 }
 
-// On the first selectable line the card shows its preamble (abstract, summary) from the top while
+// On the first selectable line the card shows its preamble (abstract) from the top while
 // the preamble and the line fit; when they do not fit, the cursor line stays visible.
 func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
 	c := card()
@@ -299,11 +299,11 @@ func TestGolden_BoardAndCard(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 open > in_progress", Cols: []view.Col{
 		{Name: "idea"},
 		{Name: "open", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
-			{ID: "T-9", Project: "alpha", Title: "Write docs", Summary: "which db?", Live: true},
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3 28.10"},
+			{ID: "T-9", Project: "alpha", Title: "Write docs", Note: "1h which db?", Live: true},
 		}},
 		{Name: "in_progress", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
-		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice", Star: true}}},
+		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Note: "2d waiting for: invoice", Star: true}}},
 		{Name: "closed"},
 	}}
 	golden(t, "board", view.RenderBoard(b))
