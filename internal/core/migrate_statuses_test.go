@@ -35,7 +35,7 @@ func oldStore(t *testing.T, e *env, config string, statuses ...string) []string 
 		}
 	}
 	e.git("add", "-A")
-	e.git("commit", "-q", "-m", "old store")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "old store")
 	return ids
 }
 
@@ -88,7 +88,7 @@ func TestOpen_MigratesDefaultNamesWithoutColumns(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.git("add", "-A")
-	e.git("commit", "-q", "-m", "no config")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "no config")
 	n := e.count()
 
 	e.open(5 * 1e9)
@@ -132,7 +132,7 @@ func TestOpen_MigratesOnlyTheStatusLine(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.git("add", "-A")
-	e.git("commit", "-q", "-m", "odd file")
+	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "odd file")
 	e.open(5 * 1e9)
 	got, err := os.ReadFile(e.file(ids[0]))
 	if err != nil {
