@@ -7,7 +7,7 @@ import "strings"
 type actionBtn struct{ text, key string }
 
 var cardActions = []actionBtn{
-	{"e edit", "e"}, {"c comment", "c"}, {"f field", "f"},
+	{"e edit", "e"}, {"c comment", "c"},
 	{"del delete", "del"}, {"j k history", ""}, {"esc back", "esc"},
 }
 
@@ -41,7 +41,6 @@ type CardHitKind int
 const (
 	CardNone      CardHitKind = iota // empty space, body headings
 	CardHistory                      // a history entry line; the zero-based entry number is in CardHit.Index
-	CardFields                       // the fields line
 	CardAction                       // an actions-line button; the key is in CardHit.Key
 	CardCriterion                    // a criterion line (the text); the zero-based number is in CardHit.Index
 	CardBox                          // the `[ ]`/`[x]` box of a criterion; the number is in CardHit.Index
@@ -75,9 +74,6 @@ func HitCard(c Card, x, y int) CardHit {
 	}
 	if hit, ok := lay.critHit(y, x); ok {
 		return hit
-	}
-	if y == lay.fieldsRow {
-		return CardHit{Kind: CardFields}
 	}
 	return CardHit{}
 }

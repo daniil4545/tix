@@ -14,4 +14,4 @@ history
                                 use a dash for empty values
 ----------------------------------------------------------------------------------------------------
 
-e edit  c comment  f field  del delete  j k history  esc back
+e edit  c comment  del delete  j k history  esc back

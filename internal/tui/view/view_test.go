@@ -309,3 +309,25 @@ func TestGolden_BoardAndCard(t *testing.T) {
 	golden(t, "board", view.RenderBoard(b))
 	golden(t, "card", view.RenderCard(card()))
 }
+
+func TestRenderBoard_EpicRow_LabelAndProgressAfterNumber(t *testing.T) {
+	b := view.Board{Total: 1, W: 60, H: 14, Cols: []view.Col{
+		{Name: "open", Rows: []view.Row{{ID: "T-322", Epic: "EPIC 1/8", Title: "tix"}}},
+	}}
+	b.Col = 5 // no selection on the epic
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, "T-322 EPIC 1/8") {
+		t.Errorf("epic label missing:\n%s", out)
+	}
+	b.Col = 0
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, ">T-322 EPIC 1/8") {
+		t.Errorf("selected epic label missing:\n%s", out)
+	}
+}
+
+func TestRenderCard_HistoryHint_RightOfHeading(t *testing.T) {
+	c := card()
+	c.HistoryHint = "last 5 of 23, enter: all"
+	if out := plain(view.RenderCard(c)); !strings.Contains(out, "history") || !strings.Contains(out, "last 5 of 23, enter: all") {
+		t.Errorf("history hint missing:\n%s", out)
+	}
+}

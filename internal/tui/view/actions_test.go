@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	boardHintFull = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
-	cardRowFull   = "e edit  c comment  f field  del delete  j k history  esc back"
+	boardHintFull = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
+	cardRowFull   = "e edit  c comment  del delete  j k history  esc back"
 )
 
 func lastNonEmpty(lines []string) (int, string) {

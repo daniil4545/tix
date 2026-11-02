@@ -21,9 +21,8 @@ import (
 )
 
 const (
-	acHint     = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
-	acFieldRow = "t title  g tags  w waiting  x external"
-	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
+	acHint   = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
+	acMoving = "moving T-1: arrows move, space drop, esc cancel"
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -710,50 +709,6 @@ func acAsked(t *testing.T) *mvEnv {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Scenario 6: fields
-// ---------------------------------------------------------------------------------------------
-
-// acFieldCard: the Alpha card (project projx) is open.
-func acFieldCard(t *testing.T) *mvEnv {
-	t.Helper()
-	e := mvNewEnv(t, "")
-	if _, err := e.store.Create("Alpha", "projx", "idea", "seed"); err != nil {
-		t.Fatal(err)
-	}
-	e.start(140, 30)
-	e.screenHas("Alpha")
-	e.acOpenCard("Alpha")
-	return e
-}
-
-// The field line opens with the current value (an edit appends to it).
-func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
-	e := acFieldCard(t)
-	e.key("f")
-	e.screenHas(acFieldRow)
-	e.key("t")
-	e.screenHas("title:")
-	e.tm.Type("X")
-	e.key("enter")
-	e.until("title AlphaX", func() bool { return e.acTask("T-1").Title == "AlphaX" })
-}
-
-// Field choice - by a click on a pair; a click on the card fields line opens the same choice.
-func TestField_SelectByClick_AndFieldsRowOpensSelect(t *testing.T) {
-	e := acFieldCard(t)
-	e.screenHas("projx")
-	e.settle()
-	_, y := e.acFind("projx") // fields line: project first
-	e.click(2, y)
-	e.screenHas(acFieldRow)
-	e.acClickOn("g tags")
-	e.screenHas("tags:")
-	e.tm.Type("x")
-	e.key("enter")
-	e.until("tags written", func() bool { return strings.Join(e.acTask("T-1").Tags, ",") == "x" })
-}
-
-// ---------------------------------------------------------------------------------------------
 // Scenario 7: the card actions line
 // ---------------------------------------------------------------------------------------------
 
@@ -771,7 +726,7 @@ func (e *mvEnv) acLastLine() int {
 // The actions line is the last card line and is visible with a non-empty status line;
 // the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
-	const row = "e edit  c comment  f field  del delete  j k history  esc back"
+	const row = "e edit  c comment  del delete  j k history  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int
@@ -810,7 +765,6 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"c comment", "comment:"},
-		{"f field", acFieldRow},
 		{"esc back", "arrows select"},
 	}
 	for _, c := range cases {

@@ -556,6 +556,8 @@ func TestMouse_CardScreen_WheelScrolls_SelectionStays_ClickSelects(t *testing.T)
 	e.opened("Alpha")
 	e.screenHas("remark-")
 	e.settle()
+	e.key("enter") // the card shows the last entries: enter on one shows all
+	e.settle()
 	// markerAbove: the ">" marker on the entry whose remark text is under it.
 	markerAbove := func(remark string) bool {
 		y := e.yOf(remark)

@@ -93,8 +93,6 @@ func (m *Model) cardKey(k string) tea.Cmd {
 		return m.siblingCard(-1)
 	case "right", "l":
 		return m.siblingCard(1)
-	case "f":
-		return m.startField()
 	case "delete", "backspace":
 		return m.startDelete()
 	case "?":

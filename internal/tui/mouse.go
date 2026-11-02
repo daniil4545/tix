@@ -27,14 +27,7 @@ type click struct {
 // a left click goes to inputClick, the rest is ignored; during a grab the mouse is ignored.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	mouse := msg.Mouse()
-	if m.input != nil {
-		m.press = nil
-		if _, ok := msg.(tea.MouseClickMsg); ok && mouse.Button == tea.MouseLeft {
-			return m.inputClick(mouse.X, mouse.Y)
-		}
-		return nil
-	}
-	if m.grab != nil || m.help {
+	if m.input != nil || m.grab != nil || m.help {
 		m.press = nil
 		return nil
 	}
