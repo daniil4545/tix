@@ -54,7 +54,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a note.
 - You may create tasks, move them from idea to open, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to idea with project `personal`.
-- A task needs the user? Move it to blocked with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The human answers with a comment and moves it back.
+- A task needs the user? Move it to blocked with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The human answers with a comment and moves it back. A blocked task is released, so the answer is not pushed to you: after `take`, read the task with `tix show`.
 
 ## Ticket template
 
