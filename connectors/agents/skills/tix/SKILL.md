@@ -15,7 +15,7 @@ Run `tix ctx` first (a hook may have run it). It lists `in_progress`, `blocked`,
 3. `tix check T-12 1 2` - tick done criteria by number.
 4. `tix done T-12 -m "result"` - close once all criteria are checked.
 
-Remaining or new scope is a new task: `tix new`; a task with the same result gets an addition instead. A task is one or two sessions. Write tickets in the user's language, the title clear without context. An epic is a task tagged `epic` with a todo list `- [ ] T-N`; `tix` ticks the lines, closing the epic with open lines is refused. Frozen work stays in idea with tag `frozen`, never done. Need the human: `tix move T-12 blocked -m "what you need"` and a note with the details. The human edits the title and fields with `tix set`. A lost edit: `git -C ~/tasks log -- T-12.md`.
+Remaining or new scope is a new task: `tix new`; a task with the same result gets an addition instead. A task is one or two sessions. Write tickets in the user's language, the title clear without context. An epic is a task tagged `epic` with a todo list `- [ ] T-N`; `tix` ticks the lines, closing the epic with open lines is refused. Frozen work stays in idea with tag `frozen`, never closed. Need the human: `tix move T-12 blocked -m "what you need"` and a note with the details. The human edits the title and fields with `tix set`. A lost edit: `git -C ~/tasks log -- T-12.md`.
 
 ## Rules
 

@@ -19,7 +19,7 @@ one git commit that names the agent session, and the model, that made it. A
 change always leads back to the conversation behind it. Your comments on a task
 reach the agent that holds it.
 
-Status: version 0.1, the file format may still change before 1.0.
+Status: pre-1.0, the file format may still change before 1.0.
 
 ## Features
 
