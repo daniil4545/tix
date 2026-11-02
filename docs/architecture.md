@@ -1,6 +1,6 @@
 # tix architecture
 
-tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex) write through the `tix` CLI, and the human edits files in Obsidian. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
+tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex) write through the `tix` CLI: tix is their memory between sessions. The human watches the TUI dashboard, edits the body there or files in Obsidian, and changes the title and fields with `tix set`. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
 
 How to read: the overall picture is section 1, the flow of work is sections 2 and 3, where to edit is section 9. Setup: `README.md`.
 
@@ -117,7 +117,7 @@ sequenceDiagram
   K->>G: commit with Actor and Code
   K->>F: release lock
   K-->>C: Result
-  C-->>A: ok T-12 todo > doing @claude until 20:40
+  C-->>A: ok T-12 open > in_progress @claude until 20:40
 ```
 
 | Step | Module | What it does |

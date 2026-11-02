@@ -27,7 +27,8 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 
 - Goal (D56): memory of agents between sessions and projects. Tasks are md files in `~/tasks` under git,
   and each edit leads to the agent session that made it. One folder for all projects and personal ideas;
-  the agent manages tasks through `tix`, the human looks at the board and the cards.
+  the agent manages tasks through `tix` and logs a short note on every movement (a decision, a commit, a PR); the human looks at the dashboard (the board and the cards), writes comments and edits through the TUI or `tix set`.
+- Restore: `~/tasks` is a git repository, `git -C ~/tasks log -- T-12.md` and `git revert` bring a task back; there is no backup command.
 - Principle (D44): a reference standard of speed, lightness and reliability. Each part passes the question "what
   breaks if it is removed"; the answer "nothing" means the part is removed. Numbers - section 7.
 

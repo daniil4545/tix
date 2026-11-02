@@ -10,9 +10,14 @@ All notable changes to this project are documented here. The format follows
 
 - The board card shows the latest note with its age in any column. A note is limited to 300 characters; a longer one is refused with code 5.
 - Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with roles. A store with `[[column]]` is migrated when it is opened: task statuses are renamed by the role of their column and `[[column]]` is removed from `config.toml`, in one commit. The old words (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) are refused with exit code 6 and a hint. `tix ctx` no longer prints the `columns:` line; the board marks `blocked` cards with `*`.
+- Epics: the todo list lives only in the epic (a task has no `Epic:` line). `tix done` ticks the task line, a move out of closed clears it, `tix check` refuses a task line. Closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`.
+- The TUI is a dashboard: the card line shows the title, the latest note with its age, the criteria and the claim; an epic shows `EPIC` with its ticked/all count; the hint line holds the common keys, the rest is under `?`; the card history opens with the last 5 rows. The title and fields are changed with `tix set`, the field editor `f` is gone.
+- `tix show` is faster: the epic lookup reads task files in parallel chunks.
 
 ### Removed
 
+- The `due` field: `tix set due=` is refused, the board drops the red date, the due sort and the `o` key.
+- The `ask` field and the `backup` command: the human is reached by a note and a move to `blocked`.
 - The `summary` field: `tix set summary=` is refused, `list`, `ctx` and the card no longer show it, and `--grep` matches the title only. An old `## Summary` section stays in the body as text.
 - The jump into an agent session: the `g` key and `g session` button in the TUI, and the Warp tab address the CLI cached after agent writes (`WARP_FOCUS_URL`, `TIX_FOCUS_DIR`).
 
