@@ -23,7 +23,6 @@ type fieldSpec struct {
 
 var cardFields = []fieldSpec{
 	{"t", "title", "title", func(t *task.Task) string { return t.Title }},
-	{"d", "due", "due", func(t *task.Task) string { return t.Due }},
 	{"g", "tags", "tags", func(t *task.Task) string { return strings.Join(t.Tags, ",") }},
 	{"a", "ask", "ask", func(t *task.Task) string { return t.Ask }},
 	{"w", "waiting", "waiting", func(t *task.Task) string { return t.Waiting }},

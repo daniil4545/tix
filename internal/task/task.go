@@ -31,7 +31,6 @@ type Task struct {
 	External string    `json:"external"`
 	Waiting  string    `json:"waiting"`
 	Claim    string    `json:"claim"`
-	Due      string    `json:"due"`
 	Ask      string    `json:"ask"`
 	Rank     float64   `json:"rank"`
 	Created  time.Time `json:"created"`
@@ -78,13 +77,12 @@ const (
 var (
 	reMarker  = regexp.MustCompile(`^<!-- c: (\S+) \| (.*) -->[ \t\r]*$`)
 	reYAMLErr = regexp.MustCompile(`line (\d+): `)
-	reDate    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 	timeLayouts = []string{CreatedLayout, commentLayout, time.RFC3339, "2006-01-02"}
 
 	// frontmatter key order of a new task
 	fieldOrder = []string{"id", "title", "project", "status", "rank", "created",
-		"external", "waiting", "claim", "due", "tags", "ask"}
+		"external", "waiting", "claim", "tags", "ask"}
 	requiredFields = map[string]bool{"id": true, "title": true, "project": true,
 		"status": true, "rank": true, "created": true}
 )
@@ -211,7 +209,7 @@ func (t *Task) parseFields(path, fm string) error {
 // setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
-	case "id", "title", "project", "status", "external", "waiting", "claim", "due", "ask":
+	case "id", "title", "project", "status", "external", "waiting", "claim", "ask":
 		if val.Kind != yaml.ScalarNode {
 			return errors.New("string required")
 		}
@@ -260,8 +258,6 @@ func (t *Task) stringField(key string) *string {
 		return &t.Waiting
 	case "claim":
 		return &t.Claim
-	case "due":
-		return &t.Due
 	default:
 		return &t.Ask
 	}
@@ -467,9 +463,6 @@ func (t *Task) fieldNode(key string) *yaml.Node {
 	s := *t.stringField(key)
 	if s == "" {
 		return nil
-	}
-	if key == "due" && reDate.MatchString(s) {
-		return plainNode(s)
 	}
 	return stringNode(s)
 }

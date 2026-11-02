@@ -22,7 +22,7 @@ type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
 	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"}, {"a", "answer"},
-	{"e", "edit"}, {"c", "comment"}, {"o", "order"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
+	{"e", "edit"}, {"c", "comment"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
 // hintSpan - the place of a pair in the hint line: characters [x0, x1).
@@ -145,9 +145,6 @@ func boardHeader(b Board, first, last int) string {
 	}
 	left := accentStyle.Render("tix") + dimStyle.Render("  project: ") +
 		accentStyle.Render(truncate(clean(project), colWidth)) + dimStyle.Render(fmt.Sprintf("  %d %s", b.Total, noun))
-	if b.ByDue {
-		left += dimStyle.Render("  order: due")
-	}
 	var hidden []string
 	if first > 0 {
 		hidden = append(hidden, fmt.Sprintf("<%d", first))
@@ -252,7 +249,7 @@ func rowCells(row Row, selected bool) []string {
 	if look.Sign != "" {
 		first = headLine(marker, row, look, colWidth-2) + " " + signStyle.Render(look.Sign)
 	}
-	return []string{first, look.Title.Render(fit(title, colWidth)), third.Render(fit(summary, colWidth)), metaLine(row, look.Rest), blank}
+	return []string{first, look.Title.Render(fit(title, colWidth)), third.Render(fit(summary, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
 }
 
 // headLine draws the ID line: the ID in the state style, the project in its palette color.
@@ -265,17 +262,6 @@ func headLine(marker string, row Row, look cardLook, width int) string {
 	}
 	label := strings.TrimRight(rest, " ")
 	return look.Head.Render(id) + projectStyle(row.ProjectColor).Render(label) + strings.Repeat(" ", len(rest)-len(label))
-}
-
-// metaLine draws the meta line; the Overdue part of it gets the overdue style.
-func metaLine(row Row, rest lipgloss.Style) string {
-	text := fit(" "+clean(row.Meta), colWidth)
-	if row.Overdue != "" {
-		if before, after, ok := strings.Cut(text, clean(row.Overdue)); ok {
-			return rest.Render(before) + overdueStyle.Render(clean(row.Overdue)) + rest.Render(after)
-		}
-	}
-	return rest.Render(text)
 }
 
 // pulseLine picks the third card line and its style: ask (askText, the kind style on a card that

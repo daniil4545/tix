@@ -9,7 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// The board color scheme. Change the scheme here: card states, signs, colors, the overdue style
+// The board color scheme. Change the scheme here: card states, signs, colors
 // and the project palette. The board code only looks these values up.
 
 // cardState - what a card tells the human: an agent works, the agent waits for you, or nobody is on it.
@@ -41,9 +41,6 @@ var (
 
 	// askKindColors - the sign color by ask kind: blue and red are the terminal ANSI colors.
 	askKindColors = map[string]string{"decide": "#E9CF6A", "review": "4", "access": "1"}
-
-	// overdueStyle - the due part of the meta line when the date is in the past.
-	overdueStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8606A"))
 
 	// projectPalette - muted colors of the project label; the name picks one by hash.
 	projectPalette = [6]lipgloss.Style{

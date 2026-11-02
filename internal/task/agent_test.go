@@ -101,13 +101,13 @@ func TestCheck_MarksOnlyNamed_RepeatUnchanged_BadNumberRejected(t *testing.T) {
 func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	defer guard(t)
 	tk := load(t, "valid.md")
-	for _, f := range [][2]string{{"title", "New title"}, {"waiting", "need key"}, {"due", "2026-11-01"},
+	for _, f := range [][2]string{{"title", "New title"}, {"waiting", "need key"},
 		{"tags", "a,b,c"}, {"ask", "which db?"}, {"external", "JIRA-7"}} {
 		if err := tk.SetField(f[0], f[1]); err != nil {
 			t.Fatalf("SetField(%s): %v", f[0], err)
 		}
 	}
-	if tk.Title != "New title" || tk.Waiting != "need key" || tk.Due != "2026-11-01" || tk.Ask != "which db?" ||
+	if tk.Title != "New title" || tk.Waiting != "need key" || tk.Ask != "which db?" ||
 		tk.External != "JIRA-7" || !reflect.DeepEqual(tk.Tags, []string{"a", "b", "c"}) {
 		t.Errorf("fields after SetField: %+v", tk)
 	}
@@ -121,7 +121,7 @@ func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	}
 	for _, name := range []string{"status", "id", "claim", "rank", "nosuch"} {
 		if err := tk.SetField(name, "x"); err == nil {
-			t.Errorf("SetField(%q) accepted: name outside title waiting due tags ask external", name)
+			t.Errorf("SetField(%q) accepted: name outside title waiting tags ask external", name)
 		}
 	}
 }
@@ -163,5 +163,20 @@ func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
 	}
 	if after := string(tk.Render()); after != before {
 		t.Error("a refused SetSection changed the task")
+	}
+}
+
+// A file written by an older version keeps its due line as a foreign field.
+func TestParse_OldDueLine_KeptOnRender(t *testing.T) {
+	defer guard(t)
+	tk := parseText(t, strings.Replace(fm, "---\nid", "---\ndue: 2026-11-01\nid", 1)+"\nbody\n")
+	if err := tk.SetField("title", "Y"); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "due: 2026-11-01") {
+		t.Errorf("due line lost:\n%s", out)
+	}
+	if err := tk.SetField("due", "2026-11-02"); err == nil {
+		t.Error("SetField(due) accepted")
 	}
 }

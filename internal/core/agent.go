@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	ident "github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/config"
@@ -69,7 +68,7 @@ const (
 	roleWaiting = "waiting"
 	roleClosed  = "closed"
 
-	allowedFields = "title project waiting due tags ask external abstract summary"
+	allowedFields = "title project waiting tags ask external abstract summary"
 )
 
 // loadConfig reads config.toml again: under the lock the config could have been changed by hand.
@@ -399,10 +398,6 @@ func setField(t *task.Task, role string, f Field) error {
 	case "waiting":
 		if strings.TrimSpace(f.Value) == "" && role == roleWaiting {
 			return rule("waiting needs a reason: use -m, or leave with tix move")
-		}
-	case "due":
-		if _, err := time.Parse("2006-01-02", f.Value); err != nil && f.Value != "" {
-			return rule("due must be 2006-01-02")
 		}
 	case "ask":
 		if _, _, known := task.ParseAsk(strings.TrimSpace(f.Value)); !known { // the board reads it trimmed

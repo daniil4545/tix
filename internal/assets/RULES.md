@@ -41,7 +41,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - `tix list` hides closed tasks; `--all` or `--status <closed column>` shows them, `--grep TEXT` matches title and summary.
 - A column without a role is not yours.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
-- `set` takes: title, project, waiting, due, tags, ask, external, abstract, summary.
+- `set` takes: title, project, waiting, tags, ask, external, abstract, summary.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
 - Exit codes: 2 held by another, 3 conflict, 4 not found, 5 rule refusal, 6 bad input.
 

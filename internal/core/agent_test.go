@@ -660,7 +660,7 @@ func TestSet_Rules(t *testing.T) {
 		_, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1")
 		wantRule(t, "Set "+name, err, "tix move")
 	}
-	for _, name := range []string{"id", "created", "nosuch"} {
+	for _, name := range []string{"id", "created", "nosuch", "due"} {
 		if _, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1"); err == nil {
 			t.Errorf("Set %s accepted", name)
 		}

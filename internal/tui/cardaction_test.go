@@ -39,7 +39,7 @@ func caXY(t *testing.T, m *Model, sub string) (x, y int) {
 	return 0, 0
 }
 
-func (e *mvEnv) caTask(id string) (ask, due, status string, comments []string) {
+func (e *mvEnv) caTask(id string) (ask, tags, status string, comments []string) {
 	e.t.Helper()
 	tk, _, err := e.store.Get(id)
 	if err != nil {
@@ -48,7 +48,7 @@ func (e *mvEnv) caTask(id string) (ask, due, status string, comments []string) {
 	for _, c := range tk.Comments {
 		comments = append(comments, c.Text)
 	}
-	return tk.Ask, tk.Due, tk.Status, comments
+	return tk.Ask, strings.Join(tk.Tags, ","), tk.Status, comments
 }
 
 func caStatus(m *Model) string { s, _ := m.statusText(); return s }
@@ -119,38 +119,32 @@ func caOpenCard(m *Model) {
 	}
 }
 
-func TestField_SetClearUnchangedRefused(t *testing.T) {
+func TestField_SetClearUnchanged(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("job", "todo")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
 
-	typeKeys(m, "fd2026-11-01")
+	typeKeys(m, "fga,b")
 	caEnter(m)
-	if _, due, _, _ := e.caTask(id); due != "2026-11-01" {
-		t.Fatalf("due = %q, expected 2026-11-01", due)
+	if _, tags, _, _ := e.caTask(id); tags != "a,b" {
+		t.Fatalf("tags = %q, expected a,b", tags)
 	}
 
 	caReload(m)
 	n := e.commits()
-	typeKeys(m, "fd") // the initial value in the line is the current one
+	typeKeys(m, "fg") // the initial value in the line is the current one
 	caEnter(m)
 	if e.commits() != n {
 		t.Error("the same value was written again")
 	}
 
-	typeKeys(m, "fd")
+	typeKeys(m, "fg")
 	feed(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	caEnter(m)
-	if _, due, _, _ := e.caTask(id); due != "" {
-		t.Errorf("an empty value did not clear the due: %q", due)
-	}
-
-	typeKeys(m, "fdnot-a-date")
-	caEnter(m)
-	if got := caStatus(m); !strings.Contains(got, "due") {
-		t.Errorf("core refusal not visible: status %q", got)
+	if _, tags, _, _ := e.caTask(id); tags != "" {
+		t.Errorf("an empty value did not clear the tags: %q", tags)
 	}
 }
 
@@ -187,10 +181,10 @@ func TestCardClick_AskRowFieldsRowAndButtons(t *testing.T) {
 		t.Fatalf("click on the fields line: input %+v", m.input)
 	}
 	// A click on a choice pair equals its key.
-	x, y = caXY(t, m, "d due")
+	x, y = caXY(t, m, "g tags")
 	leftClick(m, x, y)
-	if m.input == nil || m.input.label != "due:" {
-		t.Fatalf("click on d due: input %+v", m.input)
+	if m.input == nil || m.input.label != "tags:" {
+		t.Fatalf("click on g tags: input %+v", m.input)
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 

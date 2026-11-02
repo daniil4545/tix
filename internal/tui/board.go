@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
@@ -66,7 +64,7 @@ func (m *Model) rebuild() {
 	if len(byCol[unknownColumn]) > 0 {
 		names = append(names, unknownColumn)
 	}
-	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row, ByDue: m.board.ByDue,
+	b := view.Board{Project: m.project, Total: total, Col: m.board.Col, Row: m.board.Row,
 		FirstCol: m.board.FirstCol, RowTop: m.board.RowTop}
 	m.colTasks = m.colTasks[:0]
 	target := ""
@@ -76,9 +74,9 @@ func (m *Model) rebuild() {
 	}
 	for _, name := range names {
 		ts := byCol[name]
-		sortTasks(ts, m.board.ByDue)
+		sortTasks(ts)
 		if m.grab != nil {
-			ts = m.grab.place(name, ts, target, m.board.ByDue)
+			ts = m.grab.place(name, ts, target)
 		}
 		m.colTasks = append(m.colTasks, ts)
 		b.Cols = append(b.Cols, view.Col{Name: name, Rows: m.rows(ts)})
@@ -97,45 +95,14 @@ func (m *Model) fitWindow() {
 	m.board.FirstCol, m.board.RowTop = view.FitWindow(m.layout())
 }
 
-// sortTasks sorts a column by rank; byDue: first tasks with a due date by date, then without due by rank.
-func sortTasks(ts []*task.Task, byDue bool) {
+// sortTasks sorts a column by rank, then by id.
+func sortTasks(ts []*task.Task) {
 	sort.SliceStable(ts, func(i, j int) bool {
-		if byDue {
-			di, iok := dueDate(ts[i])
-			dj, jok := dueDate(ts[j])
-			if iok != jok {
-				return iok
-			}
-			if iok && !di.Equal(dj) {
-				return di.Before(dj)
-			}
-		}
 		if ts[i].Rank != ts[j].Rank {
 			return ts[i].Rank < ts[j].Rank
 		}
 		return core.IDNum(ts[i].ID) < core.IDNum(ts[j].ID)
 	})
-}
-
-// dueDate - the task due date as a date; an empty or unreadable due is false.
-func dueDate(t *task.Task) (time.Time, bool) {
-	d, err := time.Parse(time.DateOnly, t.Due)
-	return d, err == nil
-}
-
-// toggleOrder switches the order of all columns: by rank or by due.
-func (m *Model) toggleOrder() {
-	m.board.ByDue = !m.board.ByDue
-	m.rebuild()
-}
-
-// reorderKey - J, K: in due order the manual order is off.
-func (m *Model) reorderKey(dir int) tea.Cmd {
-	if m.board.ByDue {
-		m.setStatus("order by due: J K off", false)
-		return nil
-	}
-	return m.reorder(dir)
 }
 
 // restoreSelection looks for selID in the columns; if absent, the position stays, clamped to the bounds.
@@ -211,35 +178,23 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 		out[i] = view.Row{
 			ProjectColor: colors[strings.ToLower(t.Project)],
 			ID:           t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Live: m.liveClaim(t), Overdue: overdue(t, now), Note: m.note(t, now),
+			Meta: meta(t, now), Ask: strings.TrimSpace(t.Ask), Live: m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}
 	return out
 }
 
-// meta - the short board line: criteria, due, live claim.
+// meta - the short board line: criteria, live claim.
 func meta(t *task.Task, now time.Time) string {
 	var parts []string
 	if crit := t.Criteria(); len(crit) > 0 {
 		parts = append(parts, checks(crit))
 	}
-	if t.Due != "" {
-		parts = append(parts, "due "+dueText(t.Due))
-	}
 	if c, ok := t.ClaimInfo(); ok && c.Until.After(now) {
 		parts = append(parts, "@"+actor.Short(c.Actor))
 	}
 	return strings.Join(parts, " ")
-}
-
-// overdue - the due text of the meta line when the date is before the model-clock day; else empty.
-func overdue(t *task.Task, now time.Time) string {
-	d, err := time.Parse(time.DateOnly, t.Due)
-	if err != nil || d.Format(time.DateOnly) >= now.Format(time.DateOnly) {
-		return ""
-	}
-	return "due " + dueText(t.Due)
 }
 
 func checks(crit []task.Criterion) string {
@@ -250,15 +205,6 @@ func checks(crit []task.Criterion) string {
 		}
 	}
 	return fmt.Sprintf("%d/%d", done, len(crit))
-}
-
-// dueText: a date like 2026-10-28 is printed as 28.10, anything else as is.
-func dueText(due string) string {
-	d, err := time.Parse(time.DateOnly, due)
-	if err != nil {
-		return due
-	}
-	return d.Format("02.01")
 }
 
 // cycleProject switches the filter in a circle: all, then projects alphabetically.
