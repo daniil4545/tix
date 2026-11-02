@@ -11,10 +11,6 @@ import (
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// cardActs - the state of card actions. open starts the jump into a session; nil - the system
-// `open` command (tests substitute their own).
-type cardActs struct{ open func(url string) error }
-
 // fieldSpec - a field that `f` edits: the choice key, the core name and the value reader.
 type fieldSpec struct {
 	key, word, name string
@@ -174,8 +170,6 @@ func (m *Model) cardButton(k string) tea.Cmd {
 	switch k {
 	case "f":
 		return m.startField()
-	case "g":
-		return m.startFocus()
 	case "del":
 		return m.startDelete()
 	case "esc":

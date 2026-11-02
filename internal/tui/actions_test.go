@@ -7,7 +7,6 @@ package tui
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,14 +17,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
 	acHint     = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
 	acFieldRow = "t title  g tags  w waiting  s summary  x external"
-	acFocusURL = "warp://session/0123456789abcdef0123456789abcdef"
 	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
 )
 
@@ -207,25 +204,6 @@ func (s *acEditor) calls() int {
 
 func (s *acEditor) seen(n int) string {
 	b, _ := os.ReadFile(filepath.Join(s.dir, "seen."+strconv.Itoa(n))) //nolint:gosec // test path
-	return string(b)
-}
-
-// acFakeOpen replaces the open command with a script in PATH; returns the call log path (one line per call).
-func acFakeOpen(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	log := filepath.Join(dir, "open.log")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TIX_AC_OPEN_LOG\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "open"), []byte(script), 0o700); err != nil { //nolint:gosec // test stub
-		t.Fatal(err)
-	}
-	t.Setenv("TIX_AC_OPEN_LOG", log)
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return log
-}
-
-func acRead(path string) string {
-	b, _ := os.ReadFile(path) //nolint:gosec // test path
 	return string(b)
 }
 
@@ -821,7 +799,7 @@ func (e *mvEnv) acLastLine() int {
 // The actions line is the last card line and is visible with a non-empty status line;
 // the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
-	const row = "e edit  c comment  f field  g session  del delete  j k history  esc back"
+	const row = "e edit  c comment  f field  del delete  j k history  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int
@@ -841,14 +819,15 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 			e.start(tc.w, tc.h)
 			e.screenHas("Alpha")
 			e.acOpenCard("Alpha")
-			e.key("g")
-			e.screenHas("T-1: no session to open")
+			acStubEditor(t, "")
+			e.key("e")
+			e.screenHas("T-1 no changes")
 			e.settle()
 			last := e.acLastLine()
 			if last < 1 || strings.TrimSpace(e.lines()[last]) != row {
 				t.Fatalf("last card line %q, expected %q:\n%s", e.lines()[max(last, 0)], row, e.text())
 			}
-			if !strings.Contains(e.lines()[last-1], "T-1: no session to open") {
+			if !strings.Contains(e.lines()[last-1], "T-1 no changes") {
 				t.Errorf("above the actions line %q, expected the status line", e.lines()[last-1])
 			}
 		})
@@ -860,7 +839,6 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"c comment", "comment:"},
 		{"f field", acFieldRow},
-		{"g session", "T-1: no session to open"},
 		{"esc back", "arrows select"},
 	}
 	for _, c := range cases {
@@ -958,9 +936,7 @@ func TestCriteria_Click_TogglesCriterion(t *testing.T) {
 	e.until("check removed", func() bool { return e.acDone() == "false false" })
 }
 
-// ---------------------------------------------------------------------------------------------
-// Scenarios 8 (delete, help, m M removed) and 9 (the jump into an agent session, the TUI side)
-// ---------------------------------------------------------------------------------------------
+// Scenario 8: delete, help, m M removed.
 
 // m and M are removed - no reason line, no write, on the board and in the card.
 func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
@@ -1078,91 +1054,6 @@ func TestHelp_QuestionMark_OpensAndCloses(t *testing.T) {
 		e.acClickOn("? help")
 		e.until("help instead of the board", func() bool { return e.text() != board && !strings.Contains(e.text(), "arrows select") })
 	})
-}
-
-type acFocusCase struct {
-	name     string
-	claim    bool
-	fileName string // "" - no file
-	content  string
-	wantOpen bool
-	ways     []string
-}
-
-// acFocusEnv prepares task Alpha with a claim (if claim) and a focus file in directory dir.
-func acFocusEnv(t *testing.T, c acFocusCase, dir string) *mvEnv {
-	t.Helper()
-	steps := 0 // how many columns right from idea to the task
-	e := mvNewEnv(t, "")
-	e.create("Alpha", "idea")
-	e.acCriterion("T-1")
-	if c.claim {
-		// Take takes a task from ready and moves it to active: the cursor column is found by status
-		if _, err := e.store.Move("T-1", "todo", core.MoveOpts{}, "seed"); err != nil {
-			t.Fatalf("Move: %v", err)
-		}
-		if _, err := e.store.Take("T-1", core.Take, "claude:c1"); err != nil {
-			t.Fatalf("Take: %v", err)
-		}
-		steps = slices.Index(mvDefaultCols, e.acTask("T-1").Status)
-	}
-	if c.fileName != "" {
-		if err := os.WriteFile(filepath.Join(dir, c.fileName), []byte(c.content+"\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	e.start(140, 30)
-	e.screenHas("Alpha")
-	e.key(strings.Repeat("l", steps))
-	e.settle()
-	return e
-}
-
-// g - only with a live claim and the owner focus file that passed the form check; otherwise
-// "no session to open". The open call is a substituted command in PATH.
-func TestFocus_G_OpensOnlyForLiveClaimWithValidFile(t *testing.T) {
-	all := []string{"board", "card", "button"}
-	cases := []acFocusCase{
-		{"claim and owner file", true, "claude-c1", acFocusURL, true, all},
-		{"no claim", false, "claude-c1", acFocusURL, false, all},
-		{"claim exists, no file", true, "", "", false, all},
-		{"another agent file", true, "codex-x9", acFocusURL, false, []string{"board"}},
-		{"value of the wrong form", true, "claude-c1", "warp://session/XYZ", false, []string{"board"}},
-		{"other scheme", true, "claude-c1", "https://example.com/s", false, []string{"board"}},
-	}
-	for _, c := range cases {
-		for _, way := range c.ways {
-			t.Run(c.name+"/"+way, func(t *testing.T) {
-				dir := t.TempDir()
-				t.Setenv("TIX_FOCUS_DIR", dir)
-				log := acFakeOpen(t)
-				e := acFocusEnv(t, c, dir)
-				e.acPressG(way)
-				if c.wantOpen {
-					e.until("open called with the address", func() bool { return strings.TrimSpace(acRead(log)) == acFocusURL })
-					return
-				}
-				e.screenHas("T-1: no session to open")
-				e.settle()
-				if got := acRead(log); got != "" {
-					t.Errorf("open called without the right: %q", got)
-				}
-			})
-		}
-	}
-}
-
-// acPressG: g on the board, g in the card or the "g session" button of the card.
-func (e *mvEnv) acPressG(way string) {
-	e.t.Helper()
-	if way != "board" {
-		e.acOpenCard("Alpha")
-	}
-	if way == "button" {
-		e.acClickOn("g session")
-		return
-	}
-	e.key("g")
 }
 
 // The launch project (a folder name) filters the board whatever its case: tasks are stored in lower case.

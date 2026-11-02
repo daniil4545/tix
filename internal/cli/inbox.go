@@ -107,7 +107,7 @@ func (a *app) deliverInbox() {
 		return
 	}
 	who := actor.HookActor(a.env.Getenv, in.SessionID, in.TurnID != "")
-	file := actor.FocusFile(who)
+	file := actor.MarksFile(who)
 	dir := actor.InboxDir(a.env.Getenv)
 	if file == "" || dir == "" {
 		a.log.Warn("inbox: no actor or marks dir", "op", "inbox", "session", in.SessionID)

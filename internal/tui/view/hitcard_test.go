@@ -104,15 +104,15 @@ func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 	if got := view.HitCard(c, x, y); got.Kind != view.CardAction {
 		t.Fatalf("button c comment: %+v", got)
 	}
-	c.W = 20 // the actions line is cut: g session does not fit whole
+	c.W = 20 // the actions line is cut: f field does not fit whole
 	last := strings.Count(view.RenderCard(c), "\n")
 	clickable := 0
 	for x := 0; x < c.W; x++ {
 		if got := view.HitCard(c, x, last); got.Kind == view.CardAction {
 			clickable++
 		}
-		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "g" {
-			t.Errorf("the cut button g is clickable at column %d", x)
+		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "f" {
+			t.Errorf("the cut button f is clickable at column %d", x)
 		}
 	}
 	if clickable == 0 {

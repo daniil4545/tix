@@ -87,8 +87,7 @@ type Model struct {
 	showing bool // the card is open
 	help    bool // the help screen is open
 	input   *prompt
-	acts    cardActs // card actions: field choice
-	grab    *grab    // a card grab on the board; nil outside a grab
+	grab    *grab // a card grab on the board; nil outside a grab
 
 	notes map[string]gitx.Note // the latest task notes for the pulse; nil until git answers
 	now   func() time.Time     // the model clock: meta, pulse, double click

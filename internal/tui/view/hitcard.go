@@ -7,7 +7,7 @@ import "strings"
 type actionBtn struct{ text, key string }
 
 var cardActions = []actionBtn{
-	{"e edit", "e"}, {"c comment", "c"}, {"f field", "f"}, {"g session", "g"},
+	{"e edit", "e"}, {"c comment", "c"}, {"f field", "f"},
 	{"del delete", "del"}, {"j k history", ""}, {"esc back", "esc"},
 }
 

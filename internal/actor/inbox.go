@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -27,6 +28,34 @@ func InboxDir(getenv func(string) string) string {
 		return ""
 	}
 	return filepath.Join(cache, "tix", "inbox")
+}
+
+// maxMarksName - the limit on marks file name length.
+const maxMarksName = 120
+
+// MarksFile - the agent marks file name in the inbox directory: "claude:8f3a" - "claude-8f3a".
+// Empty for a human and an unknown identity: they have no inbox.
+func MarksFile(name string) string {
+	if name == "" || name == Unknown || name == "human" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r == ':':
+			b.WriteByte('-')
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '_', r == '-':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	out := b.String()
+	if len(out) > maxMarksName {
+		out = out[:maxMarksName]
+	}
+	// A name made of dots must not point to a directory.
+	return strings.TrimLeft(out, ".")
 }
 
 // HookActor - the agent identity in a hook: the hook input session_id with the agent prefix, otherwise the
@@ -60,7 +89,7 @@ func HookActor(getenv func(string) string, sessionID string, codex bool) string 
 // ReadMarks reads the agent marks from file name in directory dir. No file or unreadable - ok=false:
 // there are no marks, they are set again.
 func ReadMarks(dir, name string) (marks Marks, ok bool) {
-	data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir comes from the user cache, name passed FocusFile
+	data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // dir comes from the user cache, name passed MarksFile
 	if err != nil {
 		return Marks{}, false
 	}
@@ -104,7 +133,7 @@ func LockMarks(dir, name string) (unlock func(), err error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("inbox dir: %w", err)
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "."+name+".lock"), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // dir comes from the user cache, name passed FocusFile
+	f, err := os.OpenFile(filepath.Join(dir, "."+name+".lock"), os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // dir comes from the user cache, name passed MarksFile
 	if err != nil {
 		return nil, fmt.Errorf("inbox lock: %w", err)
 	}

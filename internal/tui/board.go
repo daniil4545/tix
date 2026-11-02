@@ -185,6 +185,12 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	return out
 }
 
+// liveClaim reports whether the task has a claim that is not expired by the model clock.
+func (m *Model) liveClaim(t *task.Task) bool {
+	c, ok := t.ClaimInfo()
+	return ok && c.Until.After(m.now())
+}
+
 // meta - the short board line: criteria, live claim.
 func meta(t *task.Task, now time.Time) string {
 	var parts []string

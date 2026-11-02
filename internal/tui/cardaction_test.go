@@ -1,21 +1,16 @@
 package tui
 
-// Card actions and the jump into a session.
+// Card actions.
 // The model is driven directly through Update, without a terminal.
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/daniil4545/tix/internal/core"
 )
 
 var cardANSI = regexp.MustCompile(`\x1b\[[0-9;:?]*[ -/]*[@-~]`)
@@ -137,60 +132,6 @@ func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 	leftClick(m, x, y)
 	if m.showing {
 		t.Error("click on esc back did not close the card")
-	}
-}
-
-func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
-	var opened []string
-
-	const good = "warp://session/0123456789abcdef0123456789abcdef"
-	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	m.acts.open = func(url string) error { opened = append(opened, url); return nil }
-
-	typeKeys(m, "g")
-	if got := caStatus(m); got != id+": no session to open" || len(opened) != 0 {
-		t.Fatalf("without a claim: status %q, open %v", got, opened)
-	}
-
-	if _, err := e.store.Take(id, core.Take, "claude:abcd1234"); err != nil {
-		t.Fatal(err)
-	}
-	caReload(m)
-	typeKeys(m, "g")
-	if len(opened) != 0 {
-		t.Fatalf("claim exists, no focus file, but open was called: %v", opened)
-	}
-
-	dir := t.TempDir()
-	t.Setenv("TIX_FOCUS_DIR", dir)
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	for _, bad := range []string{"-a Calculator\n", good + "\nextra\n", "warp://session/ZZ\n", ""} {
-		if err := os.WriteFile(filepath.Join(dir, "claude-abcd1234"), []byte(bad), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		typeKeys(m, "g")
-		if len(opened) != 0 {
-			t.Fatalf("file %q passed the check, open %v", bad, opened)
-		}
-	}
-
-	if err := os.WriteFile(filepath.Join(dir, "claude-abcd1234"), []byte(good+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	typeKeys(m, "g")
-	if len(opened) != 1 || opened[0] != good {
-		t.Fatalf("open called with %v, expected [%s]", opened, good)
-	}
-	caOpenCard(m)
-	x, y := caXY(t, m, "g session")
-	leftClick(m, x, y)
-	if len(opened) != 2 {
-		t.Errorf("button g session did not open a session: %v", opened)
 	}
 }
 
@@ -608,28 +549,5 @@ func TestDelete_SecondDeleteOrBackspace_Cancels(t *testing.T) {
 		if _, _, err := e.store.Get(id); err != nil || m.input != nil {
 			t.Errorf("%v with an open question: err=%v input=%v; expected a cancel without deletion", second, err, m.input)
 		}
-	}
-}
-
-func TestFocus_G_ExpiredClaim_NoSession(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
-	if _, err := e.store.Take(id, core.Take, "claude:abcd1234"); err != nil {
-		t.Fatal(err)
-	}
-	dir := t.TempDir()
-	t.Setenv("TIX_FOCUS_DIR", dir)
-	url := "warp://session/0123456789abcdef0123456789abcdef"
-	if err := os.WriteFile(filepath.Join(dir, "claude-abcd1234"), []byte(url+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	var opened []string
-	m.acts.open = func(u string) error { opened = append(opened, u); return nil }
-	m.now = func() time.Time { return time.Now().Add(10000 * time.Hour) }
-	typeKeys(m, "g")
-	if got := caStatus(m); got != id+": no session to open" || len(opened) != 0 {
-		t.Errorf("expired claim: status %q, open %v", got, opened)
 	}
 }
