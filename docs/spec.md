@@ -1,7 +1,7 @@
 # Spec: tix, an assistant with a task tracker
 
 Status: agreed 2026-10-20, reviews 1-3 passed (history in git)
-Canons: `docs/research/landscape.md`, mockup `docs/mockup/ui.html`, after the MVP `docs/specs/integrations.md`
+Canons: `docs/research/landscape.md`, after the MVP `docs/specs/integrations.md`
 
 Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decisions.md`). The mark
 "proposal" means a technical decision of the agent that the user may cancel. The agent writes all the code.
@@ -136,7 +136,7 @@ flowchart TD
 
 1. Purpose: the agent interface with the minimum of tokens.
 2. Input and output: a command; a one-line reply; `--json` only on `ctx`, `list`, `show`; `tix <command> --help` prints its usage line.
-3. Commands (proposal, sample - the "agent" tab of the mockup):
+3. Commands (proposal, sample):
 
 | Command | What it does |
 |---|---|
@@ -164,29 +164,72 @@ flowchart TD
 
 1. Purpose: the human screen, first of all for viewing.
 2. Input and output: keys; one operation queue in the background, the screen is not blocked by the lock.
-3. How it works (mockup):
+3. How it works:
    - ASCII, lines made of hyphens; colors: main, muted, accent, orange - error. Color carries life:
      a live claim - title green; no live claim (none, expired, released, any column) - the whole
-     card grey. The project
-     label has its own muted color from a palette of 6 by a hash of the lower-cased name. The scheme is
-     one table in `internal/tui/view/scheme.go`;
-   - board: number, project, title, the latest note with its age, criteria, `claim`;
-     a status outside the five is the column `?`; a card in `blocked` has `*` before its number;
-   - card: title and column, fields in one line, abstract, details,
-     history: moves, closes, takes, releases, notes and comments are always visible; two or more
-     edits in a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
-     `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
+     card grey. The project label has its own muted color from a palette of 6 by a hash of the
+     lower-cased name. The scheme is one table in `internal/tui/view/scheme.go`;
+   - the board shows the chosen project in the header (`p` switches it, `all` is every project);
+     with a project chosen the card lines do not repeat its name:
+
+```
+tix  project: tracker  9 tasks
+--------------------------------------------------------------------------------------------------------------
+idea 2              open 3              in_progress 2       blocked 1           closed 1
+------------------  ------------------  ------------------  ------------------  ------------------
+ T-399               T-322 EPIC 1/8      >T-324              *T-164
+ TUI dashboard       tix 0.7.0 ...        Drop the ask field  Five statuses
+ 2h sketch ready  1d PR #28 merged    5m 3f2a1c removed ...  1h migration ...
+                     T-326                3/5 @agent          waiting: copy of ~/tasks
+                     Docs and release
+                     -
+--------------------------------------------------------------------------------------------------------------
+arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit
+```
+
+   - a card line: the number (`EPIC` and ticked/all todo lines after it for an epic; `*` before it
+     for `blocked`), the title, the latest note with its age (2h, 1d), the criteria and the `claim`.
+     The latest note comes from the window of the last 300 notes of the whole store
+     (`noteLimit`, `gitx/history.go`); a task older than the window has an empty line;
+     a status outside the five is the column `?`;
+   - the hint line holds the common keys only, the rest is under `?`;
+   - the title and the fields (tags, project, external) are changed with `tix set`; `e` in the TUI edits the body;
+   - the card: title and status, one fields line, abstract, details with the criteria, history:
+
+```
+T-324  Drop the ask field                                                   [in_progress]
+tracker   3/5   @agent
+----------------------------------------------------------------------------------------------
+abstract
+  Drop the ask field and the backup command ...
+
+details                                                                                3/5
+  [x] S1 set ask= refuses it as an unknown field
+  [ ] S2 ...
+
+history                                                          last 5 of 23, enter: all
+> 02.11 14:10  agent    note     3f2a1c removed ask from the core
+  02.11 14:40  agent    note     PR #29 opened
+  02.11 15:02  daniil   comment  keep reading the old ask line
+----------------------------------------------------------------------------------------------
+e edit  c comment  del delete  j k history  left right task  esc back
+```
+
+   - history: the card opens with the last 5 rows, `enter` on an entry shows all and back.
+     Moves, closes, takes, releases, notes and comments are always visible; two or more edits in
+     a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
+     `enter` on it expands it; `external` is a separate author (D60), its edits fold only with each other;
    - the human main path without the CLI, by keys and mouse (D66):
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
-     `n` and `+` new task (a status with an entry check gets it in `idea`), `g` agent session, `e`, `c`, `p` project,
+     `n` and `+` new task (a status with an entry check gets it in `idea`), `e`, `c`, `p` project,
      Delete with `y/n`, `?` help, `q`; card - up-down arrows over criteria and history
-     (`enter` checks an item or unfolds an entry), left-right the neighbor task, `f` field,
-     `esc`. The mouse in the card: a click on a criterion or a history line selects it, the
-     `[ ]`/`[x]` box of a criterion toggles it, the wheel scrolls the list, the selection stays.
-     The body window is sticky: it stands while the cursor (keys, click, `enter`, history load,
-     resize) is visible, else shifts by the least lines to the edge; on the first selectable line
-     the abstract shows from the top if they fit. The wheel only moves the window.
-     The hints of the board and the card are rows of buttons.
+     (`enter` checks a criterion, unfolds a series of edits or switches the history between the
+     last rows and all), left-right the neighbor task, `esc`. The mouse in the card: a click on a
+     criterion or a history line selects it, the `[ ]`/`[x]` box of a criterion toggles it, the
+     wheel scrolls the list, the selection stays. The body window is sticky: it stands while the
+     cursor (keys, click, `enter`, history load, resize) is visible, else shifts by the least lines
+     to the edge; on the first selectable line the abstract shows from the top if they fit. The
+     wheel only moves the window. The hints of the board and the card are rows of buttons.
 4. Critical rules:
    - `$EDITOR` edits a copy of the body in `.tix/tmp/`; unchanged - cancel; changed - `edit` with
      the base that was opened before the editor; conflict - the editor again with markers, the base is the version against
@@ -332,7 +375,7 @@ There is no customer brief; the requirements are the decisions D1-D62, the tasks
 
 ## 11. Text samples
 
-Screens and CLI output - the mockup `docs/mockup/ui.html`. `RULES.md` and the task template are the first task.
+The screens are in 2.3. `RULES.md` and the task template are the first task.
 
 ## 12. Decisions and questions
 

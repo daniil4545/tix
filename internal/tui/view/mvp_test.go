@@ -13,7 +13,7 @@ import (
 
 const (
 	selBg    = "48;2;127;209;195" // #7FD1C3, highlight of the selected line
-	hintHead = "arrows select  space grab  enter open"
+	hintHead = "arrows select  enter open  space grab"
 )
 
 // frameLines draws the board and cuts the frame into lines (text without color).

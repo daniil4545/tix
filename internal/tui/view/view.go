@@ -15,10 +15,11 @@ import (
 type Row struct {
 	ID, Project, Title, Meta string
 	Note                     string
-	Live                     bool // the task has a live claim; without it the card is grey
-	Star                     bool // the task is blocked: a human looks at it, "*" before the number
-	Grabbed                  bool // the card is grabbed: highlight and the "=" marker instead of ">"
-	ProjectColor             int  // the project label slot in the palette, from ProjectColors
+	Epic                     string // "EPIC 1/8" for an epic: the label and the ticked/all progress of its todo lines
+	Live                     bool   // the task has a live claim; without it the card is grey
+	Star                     bool   // the task is blocked: a human looks at it, "*" before the number
+	Grabbed                  bool   // the card is grabbed: highlight and the "=" marker instead of ">"
+	ProjectColor             int    // the project label slot in the palette, from ProjectColors
 }
 
 // UnknownColumn - the column name for tasks with a status that is not one of the five.
@@ -51,7 +52,8 @@ type Card struct {
 	ID, Title, Column, Fields, Abstract, Details, Checks string
 	History                                              []history.Entry
 	Cursor, Scroll, W, H                                 int
-	CritAt                                               []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
+	HistoryHint                                          string // right of the history heading: "last 5 of 23, enter: all"
+	CritAt                                               []int  // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
 	Status                                               string
 	IsErr                                                bool
 }

@@ -2,70 +2,15 @@ package tui
 
 import (
 	"errors"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/daniil4545/tix/internal/core"
-	"github.com/daniil4545/tix/internal/task"
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
-// fieldSpec - a field that `f` edits: the choice key, the core name and the value reader.
-type fieldSpec struct {
-	key, word, name string
-	value           func(*task.Task) string
-}
-
-var cardFields = []fieldSpec{
-	{"t", "title", "title", func(t *task.Task) string { return t.Title }},
-	{"g", "tags", "tags", func(t *task.Task) string { return strings.Join(t.Tags, ",") }},
-	{"w", "waiting", "waiting", func(t *task.Task) string { return t.Waiting }},
-	{"x", "external", "external", func(t *task.Task) string { return t.External }},
-}
-
-// startField opens the field choice by one key; then a line with the field value.
-func (m *Model) startField() tea.Cmd {
-	t := m.current()
-	if t == nil {
-		return nil
-	}
-	id := t.ID
-	opts := make([]pickOpt, len(cardFields))
-	for i, f := range cardFields {
-		opts[i] = pickOpt{key: f.key, word: f.word, run: func() tea.Cmd { return m.editField(id, f) }}
-	}
-	m.choose("field:", opts)
-	return nil
-}
-
-// editField asks for the new field value and writes it through Set. Empty clears the field, the same
-// value is not written, a core refusal goes to the status line.
-func (m *Model) editField(id string, f fieldSpec) tea.Cmd {
-	t := m.byID(id)
-	if t == nil {
-		m.setStatus(id+" removed", true)
-		return nil
-	}
-	cur := f.value(t)
-	if strings.Contains(cur, "\n") {
-		m.setStatus(id+": "+f.name+" has several lines, use e", false)
-		return nil
-	}
-	m.askWith(f.word+":", cur, true, func(text string) tea.Cmd {
-		if text == cur {
-			m.setStatus(id+": no change", false)
-			return nil
-		}
-		return m.submit(id, f.name, nil, func() (core.Result, error) {
-			return m.d.Store.Set(id, []core.Field{{Name: f.name, Value: text}}, m.d.Actor)
-		})
-	})
-	return nil
-}
-
 // cardClick handles a click on the open card: a line selects (a criterion, a history entry), the box
-// of a criterion toggles it, the fields line and the buttons of the actions line run.
+// of a criterion toggles it, the buttons of the actions line run.
 func (m *Model) cardClick(x, y int) tea.Cmd {
 	hit := view.HitCard(m.cardView(), x, y)
 	switch hit.Kind {
@@ -79,9 +24,6 @@ func (m *Model) cardClick(x, y int) tea.Cmd {
 	case view.CardCriterion:
 		m.setStatus("", false)
 		m.selectCardLine(hit.Index)
-	case view.CardFields:
-		m.setStatus("", false)
-		return m.startField()
 	case view.CardAction:
 		m.setStatus("", false)
 		return m.cardButton(hit.Key)
@@ -117,13 +59,15 @@ func (m *Model) startDelete() tea.Cmd {
 	return nil
 }
 
-// cardEnter - enter in a card: on a criterion line it toggles the mark, on a history entry
-// it expands the series of edits.
+// cardEnter - enter in a card: on a criterion line it toggles the mark, on a series of edits it
+// expands it, on any other history entry it switches between the last entries and all history.
 func (m *Model) cardEnter() tea.Cmd {
 	if m.card.cursor < m.card.nCrit {
 		return m.toggleCriterion(m.card.cursor)
 	}
-	m.card.toggle()
+	if !m.card.toggle() {
+		m.card.toggleAll()
+	}
 	m.fitScroll()
 	return nil
 }
@@ -167,8 +111,6 @@ func (m *Model) toggleCriterion(idx int) tea.Cmd {
 // cardButton - a press of an actions-line button: same as the key.
 func (m *Model) cardButton(k string) tea.Cmd {
 	switch k {
-	case "f":
-		return m.startField()
 	case "del":
 		return m.startDelete()
 	case "esc":

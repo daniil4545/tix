@@ -49,7 +49,7 @@ func bigBoard(rowsPerCol int) view.Board {
 			n++
 			c.Rows = append(c.Rows, view.Row{
 				ID: fmt.Sprintf("T-%d", n), Project: "proj", Title: fmt.Sprintf("Заголовок %d 日本語 long long title", n),
-				Note: "2h первая строка заметки, довольно длинная", Meta: "1/3 до 28.10 @claude",
+				Note: "2h первая строка заметки, довольно длинная", Meta: "1/3 @claude",
 			})
 		}
 		b.Cols = append(b.Cols, c)
@@ -72,7 +72,7 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 40, Cols: []view.Col{
 		{Name: "idea"},
 		{Name: "open", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3 28.10"},
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3"},
 		}},
 		{Name: "in_progress"}, {Name: "blocked"}, {Name: "closed"},
 	}}
@@ -82,7 +82,7 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 			t.Errorf("board without column %q:\n%s", want, out)
 		}
 	}
-	for _, want := range []string{"T-7", "alpha", "Fix login", "see notes", "1/3 28.10"} {
+	for _, want := range []string{"T-7", "alpha", "Fix login", "see notes", "1/3"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("board without %q:\n%s", want, out)
 		}
@@ -299,7 +299,7 @@ func TestGolden_BoardAndCard(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 open > in_progress", Cols: []view.Col{
 		{Name: "idea"},
 		{Name: "open", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3 28.10"},
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3"},
 			{ID: "T-9", Project: "alpha", Title: "Write docs", Note: "1h which db?", Live: true},
 		}},
 		{Name: "in_progress", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
@@ -308,4 +308,26 @@ func TestGolden_BoardAndCard(t *testing.T) {
 	}}
 	golden(t, "board", view.RenderBoard(b))
 	golden(t, "card", view.RenderCard(card()))
+}
+
+func TestRenderBoard_EpicRow_LabelAndProgressAfterNumber(t *testing.T) {
+	b := view.Board{Total: 1, W: 60, H: 14, Cols: []view.Col{
+		{Name: "open", Rows: []view.Row{{ID: "T-322", Epic: "EPIC 1/8", Title: "tix"}}},
+	}}
+	b.Col = 5 // no selection on the epic
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, "T-322 EPIC 1/8") {
+		t.Errorf("epic label missing:\n%s", out)
+	}
+	b.Col = 0
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, ">T-322 EPIC 1/8") {
+		t.Errorf("selected epic label missing:\n%s", out)
+	}
+}
+
+func TestRenderCard_HistoryHint_RightOfHeading(t *testing.T) {
+	c := card()
+	c.HistoryHint = "last 5 of 23, enter: all"
+	if out := plain(view.RenderCard(c)); !strings.Contains(out, "history") || !strings.Contains(out, "last 5 of 23, enter: all") {
+		t.Errorf("history hint missing:\n%s", out)
+	}
 }

@@ -19,8 +19,8 @@ const (
 type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
-	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"},
-	{"e", "edit"}, {"c", "comment"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
+	{"arrows", "select"}, {"enter", "open"}, {"space", "grab"}, {"n", "new"}, {"e", "edit"},
+	{"c", "comment"}, {"del", "delete"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
 // hintSpan - the place of a pair in the hint line: characters [x0, x1).
@@ -223,7 +223,7 @@ func rowCells(row Row, selected bool) []string {
 		if row.Grabbed {
 			sel = grabStyle
 		}
-		head := marker + star(row) + clean(row.ID+" "+row.Project)
+		head := marker + star(row) + clean(headText(row))
 		first := sel.Render(fit(head, colWidth))
 		return []string{
 			first,
@@ -237,6 +237,17 @@ func rowCells(row Row, selected bool) []string {
 	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(pulse, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
 }
 
+// headText is the ID line of a selected card: the number, the epic label, the project.
+func headText(row Row) string {
+	parts := []string{row.ID}
+	for _, p := range []string{row.Epic, row.Project} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 // star is the mark before the number of a blocked card.
 func star(row Row) string {
 	if row.Star {
@@ -248,6 +259,9 @@ func star(row Row) string {
 // headLine draws the ID line: the ID in the state style, the project in its palette color.
 func headLine(marker string, row Row, look cardLook, width int) string {
 	id := marker + star(row) + clean(row.ID) + " "
+	if row.Epic != "" {
+		id += clean(row.Epic) + " "
+	}
 	text := fit(id+clean(row.Project), width)
 	rest, ok := strings.CutPrefix(text, id)
 	if !ok {

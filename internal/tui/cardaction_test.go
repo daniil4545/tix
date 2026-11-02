@@ -34,20 +34,6 @@ func caXY(t *testing.T, m *Model, sub string) (x, y int) {
 	return 0, 0
 }
 
-func (e *mvEnv) caTask(id string) (tags, status string, comments []string) {
-	e.t.Helper()
-	tk, _, err := e.store.Get(id)
-	if err != nil {
-		e.t.Fatalf("Get %s: %v", id, err)
-	}
-	for _, c := range tk.Comments {
-		comments = append(comments, c.Text)
-	}
-	return strings.Join(tk.Tags, ","), tk.Status, comments
-}
-
-func caStatus(m *Model) string { s, _ := m.statusText(); return s }
-
 func caOpenCard(m *Model) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
 	if cmd != nil {
@@ -55,55 +41,18 @@ func caOpenCard(m *Model) {
 	}
 }
 
-func TestField_SetClearUnchanged(t *testing.T) {
+func TestCardClick_Buttons(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("job", "open")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
 
-	typeKeys(m, "fga,b")
-	caEnter(m)
-	if tags, _, _ := e.caTask(id); tags != "a,b" {
-		t.Fatalf("tags = %q, expected a,b", tags)
+	leftClick(m, 0, 1) // fields line: no longer a button
+	if m.input != nil {
+		t.Fatalf("click on the fields line opened the input %+v", m.input)
 	}
-
-	caReload(m)
-	n := e.commits()
-	typeKeys(m, "fg") // the initial value in the line is the current one
-	caEnter(m)
-	if e.commits() != n {
-		t.Error("the same value was written again")
-	}
-
-	typeKeys(m, "fg")
-	feed(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
-	caEnter(m)
-	if tags, _, _ := e.caTask(id); tags != "" {
-		t.Errorf("an empty value did not clear the tags: %q", tags)
-	}
-}
-
-func TestCardClick_FieldsRowAndButtons(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "open")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	caOpenCard(m)
-
-	leftClick(m, 0, 1) // fields line: right under the header
-	if m.input == nil || m.input.pick == nil {
-		t.Fatalf("click on the fields line: input %+v", m.input)
-	}
-	// A click on a choice pair equals its key.
-	x, y := caXY(t, m, "g tags")
-	leftClick(m, x, y)
-	if m.input == nil || m.input.label != "tags:" {
-		t.Fatalf("click on g tags: input %+v", m.input)
-	}
-	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
-
-	x, y = caXY(t, m, "c comment")
+	x, y := caXY(t, m, "c comment")
 	leftClick(m, x, y)
 	if m.input == nil || m.input.label != "comment:" {
 		t.Fatalf("click on c comment: input %+v", m.input)
@@ -123,27 +72,6 @@ func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 }
 
 // caReload rereads the store, as the file watcher does.
-// A core refusal of a field edit reaches the status line and the file stays as it was.
-func TestField_CoreRefusal_ShownInStatus(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "open")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	caOpenCard(m)
-
-	typeKeys(m, "ft") // the title line is prefilled with "job"
-	for range "job" {
-		feed(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
-	}
-	caEnter(m)
-	if got, want := caStatus(m), id+": title is empty"; got != want {
-		t.Errorf("status %q, expected %q", got, want)
-	}
-	if tk, _, err := e.store.Get(id); err != nil || tk.Title != "job" {
-		t.Errorf("title %q, err %v: the refused edit changed the task", tk.Title, err)
-	}
-}
-
 func caReload(m *Model) {
 	tasks, errs := m.d.Store.List()
 	m.apply(tasks, len(errs))

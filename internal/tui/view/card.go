@@ -36,7 +36,6 @@ func CardScroll(c Card, fit bool) int {
 type cardLay struct {
 	lines      []string
 	w          int
-	fieldsRow  int // the fields line; -1 if there is none
 	actionsRow int
 	actions    []actionSpan
 	bodyOff    int         // the body offset the frame is drawn at: the fit or the clamped scroll
@@ -107,14 +106,13 @@ func layoutCard(c Card, fit bool) cardLay {
 	return lay
 }
 
-// cardHead builds the header and marks its lines in cardLay: the fields line.
+// cardHead builds the header: the title line, the fields line, the rule.
 func cardHead(c Card, w int) ([]string, cardLay) {
-	lay := cardLay{fieldsRow: -1}
+	var lay cardLay
 	column := " [" + clean(c.Column) + "]"
 	title := truncate(clean(c.ID+"  "+c.Title), max(w-lipgloss.Width(column), 1))
 	lines := []string{joinEnds(accentStyle.Render(title), dimStyle.Render(column), w)}
 	if c.Fields != "" {
-		lay.fieldsRow = len(lines)
 		lines = append(lines, dimStyle.Render(truncate(clean(c.Fields), w)))
 	}
 	return append(lines, ruleLine(w)), lay
@@ -147,7 +145,7 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits []crit
 			}
 		}
 	}
-	section(historyHead, "")
+	section(historyHead, c.HistoryHint)
 	base := len(lines)
 	hl, from, to, rel := historyLines(c, w)
 	lines = append(lines, hl...)
