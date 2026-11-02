@@ -33,7 +33,7 @@ lint:
 # Acceptance: format, vet, linter, tests, build.
 check: fmt-check vet lint test build
 
-# PR into dev: the fast tier, minutes.
+# Fast local check before a push: the fast tier, minutes.
 pr-check: fmt-check vet lint test-fast build
 
 # PR into main: everything, and the release archive of this system unpacks, starts and keeps a task.
