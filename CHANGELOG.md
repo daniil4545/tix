@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Removed
+
+- The jump into an agent session: the `g` key and `g session` button in the TUI, and the Warp tab address the CLI cached after agent writes (`WARP_FOCUS_URL`, `TIX_FOCUS_DIR`).
+
 ## [0.6.0] - 2026-10-30
 
 ### Added
