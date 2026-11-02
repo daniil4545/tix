@@ -197,6 +197,9 @@ func idleTasks(tasks []*task.Task, moves map[string]time.Time, now time.Time) []
 		if m := moves[t.ID]; m.After(last) {
 			last = m
 		}
+		if last.IsZero() {
+			continue // no created field and no move: the age is unknown
+		}
 		if d := now.Sub(last); d >= staleAfter {
 			out = append(out, idle{t: t, days: int(d / (24 * time.Hour))})
 		}
