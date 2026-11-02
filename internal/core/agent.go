@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -11,7 +10,6 @@ import (
 
 	ident "github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/config"
-	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
 )
 
@@ -20,7 +18,6 @@ var (
 	ErrClaimed    = errors.New("claimed by another actor")
 	ErrNoIdentity = errors.New("no identity")
 	ErrRule       = errors.New("rule violated")
-	ErrNoRemote   = errors.New("no remote")
 )
 
 // kindErr - an error with a ready reply text; errors.Is finds kind in it.
@@ -68,7 +65,7 @@ const (
 	roleWaiting = "waiting"
 	roleClosed  = "closed"
 
-	allowedFields = "title project waiting tags ask external abstract summary"
+	allowedFields = "title project waiting tags external abstract summary"
 )
 
 // loadConfig reads config.toml again: under the lock the config could have been changed by hand.
@@ -281,9 +278,6 @@ func (s *Store) leave(t *task.Task, fromRole, toRole, msg string, o MoveOpts, ac
 	if fromRole == roleActive || toRole == roleClosed {
 		t.ClearClaim()
 	}
-	if toRole == roleClosed {
-		return t.SetField("ask", "")
-	}
 	return nil
 }
 
@@ -399,10 +393,6 @@ func setField(t *task.Task, role string, f Field) error {
 		if strings.TrimSpace(f.Value) == "" && role == roleWaiting {
 			return rule("waiting needs a reason: use -m, or leave with tix move")
 		}
-	case "ask":
-		if _, _, known := task.ParseAsk(strings.TrimSpace(f.Value)); !known { // the board reads it trimmed
-			return rule("unknown ask kind; a prefix must be one of: %s", strings.Join(task.AskKinds, ", "))
-		}
 	case "tags", "external":
 	default:
 		return rule("field %s cannot be set; allowed: %s", f.Name, allowedFields)
@@ -449,36 +439,4 @@ func (s *Store) CheckAt(id string, nums []int, actor, baseRev string) (Result, e
 	})
 	res.Info = info
 	return res, err
-}
-
-// Backup commits foreign edits under the lock and sends HEAD to origin without the lock.
-func (s *Store) Backup(ctx context.Context) (Result, error) {
-	err := s.withLock(false, func(tx *txEnv) error {
-		if err := s.syncExternal(tx); err != nil {
-			s.log.Warn("external edits not committed before backup", "op", "backup_sync", "err", err)
-		}
-		return nil
-	})
-	if errors.Is(err, ErrNotFound) {
-		return Result{}, fmt.Errorf("no tasks folder %s: %w", s.root, ErrNotFound)
-	}
-	if err != nil {
-		return Result{}, err
-	}
-	repo, err := s.git()
-	if err != nil {
-		return Result{}, err
-	}
-	remotes, err := repo.Remotes()
-	if err != nil {
-		return Result{}, fmt.Errorf("list remotes: %w", err)
-	}
-	if !slices.Contains(remotes, "origin") {
-		return Result{}, &kindErr{kind: ErrNoRemote, msg: "no remote origin; run: git remote add origin <url>"}
-	}
-	if err := repo.Push(ctx, "origin"); err != nil {
-		s.log.Warn("push failed", "op", "push", "remote", "origin", "err", gitx.Detail(err))
-		return Result{}, fmt.Errorf("backup to origin: %w", err)
-	}
-	return Result{Info: "origin"}, nil
 }

@@ -23,7 +23,6 @@ func critCard() view.Card {
 	c := card()
 	c.Details = "intro\n- [ ] first\n- [x] second"
 	c.CritAt = []int{1, 2}
-	c.Ask = "which one?"
 	return c
 }
 
@@ -33,7 +32,6 @@ func TestHitCard_RowsAndButtons(t *testing.T) {
 		sub  string
 		want view.CardHit
 	}{
-		{"* needs you:", view.CardHit{Kind: view.CardAsk}},
 		{"- [ ] first", view.CardHit{Kind: view.CardCriterion, Index: 0}},
 		{"- [x] second", view.CardHit{Kind: view.CardCriterion, Index: 1}},
 		{"intro", view.CardHit{}},

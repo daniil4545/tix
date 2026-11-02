@@ -36,14 +36,13 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | Core: md files, lock, commit per edit, merge, pickup of Obsidian edits | yes | | |
 | CLI `tix`: 14 commands (2.2) | yes | | |
 | TUI `ascii`: board, card with history, `$EDITOR`, move, order, filter, live refresh, mouse and touchpad, key hint line (2.3) | yes | | |
-| Pulse on the board row: last note with its age, the `ask` text (2.3) | yes | priority field, filters by date and priority | |
-| Work log in the task (`RULES.md`): a note for each decision, question and stage change; the answer to `ask` is written into the task, whoever answers; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
+| Pulse on the board row: last note with its age (2.3) | yes | priority field, filters by date and priority | |
+| Work log in the task (`RULES.md`): a note for each decision, question and stage change; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
-| Columns with roles in `config.toml`; fields `waiting`, `claim`, `tags`, `ask` | yes | custom fields, theme choice, theme `cards` | |
-| Board colors: green title with a live claim, star on `ask` colored by kind, grey card without a live claim, project colors (2.3) | yes | reply to the agent from the card | |
+| Columns with roles in `config.toml`; fields `waiting`, `claim`, `tags` | yes | custom fields, theme choice, theme `cards` | |
+| Board colors: green title with a live claim, grey card without a live claim, project colors (2.3) | yes | reply to the agent from the card | |
 | Connectors for Claude Code, Codex, OpenCode (2.4) | the agent installs one once | `setup` | |
 | `RULES.md`, home session in `~/tasks` | yes | | |
-| Backup by `git push` to a private remote | by command | in the background | |
 | External trackers | `external` as a link | status and result: `tix pull`, key `s` (D61, `docs/specs/integrations.md`) | sync of fields and comments |
 | Scheduled assistant, execution time on screen | | yes | |
 | Public repository v0.1.0: the whole repository in English, manifest and scenarios in the README, demo, CI, release (D47) | yes | | |
@@ -62,7 +61,6 @@ flowchart LR
   hum["Human"] -->|"tix without arguments: TUI"| core
   core -->|"lock, write, commit"| repo[("~/tasks: md + git")]
   obs["Obsidian"] -.->|"edits bypassing the core"| repo
-  repo -->|"tix backup"| bak["Private remote"]
 ```
 
 | Block | Responsibility |
@@ -147,11 +145,11 @@ flowchart TD
 | `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `active` and `claim`, also from `inbox` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
 | `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
-| `set` | only `title`, `project`, `waiting`, `tags`, `ask`, `external`, `abstract`, `summary`; `ask` may start with a kind (2.3), an unknown lowercase prefix (`word: `) is refused with code 5, a link like `http://` is text |
+| `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); clears `ask`; a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all `T-N` lines ticked (other criteria do not count) prints "epic T-M ready for acceptance" |
-| `rm`, `backup` | delete; commit of edits that bypass the core (step 2 of 2.1), then `git push` |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all `T-N` lines ticked (other criteria do not count) prints "epic T-M ready for acceptance" |
+| `rm` | delete |
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,
      `done`); `set` and `edit` do not accept them;
@@ -168,23 +166,19 @@ flowchart TD
 2. Input and output: keys; one operation queue in the background, the screen is not blocked by the lock.
 3. How it works (mockup):
    - ASCII, lines made of hyphens; colors: main, muted, accent, orange - error. Color carries life:
-     a live claim with no `ask` - title green, no sign; a live claim and an `ask` - title
-     green and a `*`, colored by the kind of need, the `ask` prefix `decide:` (default, no prefix),
-     `review:`, `access:`: yellow, blue, red; no live claim (none, expired, released, any column) -
-     no sign and the whole card grey, the ask text included, `g` says "session ended; the answer
-     stays in the task". The project
-     label has its own muted color from a palette of 6 by a hash of the lower-cased name. The
-     pulse line shows the text without the prefix; the card shows the whole value. The scheme is
+     a live claim - title green; no live claim (none, expired, released, any column) - the whole
+     card grey. The project
+     label has its own muted color from a palette of 6 by a hash of the lower-cased name. The scheme is
      one table in `internal/tui/view/scheme.go`;
-   - board: number, project, title, first line of the summary, criteria, `claim`, star (only when the human is needed);
+   - board: number, project, title, first line of the summary, criteria, `claim`;
      an unknown column is the column `?`;
-   - card: title and column, fields in one line, the `ask` line, abstract, summary, details,
+   - card: title and column, fields in one line, abstract, summary, details,
      history: moves, closes, takes, releases, notes and comments are always visible; two or more
      edits in a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
      `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
    - the human main path without the CLI, by keys and mouse (D66):
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
-     `n` and `+` new task (a column with an entry check gets it in the inbox column), `a` reply, `g` agent session, `e`, `c`, `p` project,
+     `n` and `+` new task (a column with an entry check gets it in the inbox column), `g` agent session, `e`, `c`, `p` project,
      Delete with `y/n`, `?` help, `q`; card - up-down arrows over criteria and history
      (`enter` checks an item or unfolds an entry), left-right the neighbor task, `f` field,
      `esc`. The mouse in the card: a click on a criterion or a history line selects it, the
@@ -263,7 +257,6 @@ A `config.toml` error gives the path and the line.
 | Process killed in the middle of a write | `kill -9` | No half-written files; the next operation commits what was written |
 | Broken file or config | Cannot be parsed | The core does not write, shows the path and the line |
 | Empty `~/tasks` | Hook `ctx` | One line; the first write creates the folder |
-| Remote unavailable | `backup` | Error in one line |
 
 ## 4. Data and states
 
@@ -272,7 +265,7 @@ See section 8.
 ## 5. Code model
 
 - Task: frontmatter `id`, `title`, `project`, `status`, `rank` (fractional), `created`,
-  `external`, `waiting`, `claim`, `tags`, `ask`. Body (D23, D25): `## Abstract`,
+  `external`, `waiting`, `claim`, `tags`. Body (D23, D25): `## Abstract`,
   `## Summary` (the first line is on the board), `## Details` (criteria as checkboxes, links),
   `## Comments` (append only).
 - `claim`: `actor until ISO`; only `take` checks it; the owner's writes to the file extend it by 3 h
@@ -354,6 +347,3 @@ Tasks in tix, project `tracker` (`tix list --project tracker`). The MVP slices S
 |---|---|---|---|
 | Go 1.27.2 | all | `go version` | yes |
 | Codex, OpenCode | connectors, e2e | `codex --version`, `opencode --version` | yes |
-| private remote (provided by the user) | backup | `git -C ~/tasks remote -v` | no |
-
-The remote is needed only for backup.

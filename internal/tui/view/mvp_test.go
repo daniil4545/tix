@@ -21,18 +21,6 @@ func frameLines(b view.Board) []string {
 	return strings.Split(strings.TrimRight(plain(view.RenderBoard(b)), "\n"), "\n")
 }
 
-// lineWith returns the raw line (with color codes) whose text contains sub.
-func lineWith(t *testing.T, raw, sub string) string {
-	t.Helper()
-	for _, ln := range strings.Split(raw, "\n") {
-		if strings.Contains(plain(ln), sub) {
-			return ln
-		}
-	}
-	t.Fatalf("no line with %q in the frame:\n%s", sub, plain(raw))
-	return ""
-}
-
 func oneCol(rows ...view.Row) view.Col { return view.Col{Name: "doing", Rows: rows} }
 
 // Scenario: the hint is always the last line, the status line is above it.
@@ -66,48 +54,17 @@ func TestRenderBoard_NarrowWidth_HintTruncatedNotWrapped(t *testing.T) {
 	}
 }
 
-// Scenario: the ask color (decide kind, live claim) is the table color in both the selected and the unselected line.
-func TestRenderBoard_Ask_KindColorSelectedAndNot(t *testing.T) {
-	b := view.Board{Total: 3, W: 120, H: 40, Col: 0, Row: 0, Cols: []view.Col{oneCol(
-		view.Row{ID: "T-1", Title: "Alpha", Ask: "alpha-question", Meta: "m", Live: true},
-		view.Row{ID: "T-2", Title: "Bravo", Ask: "bravo-question", Meta: "m", Live: true},
-		view.Row{ID: "T-3", Title: "Charlie", Summary: "charlie-summary", Meta: "m", Live: true},
-	)}}
-	raw := view.RenderBoard(b)
-	yellowFg := strings.TrimSuffix(strings.TrimPrefix(view.KindSGR("decide"), "\x1b["), "m")
-
-	sel := lineWith(t, raw, "alpha-question")
-	if !strings.Contains(sel, yellowFg) {
-		t.Errorf("selected line with ask without yellow foreground %s: %q", yellowFg, sel)
-	}
-	if !strings.Contains(sel, selBg) {
-		t.Errorf("selected line is not highlighted with background %s: %q", selBg, sel)
-	}
-	unsel := lineWith(t, raw, "bravo-question")
-	if !strings.Contains(unsel, yellowFg) {
-		t.Errorf("unselected line with ask without yellow %s: %q", yellowFg, unsel)
-	}
-	if strings.Contains(unsel, selBg) {
-		t.Errorf("unselected line is highlighted: %q", unsel)
-	}
-	if plainLine := lineWith(t, raw, "charlie-summary"); strings.Contains(plainLine, yellowFg) {
-		t.Errorf("line without ask is colored yellow: %q", plainLine)
-	}
-}
-
-// Scenario (view): the third line is chosen by view: ask, then note, then summary.
-func TestRenderBoard_ThirdLine_AskThenNoteThenSummary(t *testing.T) {
+// Scenario (view): the third line is chosen by view: note, then summary.
+func TestRenderBoard_ThirdLine_NoteThenSummary(t *testing.T) {
 	cases := []struct {
 		name    string
 		row     view.Row
 		want    string
 		notWant []string
 	}{
-		{"ask outranks the note and the summary", view.Row{Ask: "pick A or B", Note: "3h did things", Summary: "the summary"},
-			"? pick A or B", []string{"did things", "the summary"}},
-		{"no ask - the note instead of the summary", view.Row{Note: "3h did things", Summary: "the summary"},
+		{"the note instead of the summary", view.Row{Note: "3h did things", Summary: "the summary"},
 			"3h did things", []string{"the summary", "?"}},
-		{"no ask and no note - the summary", view.Row{Summary: "the summary"},
+		{"no note - the summary", view.Row{Summary: "the summary"},
 			"the summary", []string{"?"}},
 	}
 	for _, c := range cases {

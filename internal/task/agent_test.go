@@ -102,12 +102,12 @@ func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	defer guard(t)
 	tk := load(t, "valid.md")
 	for _, f := range [][2]string{{"title", "New title"}, {"waiting", "need key"},
-		{"tags", "a,b,c"}, {"ask", "which db?"}, {"external", "JIRA-7"}} {
+		{"tags", "a,b,c"}, {"external", "JIRA-7"}} {
 		if err := tk.SetField(f[0], f[1]); err != nil {
 			t.Fatalf("SetField(%s): %v", f[0], err)
 		}
 	}
-	if tk.Title != "New title" || tk.Waiting != "need key" || tk.Ask != "which db?" ||
+	if tk.Title != "New title" || tk.Waiting != "need key" ||
 		tk.External != "JIRA-7" || !reflect.DeepEqual(tk.Tags, []string{"a", "b", "c"}) {
 		t.Errorf("fields after SetField: %+v", tk)
 	}
@@ -119,9 +119,9 @@ func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	if !strings.Contains(out, "x-custom: keep me") {
 		t.Errorf("SetField lost a foreign field:\n%s", out)
 	}
-	for _, name := range []string{"status", "id", "claim", "rank", "nosuch"} {
+	for _, name := range []string{"status", "id", "claim", "rank", "ask", "nosuch"} {
 		if err := tk.SetField(name, "x"); err == nil {
-			t.Errorf("SetField(%q) accepted: name outside title waiting tags ask external", name)
+			t.Errorf("SetField(%q) accepted: name outside title waiting tags external", name)
 		}
 	}
 }

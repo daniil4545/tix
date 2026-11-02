@@ -889,25 +889,22 @@ func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 // Pulse, order
 // ---------------------------------------------------------------------------------------------
 
-// ask outranks a note; a note only in the active column; without notes - summary.
-func TestPulse_AskBeatsNote_NoteOnlyInActive_ElseSummary(t *testing.T) {
+// a note only in the active column; without notes - summary.
+func TestPulse_NoteOnlyInActive_ElseSummary(t *testing.T) {
 	e := mvNewEnv(t, "")
-	asked := e.create("Asked", "doing")
 	noted := e.create("Noted", "doing")
 	plain := e.create("Plain", "doing")
 	parked := e.create("Parked", "todo")
-	for id, s := range map[string]string{asked: "sum-asked", noted: "sum-noted", plain: "sum-plain", parked: "sum-parked"} {
+	for id, s := range map[string]string{noted: "sum-noted", plain: "sum-plain", parked: "sum-parked"} {
 		e.summary(id, s)
 	}
-	e.set(asked, "ask", "pick A or B")
-	e.note(asked, "note-asked")
 	e.note(noted, "note-noted")
 	e.note(parked, "note-parked")
 	e.start(140, 40)
 
-	e.screenHas("note-noted", "? pick A or B", "sum-plain", "sum-parked")
+	e.screenHas("note-noted", "sum-plain", "sum-parked")
 	s := e.text()
-	for _, bad := range []string{"note-asked", "sum-asked", "sum-noted", "note-parked"} {
+	for _, bad := range []string{"sum-noted", "note-parked"} {
 		if strings.Contains(s, bad) {
 			t.Errorf("extra %q on the board:\n%s", bad, s)
 		}

@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
@@ -21,7 +19,7 @@ const (
 type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
-	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"}, {"a", "answer"},
+	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"},
 	{"e", "edit"}, {"c", "comment"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
@@ -209,11 +207,6 @@ func columnCells(b Board, index, bodyHeight int) []string {
 func rowCells(row Row, selected bool) []string {
 	state := stateOf(row)
 	look := scheme[state]
-	kind, text, _ := task.ParseAsk(strings.TrimSpace(row.Ask))
-	signStyle, selSign := look.Title, selKindStyle(kind)
-	if look.KindColor {
-		signStyle = kindStyle(kind)
-	}
 	marker := " "
 	switch {
 	case row.Grabbed:
@@ -222,34 +215,26 @@ func rowCells(row Row, selected bool) []string {
 		marker = ">"
 	}
 	title := " " + clean(row.Title)
-	summary, third := pulseLine(row, text, look, kindStyle(kind))
+	summary := pulseLine(row)
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected || row.Grabbed {
 		sel := selStyle
 		if row.Grabbed {
-			sel, selSign = grabStyle, grabStyle
+			sel = grabStyle
 		}
 		head := marker + clean(row.ID+" "+row.Project)
 		first := sel.Render(fit(head, colWidth))
-		pulse := sel
-		if look.Sign != "" {
-			first = sel.Render(fit(head, colWidth-2)+" ") + selSign.Render(look.Sign)
-			pulse = selSign
-		}
 		return []string{
 			first,
 			sel.Render(fit(title, colWidth)),
-			pulse.Render(fit(summary, colWidth)),
+			sel.Render(fit(summary, colWidth)),
 			sel.Render(fit(" "+clean(row.Meta), colWidth)),
 			blank,
 		}
 	}
 	first := headLine(marker, row, look, colWidth)
-	if look.Sign != "" {
-		first = headLine(marker, row, look, colWidth-2) + " " + signStyle.Render(look.Sign)
-	}
-	return []string{first, look.Title.Render(fit(title, colWidth)), third.Render(fit(summary, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
+	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(summary, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
 }
 
 // headLine draws the ID line: the ID in the state style, the project in its palette color.
@@ -264,19 +249,12 @@ func headLine(marker string, row Row, look cardLook, width int) string {
 	return look.Head.Render(id) + projectStyle(row.ProjectColor).Render(label) + strings.Repeat(" ", len(rest)-len(label))
 }
 
-// pulseLine picks the third card line and its style: ask (askText, the kind style on a card that
-// takes the kind color), note, summary.
-func pulseLine(row Row, askText string, look cardLook, askFg lipgloss.Style) (string, lipgloss.Style) {
-	switch {
-	case strings.TrimSpace(row.Ask) != "":
-		if look.KindColor {
-			return " " + clean(firstLine("? "+askText)), askFg
-		}
-		return " " + clean(firstLine("? "+askText)), look.Rest
-	case strings.TrimSpace(row.Note) != "":
-		return " " + clean(firstLine(strings.TrimSpace(row.Note))), look.Rest
+// pulseLine picks the third card line: note, then summary.
+func pulseLine(row Row) string {
+	if strings.TrimSpace(row.Note) != "" {
+		return " " + clean(firstLine(strings.TrimSpace(row.Note)))
 	}
-	return " " + clean(firstLine(row.Summary)), look.Rest
+	return " " + clean(firstLine(row.Summary))
 }
 
 func firstLine(s string) string {

@@ -542,13 +542,3 @@ func TestCLI_RulesFile_CreatedByWriteNeverOverwritten(t *testing.T) {
 		t.Errorf("the user's RULES.md was overwritten:\n%s", got)
 	}
 }
-
-func TestCLI_Backup_NoRemote_OneLineHint(t *testing.T) {
-	defer guard(t)
-	b := newBox(t)
-	b.ok("", "new", "Work")
-	r := b.tix("", "backup")
-	if r.code == 0 || r.out != "" || !oneErrLine(r.err) || !strings.Contains(r.err, "git remote add origin") {
-		t.Errorf("backup without origin: code %d, stdout %q, stderr %q, want an error with the hint `git remote add origin`", r.code, r.out, r.err)
-	}
-}

@@ -171,7 +171,7 @@ func (m *Model) cardView() view.Card {
 	if t == nil {
 		return c
 	}
-	c.Title, c.Column, c.Ask = t.Title, t.Status, strings.TrimSpace(t.Ask)
+	c.Title, c.Column = t.Title, t.Status
 	c.Fields = fields(t, time.Now(), m.card.changed())
 	c.Abstract, c.Summary = section(t.Body, "Abstract"), section(t.Body, "Summary")
 	c.Details = section(t.Body, "Details")

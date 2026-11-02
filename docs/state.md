@@ -19,7 +19,6 @@ acceptance. Before 2026-10-23 the public repository got one snapshot commit per 
 - Branch `z2-rank-cache` (`be562f9`) is kept for T-5: rank cache without tests and review.
 - vhs 0.12.1 skipped the `Screenshot` of `docs/board.tape`; the picture came from the last GIF frame (see the tape header).
 - The grey card relies on the 3-hour claim: a closed window greys out only when the claim expires.
-- Known race: the reply `a` may erase a new `ask` of the agent in a window of milliseconds; conditional write - later.
 - The model in the `Model:` trailer is only for Claude Code; `/model` in the middle of a session and subagents - later.
 - `make e2e-agents` and live Codex calls spend subscription limits: only with the user's consent.
 - The docker image `golang:1.27` is kept for checking on Linux.

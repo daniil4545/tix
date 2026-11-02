@@ -9,7 +9,7 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 3. `tix check T-12 1 2`: mark finished criteria.
 4. `tix set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
 5. `tix comment T-12 "text"`: comments are only appended.
-6. `tix done T-12 -m "result"`: closes the task, releases it and clears `ask`. All criteria are checked: close the task now, do not keep it open for follow-up work.
+6. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
 When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to the ready column.
 
@@ -18,7 +18,6 @@ When a session ends without closing, write the comment `Done / Decided / Waiting
 The human reads the task instead of your session. Keep it short and current.
 
 - Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
-- Whoever answers a question in `ask`, you or the human, record it: `tix comment T-12 "Answer: ..."`, then `tix set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
 - New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
 - A task should fit one session. It grew past that: create tasks for the rest, then `tix done T-12 --force -m "rest in T-15, T-16"`.
 
@@ -35,13 +34,13 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Checks
 
 - Into ready: at least one criterion.
-- Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field. Waiting is for an external resource; it drops your hold. Waiting for the human is an `ask` on the task you hold.
+- Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field. Waiting is for an external resource; it drops your hold. Waiting for the human is a move to blocked with a reason.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
 - `tix new "title" --to ready --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to ready` is refused; `--to` waiting or closed is refused: create the task, then `tix move` or `tix done`.
 - `tix list` hides closed tasks; `--all` or `--status <closed column>` shows them, `--grep TEXT` matches title and summary.
 - A column without a role is not yours.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
-- `set` takes: title, project, waiting, tags, ask, external, abstract, summary.
+- `set` takes: title, project, waiting, tags, external, abstract, summary.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
 - Exit codes: 2 held by another, 3 conflict, 4 not found, 5 rule refusal, 6 bad input.
 
@@ -53,7 +52,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to the inbox column with project `personal`.
-- A task needs the user? Keep holding it and put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it. Start `ask` with `review:` (look at it) or `access:` (you need a key or a login); no prefix means a decision. The star is yellow, blue or red by kind; it shows only while your session holds the task.
+- A task needs the user? Move it to the waiting role with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The human answers with a comment and moves it back.
 
 ## Ticket template
 

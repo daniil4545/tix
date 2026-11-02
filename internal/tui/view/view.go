@@ -10,13 +10,12 @@ import (
 	"github.com/daniil4545/tix/internal/history"
 )
 
-// Row - a board column line. The third card line (the pulse) is the first of: the Ask question (the kind prefix is cut),
-// the Note note (a ready line "<age> <text>", empty outside the active column), Summary.
+// Row - a board column line. The third card line (the pulse) is the first of: the Note note (a ready line "<age> <text>", empty outside the active column), Summary.
 // The colors and the sign come from the scheme by the card state (scheme.go).
 type Row struct {
 	ID, Project, Title, Summary, Meta string
-	Ask, Note                         string
-	Live                              bool // the task has a live claim; without it the card is grey and has no sign
+	Note                              string
+	Live                              bool // the task has a live claim; without it the card is grey
 	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
 	ProjectColor                      int  // the project label slot in the palette, from ProjectColors
 }
@@ -48,19 +47,18 @@ type Board struct {
 // it equals the frame on the screen. The frame only clamps it; the window shifts to the Cursor line
 // (an index in History) in CardScroll with fit, when the cursor moved. W, H <= 0: the size is not limited.
 type Card struct {
-	ID, Title, Column, Fields, Ask, Abstract, Summary, Details, Checks string
-	History                                                            []history.Entry
-	Cursor, Scroll, W, H                                               int
-	CritAt                                                             []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
-	Status                                                             string
-	IsErr                                                              bool
+	ID, Title, Column, Fields, Abstract, Summary, Details, Checks string
+	History                                                       []history.Entry
+	Cursor, Scroll, W, H                                          int
+	CritAt                                                        []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
+	Status                                                        string
+	IsErr                                                         bool
 }
 
 // Layout colors: main - the terminal color, dim, accent, yellow (action needed), orange (error). Card colors are in scheme.go.
 var (
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#69756F"))
 	accentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#7FD1C3"))
-	askStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E9CF6A"))
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8A06A"))
 	selStyle    = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3")).Foreground(lipgloss.Color("#111416"))
 	grabStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#E9CF6A")).Foreground(lipgloss.Color("#111416"))

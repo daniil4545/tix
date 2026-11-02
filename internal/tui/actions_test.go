@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	acHint     = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  p project  ? help  q quit"
-	acFieldRow = "t title  g tags  a ask  w waiting  s summary  x external"
+	acHint     = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
+	acFieldRow = "t title  g tags  w waiting  s summary  x external"
 	acFocusURL = "warp://session/0123456789abcdef0123456789abcdef"
 	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
 )
@@ -264,7 +264,6 @@ func TestHint_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"n new", "title:"},
 		{"c comment", "comment:"},
-		{"a answer", "T-1: no question"},
 	}
 	for _, c := range cases {
 		t.Run(c.pair, func(t *testing.T) {
@@ -720,108 +719,15 @@ func TestNewTask_EmptyTitleOrEsc_Cancels(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------------------------
-// Scenario 5: answer to an agent question
-// ---------------------------------------------------------------------------------------------
-
-func acAsked(t *testing.T, ask string) *mvEnv {
+// acAsked starts the board with one task, Alpha.
+func acAsked(t *testing.T) *mvEnv {
 	t.Helper()
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
-	if ask != "" {
-		e.set("T-1", "ask", ask)
-	}
 	e.start(140, 30)
 	e.screenHas("Alpha")
 	e.settle()
 	return e
-}
-
-// Without a question - "no question", nothing is written (board and card).
-func TestAnswer_NoQuestion_SaysNoQuestion(t *testing.T) {
-	for _, where := range []string{"board", "card"} {
-		t.Run(where, func(t *testing.T) {
-			e := acAsked(t, "")
-			if where == "card" {
-				e.acOpenCard("Alpha")
-			}
-			before := e.acCommitCount()
-			e.key("a")
-			e.screenHas("T-1: no question")
-			e.settle()
-			if strings.Contains(e.text(), "answer:") || e.acCommitCount() != before {
-				t.Errorf("an answer without a question opened a line or wrote, commits %d -> %d", before, e.acCommitCount())
-			}
-		})
-	}
-}
-
-// With a question - a comment "Answer: ..." from the human, ask is cleared (board and card).
-func TestAnswer_WithQuestion_CommentsAndClearsAsk(t *testing.T) {
-	for _, where := range []string{"board", "card"} {
-		t.Run(where, func(t *testing.T) {
-			e := acAsked(t, "pick A or B")
-			if where == "card" {
-				e.acOpenCard("Alpha")
-			}
-			e.key("a")
-			e.screenHas("answer:")
-			e.tm.Type("use B")
-			e.key("enter")
-			e.until("comment and empty ask", func() bool {
-				tk := e.acTask("T-1")
-				return tk.Ask == "" && len(tk.Comments) == 1
-			})
-			c := e.acTask("T-1").Comments[0]
-			if c.Text != "Answer: use B" || c.Actor != "human" {
-				t.Errorf("comment %q from %q, expected %q from human", c.Text, c.Actor, "Answer: use B")
-			}
-		})
-	}
-}
-
-// The agent managed to ask a new question - the answer is written, the new question stays, line "new question".
-func TestAnswer_AgentAskedAgain_KeepsNewQuestion(t *testing.T) {
-	e := acAsked(t, "pick A or B")
-	e.key("a")
-	e.screenHas("answer:")
-	e.tm.Type("use B")
-	e.set("T-1", "ask", "second question")
-	e.key("enter")
-	e.screenHas("T-1: new question")
-	e.until("comment written", func() bool { return len(e.acTask("T-1").Comments) == 1 })
-	if tk := e.acTask("T-1"); tk.Ask != "second question" || tk.Comments[0].Text != "Answer: use B" {
-		t.Errorf("ask %q, comment %q: expected the new question and the written answer", tk.Ask, tk.Comments[0].Text)
-	}
-}
-
-// Empty or esc - cancel without a write.
-func TestAnswer_EmptyOrEsc_Cancels(t *testing.T) {
-	for _, cancel := range []string{"enter", "esc"} {
-		t.Run(cancel, func(t *testing.T) {
-			e := acAsked(t, "pick A or B")
-			before := e.acCommitCount()
-			e.key("a")
-			e.screenHas("answer:")
-			e.key(cancel)
-			e.until("line closed", func() bool { return !strings.Contains(e.text(), "answer:") })
-			e.settle()
-			if tk := e.acTask("T-1"); tk.Ask != "pick A or B" || len(tk.Comments) != 0 || e.acCommitCount() != before {
-				t.Errorf("cancel wrote: ask %q, comments %d, commits %d -> %d",
-					tk.Ask, len(tk.Comments), before, e.acCommitCount())
-			}
-		})
-	}
-}
-
-// A click on the line "* needs you:" in the card opens "answer:".
-func TestAnswer_ClickNeedsYouLine_OpensAnswerLine(t *testing.T) {
-	e := acAsked(t, "pick A or B")
-	e.acOpenCard("Alpha")
-	e.screenHas("needs you")
-	_, y := e.acFind("needs you")
-	e.click(4, y)
-	e.screenHas("answer:")
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -915,7 +821,7 @@ func (e *mvEnv) acLastLine() int {
 // The actions line is the last card line and is visible with a non-empty status line;
 // the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
-	const row = "e edit  c comment  a answer  f field  g session  del delete  j k history  esc back"
+	const row = "e edit  c comment  f field  g session  del delete  j k history  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int
@@ -935,14 +841,14 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 			e.start(tc.w, tc.h)
 			e.screenHas("Alpha")
 			e.acOpenCard("Alpha")
-			e.key("a")
-			e.screenHas("T-1: no question")
+			e.key("g")
+			e.screenHas("T-1: no session to open")
 			e.settle()
 			last := e.acLastLine()
 			if last < 1 || strings.TrimSpace(e.lines()[last]) != row {
 				t.Fatalf("last card line %q, expected %q:\n%s", e.lines()[max(last, 0)], row, e.text())
 			}
-			if !strings.Contains(e.lines()[last-1], "T-1: no question") {
+			if !strings.Contains(e.lines()[last-1], "T-1: no session to open") {
 				t.Errorf("above the actions line %q, expected the status line", e.lines()[last-1])
 			}
 		})
@@ -953,14 +859,13 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"c comment", "comment:"},
-		{"a answer", "T-1: no question"},
 		{"f field", acFieldRow},
 		{"g session", "T-1: no session to open"},
 		{"esc back", "arrows select"},
 	}
 	for _, c := range cases {
 		t.Run(c.pair, func(t *testing.T) {
-			e := acAsked(t, "")
+			e := acAsked(t)
 			e.acOpenCard("Alpha")
 			e.acClickOn(c.pair)
 			e.screenHas(c.want)
@@ -968,7 +873,7 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	}
 	t.Run("e edit", func(t *testing.T) {
 		st := acStubEditor(t, "")
-		e := acAsked(t, "")
+		e := acAsked(t)
 		e.acOpenCard("Alpha")
 		e.acClickOn("e edit")
 		e.until("editor called", func() bool { return st.calls() == 1 })
@@ -977,7 +882,7 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 
 // A click on an empty place of the card - nothing.
 func TestCardActions_ClickEmptySpace_DoesNothing(t *testing.T) {
-	e := acAsked(t, "")
+	e := acAsked(t)
 	e.acOpenCard("Alpha")
 	e.screenHas("seed") // history loads after the card opens: the baseline waits for it
 	e.settle()
@@ -1092,7 +997,7 @@ func (e *mvEnv) acPressDelete(name string) {
 
 func acDeleteEnv(t *testing.T, where string) *mvEnv {
 	t.Helper()
-	e := acAsked(t, "")
+	e := acAsked(t)
 	if where == "card" {
 		e.acOpenCard("Alpha")
 	}
@@ -1144,7 +1049,7 @@ func TestDelete_OtherKeyCancels(t *testing.T) {
 
 // A click on the "del delete" button of the card actions line equals the key.
 func TestDelete_CardButton_AsksConfirmation(t *testing.T) {
-	e := acAsked(t, "")
+	e := acAsked(t)
 	e.acOpenCard("Alpha")
 	e.acClickOn("del delete")
 	e.screenHas("delete T-1? y/n")

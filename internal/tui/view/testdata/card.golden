@@ -17,4 +17,4 @@ history
                                 use a dash for empty values
 ----------------------------------------------------------------------------------------------------
 
-e edit  c comment  a answer  f field  g session  del delete  j k history  esc back
+e edit  c comment  f field  g session  del delete  j k history  esc back
