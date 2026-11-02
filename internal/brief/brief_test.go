@@ -10,7 +10,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/daniil4545/tix/internal/brief"
-	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/task"
 )
 
@@ -27,7 +26,7 @@ func mk(id, title, status string, rank float64) *task.Task {
 }
 
 func input(tasks ...*task.Task) brief.Input {
-	return brief.Input{Tasks: tasks, Cfg: config.Default(), Project: "p", RulesPath: "/h/RULES.md",
+	return brief.Input{Tasks: tasks, Project: "p", RulesPath: "/h/RULES.md",
 		Actor: "claude:me", Now: now, PerColumn: 5, Limit: 2000}
 }
 
@@ -45,13 +44,13 @@ func TestBuild_SevenReady_FiveRowsTwoMore_NextIsFirst(t *testing.T) {
 	defer guard(t)
 	var tasks []*task.Task
 	for i := 7; i >= 1; i-- { // input order is not by rank
-		tasks = append(tasks, mk(fmt.Sprintf("T-%d", i), "task", "todo", float64(i)))
+		tasks = append(tasks, mk(fmt.Sprintf("T-%d", i), "task", "open", float64(i)))
 	}
-	tasks = append(tasks, mk("T-20", "idea", "idea", 1), mk("T-21", "finished", "done", 1))
+	tasks = append(tasks, mk("T-20", "idea", "idea", 1), mk("T-21", "finished", "closed", 1))
 	b := brief.Build(input(tasks...))
-	s, ok := section(b, "todo")
+	s, ok := section(b, "open")
 	if !ok || len(s.Rows) != 5 || s.More != 2 {
-		t.Fatalf("section todo: %+v, want 5 lines and More=2", s)
+		t.Fatalf("section open: %+v, want 5 lines and More=2", s)
 	}
 	for i, r := range s.Rows {
 		if want := fmt.Sprintf("T-%d", i+1); r.ID != want {
@@ -65,7 +64,7 @@ func TestBuild_SevenReady_FiveRowsTwoMore_NextIsFirst(t *testing.T) {
 	if !strings.Contains(text, "2 more") || !strings.Contains(text, "next T-1") {
 		t.Errorf("the text lacks `2 more` or `next T-1`:\n%s", text)
 	}
-	for _, c := range []string{"idea", "done"} {
+	for _, c := range []string{"idea", "closed"} {
 		if _, has := section(b, c); has {
 			t.Errorf("column %s without role active, waiting, ready got into ctx", c)
 		}
@@ -77,22 +76,19 @@ func TestBuild_SevenReady_FiveRowsTwoMore_NextIsFirst(t *testing.T) {
 
 func TestBuild_AllProjects_CountsOtherColumns(t *testing.T) {
 	in := input(
-		mk("T-1", "idea", "idea", 1), mk("T-2", "ready", "todo", 1),
-		mk("T-3", "active", "doing", 1), mk("T-4", "waiting", "blocked", 1),
-		mk("T-5", "closed", "done", 1), mk("T-6", "custom", "later", 1),
-		mk("T-7", "ready too", "todo", 2),
+		mk("T-1", "idea", "idea", 1), mk("T-2", "ready", "open", 1),
+		mk("T-3", "active", "in_progress", 1), mk("T-4", "waiting", "blocked", 1),
+		mk("T-5", "closed", "closed", 1), mk("T-6", "ready too", "open", 2),
 	)
 	in.Project = ""
-	in.Cfg.Columns = append(in.Cfg.Columns, config.Column{Name: "later"})
 	b := brief.Build(in)
 	want := "project all   rules: /h/RULES.md\n" +
-		"- take: tix take; step: tix note; end: tix set summary=\n" +
-		"- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed\n" +
-		"idea    1 more\ntodo    2 more\ndoing   T-3 active\nblocked T-4 waiting\ndone    1 more\nlater   1 more\nnext T-2"
+		"- take: tix take; step: tix note; end: tix done\n" +
+		"idea        1 more\nopen        2 more\nin_progress T-3 active\nblocked     T-4 waiting\nclosed      1 more\nnext T-2"
 	if got := b.Text(); got != want {
 		t.Fatalf("all projects:\n%s\nwant:\n%s", got, want)
 	}
-	for _, col := range []string{"idea", "todo", "done", "later"} {
+	for _, col := range []string{"idea", "open", "closed"} {
 		s, ok := section(b, col)
 		if !ok || len(s.Rows) != 0 || s.More == 0 {
 			t.Errorf("column %s: want count only, got %+v", col, s)
@@ -102,20 +98,18 @@ func TestBuild_AllProjects_CountsOtherColumns(t *testing.T) {
 
 func TestBuild_ClaimAndDetail(t *testing.T) {
 	defer guard(t)
-	own := mk("T-1", "mine", "doing", 1)
+	own := mk("T-1", "mine", "in_progress", 1)
 	own.Claim = "claude:me until 2026-10-20T14:00"
-	other := mk("T-2", "theirs", "doing", 2)
+	other := mk("T-2", "theirs", "in_progress", 2)
 	other.Claim = "codex:zed until 2026-10-20T14:00"
-	expired := mk("T-3", "stale", "doing", 3)
+	expired := mk("T-3", "stale", "in_progress", 3)
 	expired.Claim = "ghost:old until 2026-10-20T11:00"
 	waiting := mk("T-4", "stuck", "blocked", 1)
 	waiting.Waiting = "need key"
-	withSummary := mk("T-5", "sum", "todo", 1)
-	withSummary.Body = "## Summary\nFirst line.\nSecond.\n"
-	crit := mk("T-6", "crit", "todo", 2)
+	crit := mk("T-6", "crit", "open", 2)
 	crit.Body = "## Details\n- [x] a\n- [ ] b\n- [ ] c\n"
 
-	b := brief.Build(input(own, other, expired, waiting, withSummary, crit))
+	b := brief.Build(input(own, other, expired, waiting, crit))
 	rows := map[string]brief.Row{}
 	for _, s := range b.Sections {
 		for _, r := range s.Rows {
@@ -137,9 +131,6 @@ func TestBuild_ClaimAndDetail(t *testing.T) {
 	if d := rows["T-4"].Detail; !strings.Contains(d, "Waiting: need key") {
 		t.Errorf("Detail waiting = %q", d)
 	}
-	if d := rows["T-5"].Detail; d != "First line." {
-		t.Errorf("Detail with summary = %q, want the first line", d)
-	}
 	if d := rows["T-6"].Detail; !strings.Contains(d, "1/3") {
 		t.Errorf("Detail with criteria = %q, want 1/3", d)
 	}
@@ -151,9 +142,8 @@ func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 	long := strings.Repeat("Очень длинное название задачи ", 12)
 	var tasks []*task.Task
 	for i := 1; i <= 40; i++ {
-		st := []string{"todo", "doing", "blocked"}[i%3]
+		st := []string{"open", "in_progress", "blocked"}[i%3]
 		tk := mk(fmt.Sprintf("T-%d", i), long, st, float64(i))
-		tk.Body = "## Summary\n" + long + "\n"
 		tasks = append(tasks, tk)
 	}
 	b := brief.Build(input(tasks...))
@@ -180,7 +170,7 @@ func TestBuild_LongTitles_FitLimit_CountsStayTrue(t *testing.T) {
 
 func TestText_HeaderRulesAndRowLines(t *testing.T) {
 	defer guard(t)
-	text := brief.Build(input(mk("T-12", "Fix it", "doing", 1), mk("T-17", "Next one", "todo", 1))).Text()
+	text := brief.Build(input(mk("T-12", "Fix it", "in_progress", 1), mk("T-17", "Next one", "open", 1))).Text()
 	lines := strings.Split(strings.TrimSpace(text), "\n")
 	if !strings.HasPrefix(lines[0], "project p") || !strings.Contains(lines[0], "rules: /h/RULES.md") {
 		t.Errorf("first line %q, want `project p   rules: /h/RULES.md`", lines[0])
@@ -188,7 +178,7 @@ func TestText_HeaderRulesAndRowLines(t *testing.T) {
 	if !strings.Contains(text, "tix take") || !strings.Contains(text, "tix note") {
 		t.Errorf("no cycle line `take: tix take; step: tix note; ...`:\n%s", text)
 	}
-	if !regexp.MustCompile(`(?m)^doing\s+T-12 Fix it`).MatchString(text) || !regexp.MustCompile(`(?m)^todo\s+T-17 Next one`).MatchString(text) {
+	if !regexp.MustCompile(`(?m)^in_progress\s+T-12 Fix it`).MatchString(text) || !regexp.MustCompile(`(?m)^open\s+T-17 Next one`).MatchString(text) {
 		t.Errorf("task lines do not match the format `<column> T-N <title>`:\n%s", text)
 	}
 	if last := lines[len(lines)-1]; last != "next T-17" {
@@ -198,7 +188,7 @@ func TestText_HeaderRulesAndRowLines(t *testing.T) {
 
 func TestBrief_JSON_LowercaseFields(t *testing.T) {
 	defer guard(t)
-	tk := mk("T-1", "x", "todo", 1)
+	tk := mk("T-1", "x", "open", 1)
 	raw, err := json.Marshal(brief.Build(input(tk)))
 	if err != nil {
 		t.Fatal(err)
@@ -231,19 +221,15 @@ func TestBrief_JSON_LowercaseFields(t *testing.T) {
 	}
 }
 
-// The third ctx line lists columns with roles: the agent sees the name of the waiting-role column.
-func TestText_ColumnsLine(t *testing.T) {
+// Statuses are fixed, so ctx prints no columns line (spec 2.2).
+func TestText_NoColumnsLine(t *testing.T) {
 	defer guard(t)
-	b := brief.Build(input(mk("T-1", "x", "todo", 1)))
-	want := "- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed"
-	if lines := strings.Split(b.Text(), "\n"); len(lines) < 3 || lines[2] != want {
-		t.Errorf("third ctx line, want %q:\n%s", want, b.Text())
-	}
+	b := brief.Build(input(mk("T-1", "x", "open", 1)))
 	raw, err := json.Marshal(b)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(raw), `"columns":"idea=inbox todo=ready`) {
-		t.Errorf("JSON lacks columns: %s", raw)
+	if strings.Contains(b.Text(), "columns") || strings.Contains(string(raw), "columns") {
+		t.Errorf("ctx has a columns line:\n%s\n%s", b.Text(), raw)
 	}
 }

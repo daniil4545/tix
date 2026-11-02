@@ -35,11 +35,11 @@ var rankOps = []rankOp{
 		_, err := s.Move(d, "idea", core.MoveOpts{Place: core.Place{First: true}}, "tester")
 		return err
 	}},
-	{name: "move to column tail", col: "doing", dCol: "todo", tail: true, run: func(s *core.Store, d string) error {
-		_, err := s.Move(d, "doing", core.MoveOpts{}, "tester")
+	{name: "move to column tail", col: "in_progress", dCol: "open", tail: true, run: func(s *core.Store, d string) error {
+		_, err := s.Move(d, "in_progress", core.MoveOpts{}, "tester")
 		return err
 	}},
-	{name: "take", col: "doing", dCol: "todo", tail: true, run: func(s *core.Store, d string) error {
+	{name: "take", col: "in_progress", dCol: "open", tail: true, run: func(s *core.Store, d string) error {
 		_, err := s.Take(d, core.Take, "claude:a")
 		return err
 	}},

@@ -23,7 +23,6 @@ func critCard() view.Card {
 	c := card()
 	c.Details = "intro\n- [ ] first\n- [x] second"
 	c.CritAt = []int{1, 2}
-	c.Ask = "which one?"
 	return c
 }
 
@@ -33,7 +32,6 @@ func TestHitCard_RowsAndButtons(t *testing.T) {
 		sub  string
 		want view.CardHit
 	}{
-		{"* needs you:", view.CardHit{Kind: view.CardAsk}},
 		{"- [ ] first", view.CardHit{Kind: view.CardCriterion, Index: 0}},
 		{"- [x] second", view.CardHit{Kind: view.CardCriterion, Index: 1}},
 		{"intro", view.CardHit{}},
@@ -106,15 +104,15 @@ func TestHitCard_ScrolledOutAndTruncated_NotClickable(t *testing.T) {
 	if got := view.HitCard(c, x, y); got.Kind != view.CardAction {
 		t.Fatalf("button c comment: %+v", got)
 	}
-	c.W = 20 // the actions line is cut: g session does not fit whole
+	c.W = 20 // the actions line is cut: f field does not fit whole
 	last := strings.Count(view.RenderCard(c), "\n")
 	clickable := 0
 	for x := 0; x < c.W; x++ {
 		if got := view.HitCard(c, x, last); got.Kind == view.CardAction {
 			clickable++
 		}
-		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "g" {
-			t.Errorf("the cut button g is clickable at column %d", x)
+		if got := view.HitCard(c, x, last); got.Kind == view.CardAction && got.Key == "f" {
+			t.Errorf("the cut button f is clickable at column %d", x)
 		}
 	}
 	if clickable == 0 {
@@ -129,7 +127,7 @@ func TestHitCard_WrappedCriterionTopCut_ContinuationIsNotBox(t *testing.T) {
 	c.W, c.H = 30, 12
 	c.Details = "- [ ] first words of a long criterion that wraps over lines"
 	c.CritAt = []int{0}
-	c.Scroll = 8 // body line 7 is the criterion head, line 8 its continuation
+	c.Scroll = 5 // body line 4 is the criterion head, line 5 its continuation
 	const firstBodyRow = 3
 	got := view.HitCard(c, 4, firstBodyRow)
 	if got.Kind != view.CardCriterion || got.Index != 0 {

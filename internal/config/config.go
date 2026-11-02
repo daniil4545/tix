@@ -14,41 +14,51 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Column - a column with a role.
-type Column struct{ Name, Role string }
+// The five fixed statuses of a task (spec 2.5): no roles, no columns in config.toml.
+const (
+	Idea       = "idea"
+	Open       = "open"
+	InProgress = "in_progress"
+	Blocked    = "blocked"
+	Closed     = "closed"
+)
 
-// Config - the content of config.toml: columns and folder=project.
+// Statuses - the statuses in board order.
+var Statuses = []string{Idea, Open, InProgress, Blocked, Closed}
+
+// legacy - the words of the former columns and roles and the status each one is now.
+var legacy = map[string]string{
+	"inbox": Idea, "ready": Open, "active": InProgress, "waiting": Blocked,
+	"todo": Open, "doing": InProgress, "done": Closed, "closed": Closed,
+}
+
+// Check returns nil for one of the five statuses, else an error that names them; an old
+// column or role word gets the hint "maybe open?".
+func Check(name string) error {
+	if slices.Contains(Statuses, name) {
+		return nil
+	}
+	list := strings.Join(Statuses, " ")
+	if to, ok := legacy[name]; ok {
+		return fmt.Errorf("unknown status %q: maybe %s? statuses: %s", name, to, list)
+	}
+	return fmt.Errorf("unknown status %q; statuses: %s", name, list)
+}
+
+// Config - the content of config.toml: folder=project.
 type Config struct {
-	Columns  []Column
 	Projects map[string]string
 }
 
-// roles - the five column roles (spec 2.5).
-var roles = map[string]bool{"inbox": true, "ready": true, "active": true, "waiting": true, "closed": true}
-
 var reLine = regexp.MustCompile(`^toml: line (\d+)[^:]*: `)
 
-// file - the shape of config.toml on disk. Foreign sections (adapters and others) are skipped.
+// file - the shape of config.toml on disk. Foreign sections (adapters and the old [[column]]) are skipped.
 type file struct {
-	Column   []fileColumn      `toml:"column"`
 	Projects map[string]string `toml:"projects"`
 }
 
-type fileColumn struct {
-	Name string `toml:"name"`
-	Role string `toml:"role,omitempty"`
-}
-
 // Default returns the config for the first write.
-func Default() *Config {
-	return &Config{
-		Columns: []Column{
-			{"idea", "inbox"}, {"todo", "ready"}, {"doing", "active"},
-			{"blocked", "waiting"}, {"done", "closed"},
-		},
-		Projects: map[string]string{},
-	}
-}
+func Default() *Config { return &Config{Projects: map[string]string{}} }
 
 // Load reads the file. No file - Default. The error carries the path and line.
 func Load(path string) (*Config, error) {
@@ -72,104 +82,46 @@ func Load(path string) (*Config, error) {
 		}
 		return nil, fmt.Errorf("%s:%d: %s", path, line, msg)
 	}
-	return build(path, string(data), f)
+	return build(f), nil
 }
 
-func build(path, text string, f file) (*Config, error) {
+func build(f file) *Config {
 	c := &Config{Projects: f.Projects}
 	if c.Projects == nil {
 		c.Projects = map[string]string{}
 	}
-	if len(f.Column) == 0 {
-		c.Columns = Default().Columns
-		return c, nil
-	}
-	names, used := map[string]bool{}, map[string]bool{}
-	for _, col := range f.Column {
-		switch {
-		case col.Name == "":
-			return nil, fail(path, text, "[[column]]", "column has no name")
-		case names[col.Name]:
-			return nil, fail(path, text, col.Name, "column %q is repeated", col.Name)
-		case col.Role != "" && !roles[col.Role]:
-			return nil, fail(path, text, col.Role, "unknown role %q on column %q", col.Role, col.Name)
-		case col.Role != "" && used[col.Role]:
-			return nil, fail(path, text, col.Role, "role %q is taken: one role per column", col.Role)
-		}
-		names[col.Name] = true
-		if col.Role != "" {
-			used[col.Role] = true
-		}
-		c.Columns = append(c.Columns, Column(col))
-	}
-	return c, nil
-}
-
-// fail builds an error with the line of the last mention of needle in the text.
-func fail(path, text, needle, format string, args ...any) error {
-	line := 1
-	for i, ln := range strings.Split(text, "\n") {
-		if strings.Contains(ln, needle) {
-			line = i + 1
-		}
-	}
-	return fmt.Errorf("%s:%d: %s", path, line, fmt.Sprintf(format, args...))
+	return c
 }
 
 // Render prints config.toml.
 func (c *Config) Render() []byte {
-	f := file{Projects: c.Projects}
-	for _, col := range c.Columns {
-		f.Column = append(f.Column, fileColumn(col))
-	}
 	var b bytes.Buffer
 	enc := toml.NewEncoder(&b)
 	enc.Indent = ""
-	if err := enc.Encode(f); err != nil {
+	if err := enc.Encode(file{Projects: c.Projects}); err != nil {
 		panic(fmt.Sprintf("config: render: %v", err)) // the file types are fixed
 	}
 	return b.Bytes()
 }
 
-// ByRole returns the first column with role role.
-func (c *Config) ByRole(role string) (Column, bool) {
-	for _, col := range c.Columns {
-		if col.Role == role {
-			return col, true
+// LegacyMap reads the old [[column]] sections and maps old status to new by column role.
+// has: sections found. A column with no known role is absent; no sections - the default names.
+func LegacyMap(text string) (m map[string]string, has bool, err error) {
+	var f struct {
+		Column []struct{ Name, Role string } `toml:"column"`
+	}
+	if _, err := toml.Decode(text, &f); err != nil {
+		return nil, false, err
+	}
+	m = map[string]string{"idea": Idea, "todo": Open, "doing": InProgress, "blocked": Blocked, "done": Closed}
+	if len(f.Column) == 0 {
+		return m, false, nil
+	}
+	m = map[string]string{}
+	for _, c := range f.Column {
+		if to, ok := legacy[c.Role]; ok {
+			m[c.Name] = to
 		}
 	}
-	return Column{}, false
-}
-
-// Resolve returns a column name by name or by role: the column name wins over the role.
-// Neither found - name as is, the column check gives the error.
-func (c *Config) Resolve(name string) string {
-	if name == "" || slices.ContainsFunc(c.Columns, func(col Column) bool { return col.Name == name }) {
-		return name
-	}
-	if col, ok := c.ByRole(name); ok {
-		return col.Name
-	}
-	return name
-}
-
-// Roles prints columns with roles: "idea=inbox todo=ready ...". Columns without a role are skipped.
-func (c *Config) Roles() string {
-	parts := make([]string, 0, len(c.Columns))
-	for _, col := range c.Columns {
-		if col.Role != "" {
-			parts = append(parts, col.Name+"="+col.Role)
-		}
-	}
-	return strings.Join(parts, " ")
-}
-
-// RoleOf returns the column role. Empty: no such column or it has no role.
-func (c *Config) RoleOf(column string) string {
-	for _, col := range c.Columns {
-		if col.Name == column {
-			return col.Role
-		}
-	}
-	return ""
+	return m, true, nil
 }

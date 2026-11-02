@@ -56,11 +56,9 @@ func (m *Model) boardKey(k string) tea.Cmd {
 	case "k", "up":
 		m.moveCursor(0, -1)
 	case "J":
-		return m.reorderKey(1)
+		return m.reorder(1)
 	case "K":
-		return m.reorderKey(-1)
-	case "o":
-		m.toggleOrder()
+		return m.reorder(-1)
 	case "p":
 		m.cycleProject()
 	case "enter":
@@ -69,10 +67,6 @@ func (m *Model) boardKey(k string) tea.Cmd {
 		m.startGrab()
 	case "n":
 		return m.startNew(m.board.Col)
-	case "a":
-		return m.startAnswer()
-	case "g":
-		return m.startFocus()
 	case "delete", "backspace":
 		return m.startDelete()
 	case "?":
@@ -99,12 +93,6 @@ func (m *Model) cardKey(k string) tea.Cmd {
 		return m.siblingCard(-1)
 	case "right", "l":
 		return m.siblingCard(1)
-	case "a":
-		return m.startAnswer()
-	case "f":
-		return m.startField()
-	case "g":
-		return m.startFocus()
 	case "delete", "backspace":
 		return m.startDelete()
 	case "?":

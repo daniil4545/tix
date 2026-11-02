@@ -1,6 +1,6 @@
 # tix architecture
 
-tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex) write through the `tix` CLI, and the human edits files in Obsidian. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
+tix is a personal task tracker for humans and agents. A task is an md file in `~/tasks`, the store is a git repository, and every edit is a commit with an author. Agents (Claude Code, Codex) write through the `tix` CLI: tix is their memory between sessions. The human watches the TUI dashboard, edits the body there or files in Obsidian, and changes the title and fields with `tix set`. The system is one `tix` binary with no daemon: a process starts for a command and exits. State lives in files and in git. All external calls (git, push) go through the `gitx` package.
 
 How to read: the overall picture is section 1, the flow of work is sections 2 and 3, where to edit is section 9. Setup: `README.md`.
 
@@ -30,9 +30,8 @@ flowchart LR
   agent["Agent: claude, codex, opencode"] -->|"tix ... in a terminal"| tix["tix (one process per command)"]
   human["Human in Obsidian"] -->|"edits md files"| db[("~/tasks: md and git")]
   tix -->|"reads and writes files"| db
-  tix -->|"git commit, push"| git["git"]
+  tix -->|"git commit"| git["git"]
   git -->|"repository"| db
-  git -->|"push HEAD, on backup"| remote["origin"]
   tix -.->|"reads project HEAD"| proj["Project repository"]
   classDef ours fill:#dbeafe,stroke:#2c5c86,color:#000
   classDef external fill:#f3f4f6,stroke:#6b7280,color:#000
@@ -73,9 +72,9 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | Module | Responsibility | Where | Status |
 |---|---|---|---|
 | cli | parses commands, prints `ok`/`err`/`warn`, maps errors to exit codes | `internal/cli` (`cli.go` common, `agent.go` agent cycle, `commands.go` base commands) | works |
-| core | the only write path: lock, temp, rename, commit, transition rules, `backup` | `internal/core` (`tx.go` write, `agent.go` take/move/set/check/backup, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
+| core | the only write path: lock, temp, rename, commit, transition rules | `internal/core` (`tx.go` write, `agent.go` take/move/set/check, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
 | task | parses and prints the task file, claim, criteria; no IO | `internal/task` | works |
-| config | reads `.tix/config.toml`: columns and their roles, project map | `internal/config` | works |
+| config | reads `.tix/config.toml`: project map; the five fixed statuses; the migration map from old columns | `internal/config` | works |
 | brief | builds the `tix ctx` output: text and JSON; no IO | `internal/brief` | works |
 | actor | write identity: sources, name check, shortening | `internal/actor` | works |
 | project | project name by working folder, project HEAD without calling git | `internal/project` (`project.go`, `head.go`) | works |
@@ -95,7 +94,6 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | A live claim of another actor is not taken over without `--steal` | `core.take` | `e2e` `FiveTakesRace_OneWinner` |
 | Only `gitx` starts external processes in `internal` | `gitx`; `gosec` in the linter | `make lint` |
 | `ctx` does not call git | `cli.cmdCtx`, `core.List`, `brief` | 15 ms target in `make bench` |
-| `backup` does not hold the lock during network I/O; push has no `--force` and no password prompt | `core.Backup`, `gitx.Push` | `e2e` `Backup_BareExternalEditBrokenRemote` |
 | `user:pass@` from a URL does not reach the reply or the log | `gitx.scrub` | `gitx/push_test.go` |
 
 ## 2. Main flow
@@ -119,7 +117,7 @@ sequenceDiagram
   K->>G: commit with Actor and Code
   K->>F: release lock
   K-->>C: Result
-  C-->>A: ok T-12 todo > doing @claude until 20:40
+  C-->>A: ok T-12 open > in_progress @claude until 20:40
 ```
 
 | Step | Module | What it does |
@@ -138,7 +136,7 @@ Failures at each step: section 6.
 
 Other scenarios:
 
-- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the columns `active`, `waiting`, `ready` (outside a project: `active` and `waiting`, the rest as counts); the text is trimmed to 2000 runes. Git and the lock are not involved.
+- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the statuses `in_progress`, `blocked`, `open` (outside a project: `in_progress` and `blocked`, the rest as counts); the text is trimmed to 2000 runes. Git and the lock are not involved.
 - `move`, `done`, `set`, `check` follow the same path; only the rule at step 5 differs (section 4).
 
 ## 3. Processes
@@ -157,29 +155,30 @@ The counter lives in `.tix/lock`.
 | Entity | Source of truth | Changed by | Key or constraint |
 |---|---|---|---|
 | Task | file `T-<N> <title>.md` in the store root | `core` under the lock | id `T-<N>`; number from `.tix/next_id`, never reused |
-| Columns and roles | `.tix/config.toml` | human; the core creates it on the first write | roles: `inbox`, `ready`, `active`, `waiting`, `closed` |
-| Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `active` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
+| Statuses | field `status` of the task | `core` | five fixed: `idea`, `open`, `in_progress`, `blocked`, `closed`; `core.migrateStatuses` converts a store with `[[column]]` once, in one commit |
+| Project map | `.tix/config.toml` | human; the core creates it on the first write | `[projects]` |
+| Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `in_progress` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
 | Order in a column | field `rank` | `core.place` | floating-point number; a gap below 1e-6 renumbers the column in one commit |
 | History | git repository `~/tasks` | `core` through `gitx` | one commit per edit; trailers `Actor:`, `Code:` |
 | Agent rules | `RULES.md` in the store | the core creates it if the file is missing | text embedded in the binary; an existing file is not overwritten |
 | gc counter, log | `.tix/lock`, `.tix/log` | `core`, `cli` | not in git |
 
-The task lifecycle by column roles. Default column names: `idea`, `todo`, `doing`, `blocked`, `done`.
+The task lifecycle by status.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> inbox: new
-  inbox --> ready: move [has criterion]
-  ready --> active: take
-  waiting --> active: take
-  active --> waiting: move [has reason]
-  active --> ready: move
-  active --> closed: done [criteria checked or --force -m]
-  waiting --> closed: done
+  [*] --> idea: new
+  idea --> open: move [has criterion]
+  open --> in_progress: take
+  blocked --> in_progress: take
+  in_progress --> blocked: move [has reason]
+  in_progress --> open: move
+  in_progress --> closed: done [criteria checked or --force -m]
+  blocked --> closed: done
   closed --> [*]
 ```
 
-The diagram shows the main paths: `move` is allowed between any columns that have a role. Rules of `core.enter`: `ready` needs a criterion; `waiting` needs a reason (`-m` or the field `waiting`); `closed` needs all criteria checked, otherwise `--force` with `-m`, and a task without criteria needs `-m`. Leaving `waiting` clears the field, leaving `active` and closing release the claim. An agent or a human starts the transitions; the final column is `closed`.
+The diagram shows the main paths: `move` is allowed between any two statuses. Rules of `core.enter`: `open` needs a criterion; `blocked` needs a reason (`-m` or the field `waiting`); `closed` needs all criteria checked, otherwise `--force` with `-m`, and a task without criteria needs `-m`. Leaving `blocked` clears the field, leaving `in_progress` and closing release the claim. An agent or a human starts the transitions; the final status is `closed`.
 
 ## 5. External systems and trust boundaries
 
@@ -202,8 +201,6 @@ The diagram shows the main paths: `move` is allowed between any columns that hav
 | Commit failed | `core.commit` | - | none | the edit is in the file, `Warning`, `warn` on stderr, code 0; the next operation commits it as external edit |
 | Process killed (`kill -9`) | the OS releases flock; `cleanTmp` removes temp | - | - | no half-written files |
 | `edit` against an old base | `mergeBody`, `git merge-file` | base blob id | - | conflict: `ErrConflict`, code 3 |
-| `backup`: no `origin` | `core.Backup` | - | - | `no remote origin; run: git remote add origin <url>`, code 1 |
-| `backup`: push failed or hung | `gitx.Push`, `WaitDelay` | - | 30 s, once | `err`, code 1, details in `.tix/log` |
 | Background gc failed | `gcScript` | - | at the next threshold | `WARN` in `.tix/log` |
 
 Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task; 5 rule (`ErrRule`); 6 input (`ErrNoIdentity`, `actor.ErrAmbiguous`, flag, id); 1 other (`ErrNotRecorded` of `note`).
@@ -222,13 +219,13 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Variable or mode | What it enables | Where set |
 |---|---|---|
 | `TIX_ACTOR` | identity, if there is no flag and no agent environment | environment |
-| columns, roles, project map | column behavior | `.tix/config.toml` in the store |
+| project map | folder to project name | `.tix/config.toml` in the store |
 
 ## 9. Where to change
 
 | I want to change | Module | What else to check |
 |---|---|---|
-| A transition rule (`ready`, `waiting`, closing) | `core.enter`, `core.closeChecks` in `internal/core/agent.go` | `RULES.md`, tests `core/agent_test.go`, `e2e/cycle_test.go` |
+| A transition rule (`open`, `blocked`, closing) | `core.enter`, `core.closeChecks` in `internal/core/agent.go` | `RULES.md`, tests `core/agent_test.go`, `e2e/cycle_test.go` |
 | Claim term, extension rule | `core.claimTTL`, `core.extendClaim` | `RULES.md`, the `take` output line |
 | Write order, lock | `internal/core/tx.go` | invariants of section 1, `e2e` |
 | A new command | `cli.dispatch`, `internal/cli/agent.go` or `commands.go`, a `Store` method | usage in `cli.go`, exit codes, `RULES.md`, `README.md` |
@@ -236,11 +233,10 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
-| Columns and roles | `.tix/config.toml`, `internal/config` | the code finds columns by role, names are not hardcoded |
+| The statuses | `config.Statuses`, `config.Check`, `core.migrateStatuses` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
 | `RULES.md` text | `internal/assets/RULES.md` | move the old `assets.RulesHash` into `previousRules`: stores with an untouched copy get the new text |
 
 ## 10. Limits and open items
 
 - `RULES.md` of a store gets the new text only while it is an untouched copy of an earlier version; an edited copy keeps the old rules.
 - `kill -9` during a column renumbering can leave it partly renumbered (a known failure, accepted in S2).
-- There is no background backup. Push to a real remote is not covered by autotests; no remote is set up for `~/tasks`.

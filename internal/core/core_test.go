@@ -188,6 +188,23 @@ func TestStore_NotFoundAndBadColumn(t *testing.T) {
 	}
 }
 
+func TestStore_Note_LimitInRunes(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.open(2 * time.Second)
+	mustCreate(t, s, "Alpha")
+	n := e.count()
+	_, err := s.Note("T-1", strings.Repeat("я", core.MaxNote+1), "tester")
+	wantRule(t, "long note", err, "path in the note")
+	if e.count() != n {
+		t.Error("a refused note created a commit")
+	}
+	// 300 two-byte runes are 600 bytes: the limit counts characters
+	if _, err := s.Note("T-1", strings.Repeat("я", core.MaxNote), "tester"); err != nil {
+		t.Errorf("note of %d runes refused: %v", core.MaxNote, err)
+	}
+}
+
 func TestStore_NoteEmptyCommit_RemoveDeletes(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)

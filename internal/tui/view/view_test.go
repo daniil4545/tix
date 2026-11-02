@@ -38,7 +38,7 @@ func fits(t *testing.T, name, out string, w, h int) {
 	}
 }
 
-var colNames = []string{"idea", "todo", "doing", "blocked", "done"}
+var colNames = []string{"idea", "open", "in_progress", "blocked", "closed"}
 
 func bigBoard(rowsPerCol int) view.Board {
 	b := view.Board{Total: rowsPerCol * len(colNames), Col: 1, Row: 0}
@@ -49,7 +49,7 @@ func bigBoard(rowsPerCol int) view.Board {
 			n++
 			c.Rows = append(c.Rows, view.Row{
 				ID: fmt.Sprintf("T-%d", n), Project: "proj", Title: fmt.Sprintf("Заголовок %d 日本語 long long title", n),
-				Summary: "первая строка сводки, довольно длинная", Meta: "1/3 до 28.10 @claude",
+				Note: "2h первая строка заметки, довольно длинная", Meta: "1/3 @claude",
 			})
 		}
 		b.Cols = append(b.Cols, c)
@@ -71,10 +71,10 @@ func TestRenderBoard_AnySize_FitsScreen(t *testing.T) {
 func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 40, Cols: []view.Col{
 		{Name: "idea"},
-		{Name: "todo", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
+		{Name: "open", Rows: []view.Row{
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3"},
 		}},
-		{Name: "doing"}, {Name: "blocked"}, {Name: "done"},
+		{Name: "in_progress"}, {Name: "blocked"}, {Name: "closed"},
 	}}
 	out := plain(view.RenderBoard(b))
 	for _, want := range colNames {
@@ -82,26 +82,23 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 			t.Errorf("board without column %q:\n%s", want, out)
 		}
 	}
-	for _, want := range []string{"T-7", "alpha", "Fix login", "see notes", "1/3 28.10"} {
+	for _, want := range []string{"T-7", "alpha", "Fix login", "see notes", "1/3"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("board without %q:\n%s", want, out)
 		}
 	}
 }
 
-func TestRenderBoard_StarOnlyOnRowThatNeedsYou(t *testing.T) {
-	b := view.Board{W: 120, H: 30, Total: 2, Cols: []view.Col{{Name: "todo", Rows: []view.Row{
-		{ID: "T-1", Project: "p", Title: "Quiet", Live: true},
-		{ID: "T-2", Project: "p", Title: "Needs you", Ask: "pick", Live: true},
-	}}}}
-	for _, ln := range strings.Split(plain(view.RenderBoard(b)), "\n") {
-		hasStar := strings.Contains(ln, "*")
-		if strings.Contains(ln, "T-2") && !hasStar {
-			t.Errorf("line T-2 without a star: %q", ln)
-		}
-		if strings.Contains(ln, "T-1") && hasStar {
-			t.Errorf("line T-1 with a star: %q", ln)
-		}
+func TestRenderBoard_StarRow_MarkBeforeNumber(t *testing.T) {
+	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 20, Cols: []view.Col{
+		{Name: "blocked", Rows: []view.Row{
+			{ID: "T-1", Project: "alpha", Title: "Waits", Star: true},
+			{ID: "T-2", Project: "alpha", Title: "Plain"},
+		}},
+	}}
+	out := plain(view.RenderBoard(b))
+	if !strings.Contains(out, "*T-1 alpha") || strings.Contains(out, "*T-2") {
+		t.Errorf("want a star before T-1 only:\n%s", out)
 	}
 }
 
@@ -154,8 +151,8 @@ func TestRenderBoard_SelectionAndErrorLookDifferent(t *testing.T) {
 func card() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
 	return view.Card{
-		ID: "T-12", Title: "Report on calls", Column: "doing", Fields: "alpha   due 28.10   @claude",
-		Abstract: "abstract text", Summary: "summary text", Details: "details text", Checks: "1/3",
+		ID: "T-12", Title: "Report on calls", Column: "in_progress", Fields: "alpha   #a   @claude",
+		Abstract: "abstract text", Details: "details text", Checks: "1/3",
 		History: []history.Entry{
 			{At: at, Actor: "claude", Op: "new"},
 			{At: at.Add(time.Hour), Actor: "claude", Op: "set", Text: "3 edits", Folded: []history.Entry{
@@ -168,22 +165,11 @@ func card() view.Card {
 
 func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 	out := plain(view.RenderCard(card()))
-	for _, want := range []string{"T-12", "Report on calls", "doing", "alpha", "abstract text", "summary text",
+	for _, want := range []string{"T-12", "Report on calls", "in_progress", "alpha", "abstract text",
 		"details text", "claude", "new", "3 edits", "daniil", "use a dash for empty values"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("card without %q:\n%s", want, out)
 		}
-	}
-}
-
-func TestRenderCard_AskShownOnlyWhenSet(t *testing.T) {
-	c := card()
-	if out := plain(view.RenderCard(c)); strings.Contains(out, "needs you") {
-		t.Errorf("empty ask shown:\n%s", out)
-	}
-	c.Ask = "pick A or B"
-	if out := plain(view.RenderCard(c)); !strings.Contains(out, "* needs you: pick A or B") {
-		t.Errorf("ask not shown as the line `* needs you: <ask>`:\n%s", out)
 	}
 }
 
@@ -193,8 +179,8 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 		for _, n := range []int{0, 5, 200} {
 			c := card()
 			c.W, c.H = sz.w, sz.h
-			c.Title, c.Abstract, c.Summary, c.Details, c.Fields = long, long, long, long+"\n"+long, long
-			c.Ask, c.Status = long, long
+			c.Title, c.Abstract, c.Details, c.Fields = long, long, long+"\n"+long, long
+			c.Status = long
 			c.History = nil
 			for i := 0; i < n; i++ {
 				c.History = append(c.History, history.Entry{Actor: "claude", Op: "comment", Text: long})
@@ -211,7 +197,7 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 // entries, H is such that exactly three body lines fit.
 func stepCard() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
-	c := view.Card{ID: "T-1", Title: "Steps", Column: "doing", W: 60, H: 8}
+	c := view.Card{ID: "T-1", Title: "Steps", Column: "in_progress", W: 60, H: 8}
 	for i := 0; i < 6; i++ {
 		c.History = append(c.History, history.Entry{At: at, Actor: "claude", Op: "note", Text: fmt.Sprintf("step %d", i)})
 	}
@@ -243,7 +229,7 @@ func TestFitScroll_CursorInside_KeepsWindow_LeftEdgeFits(t *testing.T) {
 	}
 }
 
-// On the first selectable line the card shows its preamble (abstract, summary) from the top while
+// On the first selectable line the card shows its preamble (abstract) from the top while
 // the preamble and the line fit; when they do not fit, the cursor line stays visible.
 func TestCardScroll_FirstSelectableLine_ShowsPreambleIfFits(t *testing.T) {
 	c := card()
@@ -310,16 +296,38 @@ func golden(t *testing.T, name, got string) {
 }
 
 func TestGolden_BoardAndCard(t *testing.T) {
-	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 todo > doing", Cols: []view.Col{
+	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 open > in_progress", Cols: []view.Col{
 		{Name: "idea"},
-		{Name: "todo", Rows: []view.Row{
-			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
-			{ID: "T-9", Project: "alpha", Title: "Write docs", Ask: "which db?", Live: true},
+		{Name: "open", Rows: []view.Row{
+			{ID: "T-7", Project: "alpha", Title: "Fix login", Note: "5m see notes", Meta: "1/3"},
+			{ID: "T-9", Project: "alpha", Title: "Write docs", Note: "1h which db?", Live: true},
 		}},
-		{Name: "doing", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
-		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice"}}},
-		{Name: "done"},
+		{Name: "in_progress", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
+		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Note: "2d waiting for: invoice", Star: true}}},
+		{Name: "closed"},
 	}}
 	golden(t, "board", view.RenderBoard(b))
 	golden(t, "card", view.RenderCard(card()))
+}
+
+func TestRenderBoard_EpicRow_LabelAndProgressAfterNumber(t *testing.T) {
+	b := view.Board{Total: 1, W: 60, H: 14, Cols: []view.Col{
+		{Name: "open", Rows: []view.Row{{ID: "T-322", Epic: "EPIC 1/8", Title: "tix"}}},
+	}}
+	b.Col = 5 // no selection on the epic
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, "T-322 EPIC 1/8") {
+		t.Errorf("epic label missing:\n%s", out)
+	}
+	b.Col = 0
+	if out := plain(view.RenderBoard(b)); !strings.Contains(out, ">T-322 EPIC 1/8") {
+		t.Errorf("selected epic label missing:\n%s", out)
+	}
+}
+
+func TestRenderCard_HistoryHint_RightOfHeading(t *testing.T) {
+	c := card()
+	c.HistoryHint = "last 5 of 23, enter: all"
+	if out := plain(view.RenderCard(c)); !strings.Contains(out, "history") || !strings.Contains(out, "last 5 of 23, enter: all") {
+		t.Errorf("history hint missing:\n%s", out)
+	}
 }

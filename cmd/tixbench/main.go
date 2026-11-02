@@ -26,14 +26,14 @@ const (
 	// The tasks measured: show and comment read one, an external edit changes another.
 	targetTask   = 500
 	externalTask = 600
-	// moveTask sits in the todo column; move drives it between todo and doing, each call writes a commit.
+	// moveTask sits in open; move drives it between open and in_progress, each call writes a commit.
 	moveTask = 701
-	// takeFirst - the first todo task; take takes one new task per run (every fifth).
-	takeFirst   = 6
-	takeStride  = 5
-	columnTodo  = "todo"
-	columnDoing = "doing"
-	// maxRuns keeps take between the first todo task and moveTask (701 = 6 + 5*139).
+	// takeFirst - the first open task; take takes one new task per run (every fifth).
+	takeFirst        = 6
+	takeStride       = 5
+	statusOpen       = "open"
+	statusInProgress = "in_progress"
+	// maxRuns keeps take between the first open task and moveTask (701 = 6 + 5*139).
 	maxRuns = 130
 )
 
@@ -158,7 +158,7 @@ func benches(home string, tasks int) []bench {
 			name: "take", targetMS: 50,
 			argsOf: func(n int) []string { return []string{"take", taskID(takeFirst + takeStride*n)} },
 			check: func(n int, out string) error {
-				return expectMove(out, taskID(takeFirst+takeStride*n), columnDoing)
+				return expectMove(out, taskID(takeFirst+takeStride*n), statusInProgress)
 			},
 		},
 		{
@@ -187,12 +187,12 @@ func expectOK(_ int, out string) error {
 
 func taskID(n int) string { return fmt.Sprintf("T-%d", n) }
 
-// moveTarget alternates columns: an even run goes to doing, an odd run goes back to todo.
+// moveTarget alternates columns: an even run goes to in_progress, an odd run goes back to open.
 func moveTarget(n int) string {
 	if n%2 == 0 {
-		return columnDoing
+		return statusInProgress
 	}
-	return columnTodo
+	return statusOpen
 }
 
 // expectMove requires an answer about a real move: a repeat without a change writes no commit.
@@ -348,7 +348,7 @@ func seed(tixBin, home string, tasks int) error {
 
 func taskFile(id int) string { return fmt.Sprintf("T-%d bench-%d.md", id, id) }
 
-var words = strings.Fields("core write commit lock task agent column board card check merge file git frontmatter comment criterion result summary stream")
+var words = strings.Fields("core write commit lock task agent column board card check merge file git frontmatter comment criterion result stream")
 
 func para(r *rand.Rand, n int) string {
 	p := make([]string, n)
@@ -360,12 +360,12 @@ func para(r *rand.Rand, n int) string {
 
 // taskContent builds a file of about 4 KB per spec section 5: frontmatter, body, comments.
 func taskContent(r *rand.Rand, id int) string {
-	cols := []string{"idea", "todo", "doing", "blocked", "done"}
+	cols := []string{"idea", "open", "in_progress", "blocked", "closed"}
 	var b strings.Builder
 	fmt.Fprintf(&b, "---\nid: T-%d\ntitle: Task number %d about the core\nproject: proj%d\nstatus: %s\nrank: %d\ncreated: 2026-10-01T09:00:00\n",
 		id, id, id%12, cols[id%5], id)
-	fmt.Fprintf(&b, "external: \"\"\nwaiting: \"\"\nclaim: \"\"\ndue: \"\"\ntags: [a, b]\nask: \"\"\n---\n")
-	fmt.Fprintf(&b, "## Abstract\n\n%s.\n\n## Summary\n\n%s.\n\n## Details\n\n", para(r, 30), para(r, 12))
+	fmt.Fprintf(&b, "external: \"\"\nwaiting: \"\"\nclaim: \"\"\ntags: [a, b]\n---\n")
+	fmt.Fprintf(&b, "## Abstract\n\n%s.\n\n## Details\n\n", para(r, 30))
 	for i := 0; i < 4+r.Intn(4); i++ {
 		fmt.Fprintf(&b, "- [ ] %s\n", para(r, 10))
 	}

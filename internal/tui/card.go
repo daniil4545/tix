@@ -25,9 +25,15 @@ type cardState struct {
 	moved   bool            // the user moved the cursor: the first history load does not shift it
 	nCrit   int             // the number of criteria before the history; updated on open and in cardView
 	open    map[string]bool // expanded "N edits" series
+	all     bool            // the whole history is shown, not the last historyTail rows
+	hidden  int             // the older rows left out of rows
+	total   int             // the rows before the cut
 	loaded  bool            // the history has arrived at least once
 	scroll  int             // the body offset in lines, equal to the frame on the screen; see fitScroll, wheelScroll
 }
+
+// historyTail - how many of the last history rows the card shows until enter expands the rest.
+const historyTail = 5
 
 // shown - a history row on the screen. group - the series index in entries, -1 for a single entry.
 type shown struct {
@@ -113,6 +119,33 @@ func (c *cardState) rebuild() {
 			c.rows = append(c.rows, shown{entry: e, group: i})
 		}
 	}
+	c.total, c.hidden = len(c.rows), 0
+	if !c.all && c.total > historyTail {
+		c.hidden = c.total - historyTail
+		c.rows = c.rows[c.hidden:]
+	}
+}
+
+// toggleAll switches between the last rows and the whole history; the cursor stays on its entry.
+func (c *cardState) toggleAll() {
+	if c.total <= historyTail && !c.all {
+		return
+	}
+	before := c.hidden
+	c.all = !c.all
+	c.rebuild()
+	c.cursor = min(max(c.cursor+before-c.hidden, c.nCrit), c.last())
+}
+
+// hint is the text right of the history heading; empty when the whole history is short.
+func (c *cardState) hint() string {
+	switch {
+	case c.all && c.total > historyTail:
+		return fmt.Sprintf("all %d, enter: last %d", c.total, historyTail)
+	case c.hidden > 0:
+		return fmt.Sprintf("last %d of %d, enter: all", len(c.rows), c.total)
+	}
+	return ""
 }
 
 func groupKey(e history.Entry) string {
@@ -136,12 +169,12 @@ func (c *cardState) step(d int) {
 	c.cursor = min(max(c.cursor+d, 0), c.last())
 }
 
-// toggle expands the edit series under the cursor or collapses an expanded one. A criterion row
-// is not a series: cardEnter toggles it.
-func (c *cardState) toggle() {
+// toggle expands the edit series under the cursor or collapses an expanded one; false if the cursor
+// is not on a series. A criterion row is not a series: cardEnter toggles it.
+func (c *cardState) toggle() bool {
 	row := c.cursor - c.nCrit
 	if row < 0 || row >= len(c.rows) || c.rows[row].group < 0 {
-		return
+		return false
 	}
 	g := c.rows[row].group
 	key := groupKey(c.entries[g])
@@ -150,9 +183,10 @@ func (c *cardState) toggle() {
 	for i, r := range c.rows {
 		if r.group == g {
 			c.cursor = c.nCrit + i
-			return
+			break
 		}
 	}
+	return true
 }
 
 // cardView builds the card frame from the current task file.
@@ -163,6 +197,7 @@ func (m *Model) cardView() view.Card {
 	m.card.cursor = min(m.card.cursor, m.card.last())
 	c := view.Card{ID: m.card.id, Cursor: m.card.cursor, Scroll: m.card.scroll, W: m.w, H: m.h}
 	c.Status, c.IsErr = m.statusText()
+	c.HistoryHint = m.card.hint()
 	c.History = make([]history.Entry, len(m.card.rows))
 	for i, r := range m.card.rows {
 		c.History[i] = r.entry
@@ -171,9 +206,9 @@ func (m *Model) cardView() view.Card {
 	if t == nil {
 		return c
 	}
-	c.Title, c.Column, c.Ask = t.Title, t.Status, strings.TrimSpace(t.Ask)
+	c.Title, c.Column = t.Title, t.Status
 	c.Fields = fields(t, time.Now(), m.card.changed())
-	c.Abstract, c.Summary = section(t.Body, "Abstract"), section(t.Body, "Summary")
+	c.Abstract = section(t.Body, "Abstract")
 	c.Details = section(t.Body, "Details")
 	if crit := t.Criteria(); len(crit) > 0 {
 		c.Checks = checks(crit)
@@ -194,7 +229,7 @@ func (m *Model) wheelScroll(d int) {
 	m.card.scroll = view.CardScroll(m.cardView(), false)
 }
 
-// fields - the card fields line: project, external link, claim, wait, due, tags, modification date.
+// fields - the card fields line: project, external link, claim, wait, tags, modification date.
 func fields(t *task.Task, now time.Time, changed time.Time) string {
 	parts := []string{t.Project}
 	if t.External != "" {
@@ -205,9 +240,6 @@ func fields(t *task.Task, now time.Time, changed time.Time) string {
 	}
 	if strings.TrimSpace(t.Waiting) != "" {
 		parts = append(parts, "waiting for: "+t.Waiting)
-	}
-	if t.Due != "" {
-		parts = append(parts, "due "+dueText(t.Due))
 	}
 	if len(t.Tags) > 0 {
 		parts = append(parts, "#"+strings.Join(t.Tags, " #"))

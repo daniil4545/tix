@@ -1,6 +1,6 @@
 name: ci
 
-# dev (task PRs) runs on Linux only and nothing waits on it; main (release PRs) runs both systems.
+# dev (task PRs): pr-check on Linux, the required check of dev. main (release PRs): ci-check on both systems.
 on:
   push:
     branches: [main, dev]
@@ -26,6 +26,14 @@ jobs:
         with:
           # Pinned: a linter built with an older Go refuses to read the module.
           version: v2.15.0
-          # make check runs the linter itself; the action only installs it.
+          # make runs the linter itself; the action only installs it.
           install-only: true
-      - run: make check
+      - if: github.base_ref == 'dev' || github.ref == 'refs/heads/dev'
+        run: make pr-check
+      - if: github.base_ref != 'dev' && github.ref != 'refs/heads/dev'
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: "~> v2"
+          install-only: true
+      - if: github.base_ref != 'dev' && github.ref != 'refs/heads/dev'
+        run: make ci-check

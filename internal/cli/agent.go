@@ -1,19 +1,18 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/brief"
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -23,8 +22,6 @@ const (
 	ctxPerColumn   = 5
 	ctxTextLimit   = 2000
 	rulesFile      = "RULES.md"
-	closedRole     = "closed"
-	backupFallback = "origin"
 	hookStdinLimit = 64 << 10
 )
 
@@ -116,7 +113,7 @@ func (a *app) cmdCtx(args []string) error {
 		return nil
 	}
 	in := brief.Input{
-		Tasks: tasks, Cfg: a.store.Config(), Project: proj,
+		Tasks: tasks, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
 		Now:       time.Now(), PerColumn: ctxPerColumn,
 	}
@@ -243,12 +240,15 @@ func (a *app) cmdMove(args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := target(p, 2, "tix move <id> <column> [--first|--after T-9] [-m text] [--force]")
+	id, err := target(p, 2, "tix move <id> <status> [--first|--after T-9] [-m text] [--force]")
 	if err != nil {
 		return err
 	}
 	opts, err := moveOpts(p)
 	if err != nil {
+		return &idError{ID: id, Err: err}
+	}
+	if err := checkStatus(p.pos[1]); err != nil {
 		return &idError{ID: id, Err: err}
 	}
 	who, err := a.actorOf(p)
@@ -371,106 +371,18 @@ func (a *app) cmdDone(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	col, ok := a.store.Config().ByRole(closedRole)
-	if !ok {
-		return &idError{ID: id, Err: &ruleError{msg: "config.toml has no column with role closed"}}
-	}
-	res, err := a.store.Move(id, col.Name, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
+	res, err := a.store.Move(id, config.Closed, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
 	if err != nil {
 		return wrap(id, err)
 	}
 	a.reply(p, res, id, what(res, "done"))
-	a.checkEpic(id, who)
 	return nil
 }
 
-func (a *app) checkEpic(id, who string) {
-	child, _, err := a.store.Get(id)
-	if err != nil {
-		a.warn("epic for %s: %s", id, firstLine(err.Error()))
-		return
-	}
-	line := strings.SplitN(strings.TrimSpace(child.Body), "\n", 2)[0]
-	if !strings.HasPrefix(line, "Epic: T-") {
-		return
-	}
-	epicID, err := taskID([]string{strings.TrimPrefix(strings.TrimSuffix(line, "\r"), "Epic: ")})
-	if err != nil {
-		return
-	}
-	// one retry: two children of one epic closed at once both read the same revision
-	res, ready, err := a.tickEpic(epicID, id, who)
-	if errors.Is(err, core.ErrConflict) {
-		res, ready, err = a.tickEpic(epicID, id, who)
-	}
-	if errors.Is(err, core.ErrNotFound) || errors.Is(err, errNoEpicLine) {
-		return
-	}
-	if err != nil {
-		a.warn("epic %s: %s", epicID, firstLine(err.Error()))
-		return
-	}
-	if res.Warning != "" {
-		a.warn("epic %s: %s", epicID, res.Warning)
-	}
-	if ready {
-		a.out("epic %s ready for acceptance", epicID)
-	}
-}
-
-var (
-	errNoEpicLine = errors.New("no open line of the task in the epic")
-	// taskLine - an epic criterion that names a task: "T-12" or "T-12 gist"
-	taskLine = regexp.MustCompile(`^T-\d+(\s|$)`)
-)
-
-// tickEpic ticks the open "- [ ] <id>" lines of the epic, guarded by the revision it read them from.
-// ready: every task line of the epic is ticked now; other criteria, as the acceptance one, do not count.
-func (a *app) tickEpic(epicID, id, who string) (core.Result, bool, error) {
-	epic, rev, err := a.store.Get(epicID)
-	if err != nil {
-		return core.Result{}, false, err
-	}
-	var nums []int
-	ready := true
-	for _, c := range epic.Criteria() {
-		mine := !c.Done && (c.Text == id || strings.HasPrefix(c.Text, id+" "))
-		if mine {
-			nums = append(nums, c.N)
-		} else if !c.Done && taskLine.MatchString(c.Text) {
-			ready = false
-		}
-	}
-	if len(nums) == 0 {
-		return core.Result{}, false, errNoEpicLine
-	}
-	res, err := a.store.CheckAt(epicID, nums, who, rev)
-	return res, ready && err == nil, err
-}
-
-func (a *app) cmdBackup(ctx context.Context, args []string) error {
-	p, err := parseArgs(args, withCommon(nil))
-	if err != nil {
-		return err
-	}
-	if len(p.pos) > 0 {
-		return inputf("backup takes no arguments, extra: %s", p.pos[0])
-	}
-	if err := a.open(); err != nil {
-		return err
-	}
-	res, err := a.store.Backup(ctx)
-	if err != nil {
-		return err
-	}
-	remote := strings.TrimPrefix(what(res, backupFallback), "backup ")
-	line := "ok backup " + remote
-	if p.set["v"] && res.Commit != "" {
-		line += " " + res.Commit
-	}
-	a.out("%s", line)
-	if res.Warning != "" {
-		a.warn("backup: commit not recorded")
+// checkStatus refuses a word that is not one of the five statuses; an old column word gets a hint. Exit code 6.
+func checkStatus(name string) error {
+	if err := config.Check(name); err != nil {
+		return inputf("%v", err)
 	}
 	return nil
 }

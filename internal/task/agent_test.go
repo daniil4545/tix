@@ -101,13 +101,13 @@ func TestCheck_MarksOnlyNamed_RepeatUnchanged_BadNumberRejected(t *testing.T) {
 func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	defer guard(t)
 	tk := load(t, "valid.md")
-	for _, f := range [][2]string{{"title", "New title"}, {"waiting", "need key"}, {"due", "2026-11-01"},
-		{"tags", "a,b,c"}, {"ask", "which db?"}, {"external", "JIRA-7"}} {
+	for _, f := range [][2]string{{"title", "New title"}, {"waiting", "need key"},
+		{"tags", "a,b,c"}, {"external", "JIRA-7"}} {
 		if err := tk.SetField(f[0], f[1]); err != nil {
 			t.Fatalf("SetField(%s): %v", f[0], err)
 		}
 	}
-	if tk.Title != "New title" || tk.Waiting != "need key" || tk.Due != "2026-11-01" || tk.Ask != "which db?" ||
+	if tk.Title != "New title" || tk.Waiting != "need key" ||
 		tk.External != "JIRA-7" || !reflect.DeepEqual(tk.Tags, []string{"a", "b", "c"}) {
 		t.Errorf("fields after SetField: %+v", tk)
 	}
@@ -119,30 +119,43 @@ func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	if !strings.Contains(out, "x-custom: keep me") {
 		t.Errorf("SetField lost a foreign field:\n%s", out)
 	}
-	for _, name := range []string{"status", "id", "claim", "rank", "nosuch"} {
+	for _, name := range []string{"status", "id", "claim", "rank", "ask", "nosuch"} {
 		if err := tk.SetField(name, "x"); err == nil {
-			t.Errorf("SetField(%q) accepted: name outside title waiting due tags ask external", name)
+			t.Errorf("SetField(%q) accepted: name outside title waiting tags external", name)
 		}
+	}
+}
+
+// A section other than Abstract is not set; an old "## Summary" stays in the body as text.
+func TestSetSection_SummaryRefused_OldSectionKeptAsText(t *testing.T) {
+	defer guard(t)
+	tk := load(t, "valid.md")
+	if err := tk.SetSection("Summary", "x"); err == nil {
+		t.Error("SetSection(Summary) accepted")
+	}
+	if err := tk.SetSection("Abstract", "New abstract."); err != nil {
+		t.Fatal(err)
+	}
+	out := string(tk.Render())
+	if !strings.Contains(out, "## Summary\nFirst summary line.") {
+		t.Errorf("the old Summary section was lost:\n%s", out)
 	}
 }
 
 func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
 	defer guard(t)
 	tk := load(t, "valid.md")
-	if err := tk.SetSection("Summary", "Done: all good.\nSecond line."); err != nil {
+	if err := tk.SetSection("Abstract", "Done: all good.\nSecond line."); err != nil {
 		t.Fatal(err)
 	}
 	out := string(tk.Render())
-	for _, want := range []string{"Short task summary.", "Done: all good.\nSecond line.", "- [ ] criterion one", "- [x] criterion two"} {
+	for _, want := range []string{"First summary line.", "Done: all good.\nSecond line.", "- [ ] criterion one", "- [x] criterion two"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("after SetSection no %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "First summary line.") {
+	if strings.Contains(out, "Short task summary.") {
 		t.Errorf("old section text remained:\n%s", out)
-	}
-	if got := parseText(t, out).Summary(); got != "Done: all good." {
-		t.Errorf("Summary() = %q", got)
 	}
 
 	// A fresh task: no body, the section is created.
@@ -150,18 +163,30 @@ func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
 	if err := fresh.SetSection("Abstract", "Short."); err != nil {
 		t.Fatal(err)
 	}
-	if err := fresh.SetSection("Summary", "Result."); err != nil {
-		t.Fatal(err)
-	}
-	if got := parseText(t, string(fresh.Render())); got.Summary() != "Result." || !strings.Contains(got.Body, "Short.") {
+	if got := parseText(t, string(fresh.Render())); !strings.Contains(got.Body, "Short.") {
 		t.Errorf("sections not created in an empty task: %q", got.Body)
 	}
 
 	before := string(tk.Render())
-	if err := tk.SetSection("Summary", "text\n## Fake heading\nmore"); err == nil {
+	if err := tk.SetSection("Abstract", "text\n## Fake heading\nmore"); err == nil {
 		t.Error("`## ` in the section text accepted")
 	}
 	if after := string(tk.Render()); after != before {
 		t.Error("a refused SetSection changed the task")
+	}
+}
+
+// A file written by an older version keeps its due line as a foreign field.
+func TestParse_OldDueLine_KeptOnRender(t *testing.T) {
+	defer guard(t)
+	tk := parseText(t, strings.Replace(fm, "---\nid", "---\ndue: 2026-11-01\nid", 1)+"\nbody\n")
+	if err := tk.SetField("title", "Y"); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "due: 2026-11-01") {
+		t.Errorf("due line lost:\n%s", out)
+	}
+	if err := tk.SetField("due", "2026-11-02"); err == nil {
+		t.Error("SetField(due) accepted")
 	}
 }

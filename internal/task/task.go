@@ -31,8 +31,6 @@ type Task struct {
 	External string    `json:"external"`
 	Waiting  string    `json:"waiting"`
 	Claim    string    `json:"claim"`
-	Due      string    `json:"due"`
-	Ask      string    `json:"ask"`
 	Rank     float64   `json:"rank"`
 	Created  time.Time `json:"created"`
 	Tags     []string  `json:"tags"`
@@ -69,7 +67,6 @@ type source struct {
 
 const (
 	commentsHeading = "## Comments"
-	summaryHeading  = "## Summary"
 	CreatedLayout   = "2006-01-02T15:04:05"
 	commentLayout   = "2006-01-02T15:04"
 	maxSlug         = 40
@@ -78,13 +75,12 @@ const (
 var (
 	reMarker  = regexp.MustCompile(`^<!-- c: (\S+) \| (.*) -->[ \t\r]*$`)
 	reYAMLErr = regexp.MustCompile(`line (\d+): `)
-	reDate    = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
 
 	timeLayouts = []string{CreatedLayout, commentLayout, time.RFC3339, "2006-01-02"}
 
 	// frontmatter key order of a new task
 	fieldOrder = []string{"id", "title", "project", "status", "rank", "created",
-		"external", "waiting", "claim", "due", "tags", "ask"}
+		"external", "waiting", "claim", "tags"}
 	requiredFields = map[string]bool{"id": true, "title": true, "project": true,
 		"status": true, "rank": true, "created": true}
 )
@@ -211,7 +207,7 @@ func (t *Task) parseFields(path, fm string) error {
 // setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
-	case "id", "title", "project", "status", "external", "waiting", "claim", "due", "ask":
+	case "id", "title", "project", "status", "external", "waiting", "claim":
 		if val.Kind != yaml.ScalarNode {
 			return errors.New("string required")
 		}
@@ -258,12 +254,8 @@ func (t *Task) stringField(key string) *string {
 		return &t.External
 	case "waiting":
 		return &t.Waiting
-	case "claim":
-		return &t.Claim
-	case "due":
-		return &t.Due
 	default:
-		return &t.Ask
+		return &t.Claim
 	}
 }
 
@@ -468,9 +460,6 @@ func (t *Task) fieldNode(key string) *yaml.Node {
 	if s == "" {
 		return nil
 	}
-	if key == "due" && reDate.MatchString(s) {
-		return plainNode(s)
-	}
 	return stringNode(s)
 }
 
@@ -546,23 +535,6 @@ func (t *Task) AddComment(at time.Time, actor, text string) {
 	}
 	t.src.heading = true
 	t.Comments = append(t.Comments, Comment{At: at, Actor: actor, Text: strings.Trim(text, "\r\n")})
-}
-
-// Summary returns the first line of the summary for list.
-func (t *Task) Summary() string {
-	in := false
-	for _, ln := range strings.Split(t.Body, "\n") {
-		ln = strings.TrimSpace(ln)
-		switch {
-		case !in:
-			in = ln == summaryHeading
-		case strings.HasPrefix(ln, "## "):
-			return ""
-		case ln != "":
-			return ln
-		}
-	}
-	return ""
 }
 
 // FileName builds the file name "T-N slug.md" from the id and the title (spec 8, mockup).

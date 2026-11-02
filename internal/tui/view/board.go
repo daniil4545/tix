@@ -5,14 +5,12 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
 	colWidth   = 24
 	colGap     = 2
-	cardLines  = 5   // ID and project, title, summary, meta, empty
+	cardLines  = 5   // ID and project, title, note, meta, empty
 	boardFrame = 7   // header, line, column names, column lines, line, state, hint
 	plusMark   = "+" // the last character of a column name cell: the new task button
 )
@@ -21,8 +19,8 @@ const (
 type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
-	{"arrows", "select"}, {"space", "grab"}, {"enter", "open"}, {"n", "new"}, {"a", "answer"},
-	{"e", "edit"}, {"c", "comment"}, {"o", "order"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
+	{"arrows", "select"}, {"enter", "open"}, {"space", "grab"}, {"n", "new"}, {"e", "edit"},
+	{"c", "comment"}, {"del", "delete"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
 // hintSpan - the place of a pair in the hint line: characters [x0, x1).
@@ -145,9 +143,6 @@ func boardHeader(b Board, first, last int) string {
 	}
 	left := accentStyle.Render("tix") + dimStyle.Render("  project: ") +
 		accentStyle.Render(truncate(clean(project), colWidth)) + dimStyle.Render(fmt.Sprintf("  %d %s", b.Total, noun))
-	if b.ByDue {
-		left += dimStyle.Render("  order: due")
-	}
 	var hidden []string
 	if first > 0 {
 		hidden = append(hidden, fmt.Sprintf("<%d", first))
@@ -212,11 +207,6 @@ func columnCells(b Board, index, bodyHeight int) []string {
 func rowCells(row Row, selected bool) []string {
 	state := stateOf(row)
 	look := scheme[state]
-	kind, text, _ := task.ParseAsk(strings.TrimSpace(row.Ask))
-	signStyle, selSign := look.Title, selKindStyle(kind)
-	if look.KindColor {
-		signStyle = kindStyle(kind)
-	}
 	marker := " "
 	switch {
 	case row.Grabbed:
@@ -225,39 +215,53 @@ func rowCells(row Row, selected bool) []string {
 		marker = ">"
 	}
 	title := " " + clean(row.Title)
-	summary, third := pulseLine(row, text, look, kindStyle(kind))
+	pulse := pulseLine(row)
 	blank := strings.Repeat(" ", colWidth)
 
 	if selected || row.Grabbed {
 		sel := selStyle
 		if row.Grabbed {
-			sel, selSign = grabStyle, grabStyle
+			sel = grabStyle
 		}
-		head := marker + clean(row.ID+" "+row.Project)
+		head := marker + star(row) + clean(headText(row))
 		first := sel.Render(fit(head, colWidth))
-		pulse := sel
-		if look.Sign != "" {
-			first = sel.Render(fit(head, colWidth-2)+" ") + selSign.Render(look.Sign)
-			pulse = selSign
-		}
 		return []string{
 			first,
 			sel.Render(fit(title, colWidth)),
-			pulse.Render(fit(summary, colWidth)),
+			sel.Render(fit(pulse, colWidth)),
 			sel.Render(fit(" "+clean(row.Meta), colWidth)),
 			blank,
 		}
 	}
 	first := headLine(marker, row, look, colWidth)
-	if look.Sign != "" {
-		first = headLine(marker, row, look, colWidth-2) + " " + signStyle.Render(look.Sign)
+	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(pulse, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
+}
+
+// headText is the ID line of a selected card: the number, the epic label, the project.
+func headText(row Row) string {
+	parts := []string{row.ID}
+	for _, p := range []string{row.Epic, row.Project} {
+		if p != "" {
+			parts = append(parts, p)
+		}
 	}
-	return []string{first, look.Title.Render(fit(title, colWidth)), third.Render(fit(summary, colWidth)), metaLine(row, look.Rest), blank}
+	return strings.Join(parts, " ")
+}
+
+// star is the mark before the number of a blocked card.
+func star(row Row) string {
+	if row.Star {
+		return "*"
+	}
+	return ""
 }
 
 // headLine draws the ID line: the ID in the state style, the project in its palette color.
 func headLine(marker string, row Row, look cardLook, width int) string {
-	id := marker + clean(row.ID) + " "
+	id := marker + star(row) + clean(row.ID) + " "
+	if row.Epic != "" {
+		id += clean(row.Epic) + " "
+	}
 	text := fit(id+clean(row.Project), width)
 	rest, ok := strings.CutPrefix(text, id)
 	if !ok {
@@ -267,30 +271,9 @@ func headLine(marker string, row Row, look cardLook, width int) string {
 	return look.Head.Render(id) + projectStyle(row.ProjectColor).Render(label) + strings.Repeat(" ", len(rest)-len(label))
 }
 
-// metaLine draws the meta line; the Overdue part of it gets the overdue style.
-func metaLine(row Row, rest lipgloss.Style) string {
-	text := fit(" "+clean(row.Meta), colWidth)
-	if row.Overdue != "" {
-		if before, after, ok := strings.Cut(text, clean(row.Overdue)); ok {
-			return rest.Render(before) + overdueStyle.Render(clean(row.Overdue)) + rest.Render(after)
-		}
-	}
-	return rest.Render(text)
-}
-
-// pulseLine picks the third card line and its style: ask (askText, the kind style on a card that
-// takes the kind color), note, summary.
-func pulseLine(row Row, askText string, look cardLook, askFg lipgloss.Style) (string, lipgloss.Style) {
-	switch {
-	case strings.TrimSpace(row.Ask) != "":
-		if look.KindColor {
-			return " " + clean(firstLine("? "+askText)), askFg
-		}
-		return " " + clean(firstLine("? "+askText)), look.Rest
-	case strings.TrimSpace(row.Note) != "":
-		return " " + clean(firstLine(strings.TrimSpace(row.Note))), look.Rest
-	}
-	return " " + clean(firstLine(row.Summary)), look.Rest
+// pulseLine is the third card line: the latest note with its age, empty without a note.
+func pulseLine(row Row) string {
+	return " " + clean(firstLine(strings.TrimSpace(row.Note)))
 }
 
 func firstLine(s string) string {

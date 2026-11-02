@@ -1,18 +1,6 @@
 #!/usr/bin/env bash
-# Live check of the agent connectors: Claude Code and Codex run the tix cycle on the real CLIs.
-# SPENDS SUBSCRIPTION LIMITS: run only with --yes.
-#
-# What it does for each agent:
-#   1. Fixture in ~/.cache/tix-e2e/<random>/<agent> (not /tmp: Codex gives a false green there):
-#      git project e2eproj, TIX_HOME with task T-1 in ready and one criterion.
-#   2. Run 1 (cwd = the project): the agent claims the task. Pass: commits take, note, done with the agent's Actor:.
-#   3. Run 2 (cwd = TIX_HOME, "home session"): "write down an idea". Pass: a new task
-#      in idea, project personal, a new commit with the agent's Actor:.
-# User settings are not written. Claude: `--settings` points to a file with the hook and permission from
-# connectors/claude/hooks.json, skill in <fixture>/.claude/skills. Codex: a temporary CODEX_HOME
-# (auth.json symlink, tix.rules, no hooks.json), skill in <fixture>/.agents/skills.
-# Each agent runs through `env -u` with the id of the launching session, else a foreign id lands in Actor:.
-#
+# Runs the tix cycle on the real Claude Code and Codex CLIs. SPENDS LIMITS: only with --yes.
+
 # Usage: scripts/e2e-agents.sh --yes [--agents claude,codex]
 # Environment: E2E_TIMEOUT (seconds per run, 600), E2E_CODEX_MODEL (default gpt-6.1-sol).
 # Exit code: 0 - pass for all chosen agents; 1 - some fail; 2 - bad call, no --yes.
@@ -101,8 +89,8 @@ setup_fixture() {
 	[ -n "$rev" ] || return 1
 	printf '## Details\n\n- [ ] Say "job done" in your final answer\n' |
 		tix_in "$WORK" edit T-1 --base "$rev" --as e2e:setup >/dev/null || return 1
-	tix_in "$WORK" move T-1 todo --as e2e:setup >/dev/null || return 1
-	[ "$(tix_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj todo" ] || return 1
+	tix_in "$WORK" move T-1 open --as e2e:setup >/dev/null || return 1
+	[ "$(tix_in "$WORK" list --json | jq -r '.[0].project + " " + .[0].status')" = "e2eproj open" ] || return 1
 	mkdir -p "$TASKS/.git/info"
 	printf '.agents/\n.claude/\n' >>"$TASKS/.git/info/exclude"
 }

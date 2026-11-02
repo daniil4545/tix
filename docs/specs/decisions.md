@@ -51,7 +51,7 @@ Accepted on 2026-10-20:
 - D44. A reference standard of speed, lightness and reliability; the numbers are in section 7.
 - D45. Cancelled on 2026-10-21 by decision D66.
 - D46. Interface and format in English: CLI and TUI replies, file sections, `RULES.md`; the Russian
-  strings of the spec and the mockup are a sample of meaning. The text of tasks is in any language.
+  strings of the spec are a sample of meaning. The text of tasks is in any language.
 - D47. A public repository for a portfolio: a snapshot of the working one per `~/.claude/templates/github/design.md`,
   task S5 after the MVP. The command stays `tk` (the conflict with wedow/ticket is accepted), the repository name is in S5.
 - D48. Short id: `12` equals `T-12` in all commands.
@@ -99,3 +99,6 @@ Accepted on 2026-10-20:
   whole history and the internal docs are public. The tix repository becomes the bench of the admitd agent farm:
   agents send PRs, the owner reviews and merges. User decision 2026-10-23 ("tix is fully public, a pet project,
   no reason to hide"). Cancels the snapshot from D47; `scripts/snapshot.sh` is removed.
+- D69. Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with
+  roles (D5, D20, D24 are superseded): agents confused the two names of each column. Stores with `[[column]]` are
+  migrated on opening by the role of the column, in one commit. User decision 2026-10-30, confirmed 2026-11-02.

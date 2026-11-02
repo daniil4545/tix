@@ -128,7 +128,7 @@ func TestCommit_ModelTrailer(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("TIX_MODEL", c.model)
 			b := newBox(t)
-			b.newTask("task", "todo")
+			b.newTask("task", "open")
 			msg := b.git("log", "-1", "--format=%B")
 			has := strings.Contains(msg, "\nModel: "+c.model+"\n") || strings.HasPrefix(msg, "Model: "+c.model)
 			if c.want && !has {

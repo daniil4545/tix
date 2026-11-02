@@ -34,15 +34,13 @@ func CardScroll(c Card, fit bool) int {
 // cardLay - the card frame and the lines the mouse can hit. Drawing and HitCard take it
 // from one place, so body scroll does not diverge from a click.
 type cardLay struct {
-	lines          []string
-	w              int
-	askFrom, askTo int // agent ask lines [askFrom, askTo); -1 if there is no ask
-	fieldsRow      int // the fields line; -1 if there is none
-	actionsRow     int
-	actions        []actionSpan
-	bodyOff        int         // the body offset the frame is drawn at: the fit or the clamped scroll
-	crits          []frameSpan // visible criterion lines
-	hists          []frameSpan // visible history entry lines
+	lines      []string
+	w          int
+	actionsRow int
+	actions    []actionSpan
+	bodyOff    int         // the body offset the frame is drawn at: the fit or the clamped scroll
+	crits      []frameSpan // visible criterion lines
+	hists      []frameSpan // visible history entry lines
 }
 
 // frameSpan - frame lines [from, to) of a criterion (index - the criterion number) or of a history
@@ -108,22 +106,14 @@ func layoutCard(c Card, fit bool) cardLay {
 	return lay
 }
 
-// cardHead builds the header and marks its lines in cardLay: the fields and the agent ask.
+// cardHead builds the header: the title line, the fields line, the rule.
 func cardHead(c Card, w int) ([]string, cardLay) {
-	lay := cardLay{fieldsRow: -1, askFrom: -1, askTo: -1}
+	var lay cardLay
 	column := " [" + clean(c.Column) + "]"
 	title := truncate(clean(c.ID+"  "+c.Title), max(w-lipgloss.Width(column), 1))
 	lines := []string{joinEnds(accentStyle.Render(title), dimStyle.Render(column), w)}
 	if c.Fields != "" {
-		lay.fieldsRow = len(lines)
 		lines = append(lines, dimStyle.Render(truncate(clean(c.Fields), w)))
-	}
-	if c.Ask != "" {
-		lay.askFrom = len(lines)
-		for _, l := range wrap("* needs you: "+c.Ask, w) {
-			lines = append(lines, askStyle.Render(l))
-		}
-		lay.askTo = len(lines)
 	}
 	return append(lines, ruleLine(w)), lay
 }
@@ -142,10 +132,6 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits []crit
 		section("abstract", "")
 		lines = append(lines, indentLines(c.Abstract, false, w)...)
 	}
-	if strings.TrimSpace(c.Summary) != "" {
-		section("summary", "")
-		lines = append(lines, indentLines(c.Summary, true, w)...)
-	}
 	if strings.TrimSpace(c.Details) != "" || c.Checks != "" {
 		section("details", c.Checks)
 		base := len(lines)
@@ -159,7 +145,7 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits []crit
 			}
 		}
 	}
-	section(historyHead, "")
+	section(historyHead, c.HistoryHint)
 	base := len(lines)
 	hl, from, to, rel := historyLines(c, w)
 	lines = append(lines, hl...)
@@ -297,9 +283,7 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 }
 
 // scrollBody keeps room body lines from offset scroll. With fit the offset shifts only when the
-// selected line (cur = start, end, start of the first selectable line) left the window: below the
-// bottom edge or above the top one. When the cursor reaches the first selectable line from above the
-// window, the preamble (abstract, summary) shows from the top while it fits.
+// cursor line (cur = start, end, first selectable) left the window; the abstract shows while it fits.
 func scrollBody(body []string, scroll int, cur [3]int, room int, fit bool) ([]string, int) {
 	curStart, curEnd, first := cur[0], cur[1], cur[2]
 	if room <= 0 {

@@ -31,7 +31,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tix ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -53,12 +53,6 @@ type inputError struct{ msg string }
 func (e *inputError) Error() string { return e.msg }
 
 func inputf(format string, v ...any) error { return &inputError{msg: fmt.Sprintf(format, v...)} }
-
-// ruleError - a refusal by a rule outside the core. Exit code 5.
-type ruleError struct{ msg string }
-
-func (e *ruleError) Error() string        { return e.msg }
-func (e *ruleError) Is(target error) bool { return target == core.ErrRule }
 
 // exitCode maps an error to an exit code via errors.Is.
 func exitCode(err error) int {
@@ -110,16 +104,7 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 		a.fail(err)
 		return exitCode(err)
 	}
-	if writeCmds[a.cmd] {
-		a.recordFocus()
-	}
 	return 0
-}
-
-// writeCmds - commands after whose success the agent leaves the address of its tab.
-var writeCmds = map[string]bool{
-	"new": true, "edit": true, "comment": true, "note": true, "rm": true,
-	"take": true, "move": true, "set": true, "check": true, "done": true,
 }
 
 func (a *app) dispatch(ctx context.Context, args []string) error {
@@ -167,8 +152,6 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdCheck(args)
 	case "done":
 		return a.cmdDone(args)
-	case "backup":
-		return a.cmdBackup(ctx, args)
 	case "version":
 		a.out("%s", a.env.Version)
 		return nil
@@ -181,7 +164,7 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 
 // usageCmds - the commands of the usage line in usage order.
 var usageCmds = []string{
-	"ctx", "inbox", "take", "move", "set", "check", "done", "backup",
+	"ctx", "inbox", "take", "move", "set", "check", "done",
 	"new", "list", "show", "edit", "comment", "note", "rm",
 }
 
@@ -227,19 +210,18 @@ func editDistance(a, b string) int {
 var commandHelp = map[string]string{
 	"ctx":     "ctx [--project P] [--json] [--hook]",
 	"inbox":   "inbox [--hook]",
-	"new":     "new <title> [--to column|role] [--project P] [--body-file FILE|-]",
-	"list":    "list [--project P] [--status column] [--all] [--grep TEXT] [--json]; alias: ls",
+	"new":     "new <title> [--to status] [--project P] [--body-file FILE|-]",
+	"list":    "list [--project P] [--status status] [--all] [--grep TEXT] [--json]; alias: ls",
 	"show":    "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":    "edit <id> --base <rev> < body.md",
 	"comment": "comment <id> <text>",
 	"note":    "note <id> <text>",
 	"rm":      "rm <id>",
 	"take":    "take <id> [--steal|--release]",
-	"move":    "move <id> <column|role> [--first|--after T-9] [-m text] [--force]",
-	"set":     "set <id> field=value...; fields: title project waiting due tags ask external abstract summary",
+	"move":    "move <id> <status> [--first|--after T-9] [-m text] [--force]",
+	"set":     "set <id> field=value...; fields: title project waiting tags external abstract",
 	"check":   "check <id> N...",
 	"done":    "done <id> [-m result] [--force]",
-	"backup":  "backup",
 }
 
 // wantsHelp reports -h or --help among the flags; text after "--" does not count.

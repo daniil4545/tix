@@ -16,19 +16,16 @@ func TestBoard_NavigateOpenCardEscKeepsSelection(t *testing.T) {
 	e := newEnv(t, "")
 	e.create("Alpha", "p", "idea")
 	e.create("Bravo", "p", "idea")
-	e.create("Gamma", "p", "todo")
+	e.create("Gamma", "p", "open")
 	e.body("T-2", "## Details\n- [ ] one\n")
 	if _, err := e.store.Comment("T-2", "hello from agent", "agent"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.store.Set("T-2", []core.Field{{Name: "ask", Value: "pick A or B"}}, "agent"); err != nil {
-		t.Fatal(err)
-	}
 	e.start("", 140, 40)
-	e.screenHas("idea", "todo", "doing", "blocked", "done", "Alpha", "Bravo", "Gamma")
+	e.screenHas("idea", "open", "in_progress", "blocked", "closed", "Alpha", "Bravo", "Gamma")
 
 	e.key("j", "enter")
-	e.screenHas("Bravo", "hello from agent", "* needs you: pick A or B")
+	e.screenHas("Bravo", "hello from agent")
 	if s := e.text(); strings.Contains(s, "Alpha") || strings.Contains(s, "Gamma") {
 		t.Errorf("card shows other tasks:\n%s", s)
 	}
@@ -43,7 +40,7 @@ func TestBoard_NavigateOpenCardEscKeepsSelection(t *testing.T) {
 func TestBoard_EmptyStoreAndBrokenFile(t *testing.T) {
 	e := newEnv(t, "")
 	e.start("", 140, 30)
-	e.screenHas("idea", "todo", "done")
+	e.screenHas("idea", "open", "closed")
 
 	b := newEnv(t, "")
 	b.create("Alpha", "p", "idea")
@@ -54,93 +51,67 @@ func TestBoard_EmptyStoreAndBrokenFile(t *testing.T) {
 	b.screenHas("Alpha", "1 file skipped")
 }
 
-const closeCfg = `[[column]]
-name = "wait"
-role = "waiting"
-
-[[column]]
-name = "fin"
-role = "closed"
-
-[[column]]
-name = "work"
-role = "active"
-`
-
-const moveCfg = `[[column]]
-name = "work"
-role = "active"
-
-[[column]]
-name = "wait"
-role = "waiting"
-
-[[column]]
-name = "fin"
-role = "closed"
-`
-
 func TestMove_ToWaiting_AsksReasonOnlyWhenFieldEmpty(t *testing.T) {
 	t.Run("input and enter", func(t *testing.T) {
-		e := newEnv(t, moveCfg)
-		e.create("Alpha", "p", "work")
+		e := newEnv(t, "")
+		e.create("Alpha", "p", "in_progress")
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key(" ", "l", " ")
+		e.key("l", "l", " ", "l", " ")
 		e.screenHas("waiting for:")
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("task in wait with a reason", func() bool { st, w, _, _ := e.get("T-1"); return st == "wait" && w == "vendor reply" })
+		e.until("task in wait with a reason", func() bool { st, w, _, _ := e.get("T-1"); return st == "blocked" && w == "vendor reply" })
 	})
 	t.Run("esc cancels", func(t *testing.T) {
-		e := newEnv(t, moveCfg)
-		e.create("Alpha", "p", "work")
+		e := newEnv(t, "")
+		e.create("Alpha", "p", "in_progress")
 		n := e.gitOut("rev-list", "--count", "HEAD")
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key(" ", "l", " ")
+		e.key("l", "l", " ", "l", " ")
 		e.screenHas("waiting for:")
 		e.key("esc")
 		e.until("input line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
-		if st, _, _, _ := e.get("T-1"); st != "work" || e.gitOut("rev-list", "--count", "HEAD") != n {
+		if st, _, _, _ := e.get("T-1"); st != "in_progress" || e.gitOut("rev-list", "--count", "HEAD") != n {
 			t.Errorf("cancel changed the task: status %s", st)
 		}
 	})
 	t.Run("field already filled - no question", func(t *testing.T) {
-		e := newEnv(t, moveCfg)
-		e.create("Alpha", "p", "work")
+		e := newEnv(t, "")
+		e.create("Alpha", "p", "in_progress")
 		if _, err := e.store.Set("T-1", []core.Field{{Name: "waiting", Value: "set earlier"}}, "seed"); err != nil {
 			t.Fatal(err)
 		}
 		e.start("", 140, 30)
 		e.screenHas("Alpha")
-		e.key(" ", "l", " ")
-		e.until("task in wait", func() bool { st, _, _, _ := e.get("T-1"); return st == "wait" })
+		e.key("l", "l", " ", "l", " ")
+		e.until("task in wait", func() bool { st, _, _, _ := e.get("T-1"); return st == "blocked" })
 	})
 }
 
 func TestMove_AgentMovedDuringPrompt_HumanMoveRefused(t *testing.T) {
-	e := newEnv(t, moveCfg)
-	e.create("Alpha", "p", "work")
+	e := newEnv(t, "")
+	e.create("Alpha", "p", "in_progress")
 	e.start("", 140, 30)
 	e.screenHas("Alpha")
-	e.key(" ", "l", " ")
+	e.key("l", "l", " ", "l", " ")
 	e.screenHas("waiting for:")
-	if _, err := e.store.Move("T-1", "fin", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
+	if _, err := e.store.Move("T-1", "closed", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
 		t.Fatal(err)
 	}
 	e.tm.Type("human reason")
 	e.key("enter")
 	e.screenHas("meanwhile")
-	if st, _, _, _ := e.get("T-1"); st != "fin" {
-		t.Errorf("human move overwrote the agent move: fin -> %s", st)
+	if st, _, _, _ := e.get("T-1"); st != "closed" {
+		t.Errorf("human move overwrote the agent move: closed -> %s", st)
 	}
 }
 
 func TestMove_RuleViolation_ShownInStatusLine(t *testing.T) {
 	e := newEnv(t, "")
-	e.create("Alpha", "p", "idea") // todo needs a criterion
-	_, err := e.store.Move("T-1", "todo", core.MoveOpts{}, "probe")
+	e.create("Alpha", "p", "idea") // open needs a criterion
+	_, err := e.store.Move("T-1", "open", core.MoveOpts{}, "probe")
 	if err == nil {
 		t.Fatal("core let a task without a criterion into ready")
 	}
@@ -163,18 +134,18 @@ func TestMove_ToClosed_CriteriaCases(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			e := newEnv(t, closeCfg)
-			e.create("Alpha", "p", "wait")
+			e := newEnv(t, "")
+			e.create("Alpha", "p", "blocked")
 			e.body("T-1", c.body)
 			e.start("", 140, 30)
 			e.screenHas("Alpha")
-			e.key(" ", "l", " ")
+			e.key("l", "l", "l", " ", "l", " ")
 			if c.reply != "" {
 				e.screenHas("close reason:")
 				e.tm.Type(c.reply)
 				e.key("enter")
 			}
-			e.until("task in fin", func() bool { st, _, _, _ := e.get("T-1"); return st == "fin" })
+			e.until("task in closed", func() bool { st, _, _, _ := e.get("T-1"); return st == "closed" })
 			e.until("commit "+c.subject, func() bool { return e.gitOut("log", "-1", "--format=%s") == c.subject })
 			_, _, _, comments := e.get("T-1")
 			if c.comment != "" && !strings.Contains(strings.Join(comments, "|"), c.comment) {

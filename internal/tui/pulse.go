@@ -37,11 +37,8 @@ func (m *Model) setNotes(msg notesLoaded) {
 	m.rebuild()
 }
 
-// note - the note line for the board: age and text; only for a task in the active column.
+// note - the note line for the board: age and text of the latest note; no note - empty.
 func (m *Model) note(t *task.Task, now time.Time) string {
-	if m.cfg.RoleOf(t.Status) != "active" {
-		return ""
-	}
 	n, ok := m.notes[t.ID]
 	if !ok {
 		return ""

@@ -1,12 +1,10 @@
 package core_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -22,10 +20,6 @@ import (
 
 const (
 	critBody = "## Details\n- [ ] one\n- [ ] two\n- [ ] three\n"
-	// reviewConfig: the review column without a role; the other roles as by default.
-	reviewConfig = "[[column]]\nname = \"idea\"\nrole = \"inbox\"\n\n[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n" +
-		"[[column]]\nname = \"review\"\n\n[[column]]\nname = \"doing\"\nrole = \"active\"\n\n" +
-		"[[column]]\nname = \"blocked\"\nrole = \"waiting\"\n\n[[column]]\nname = \"done\"\nrole = \"closed\"\n"
 )
 
 type clock struct {
@@ -59,15 +53,6 @@ func (e *env) openAt(c *clock) *core.Store {
 	return s
 }
 
-// withConfig writes config.toml and opens the store again.
-func (e *env) withConfig(c *clock, text string) *core.Store {
-	e.t.Helper()
-	if err := os.WriteFile(filepath.Join(e.root, ".tix", "config.toml"), []byte(text), 0o644); err != nil {
-		e.t.Fatal(err)
-	}
-	return e.openAt(c)
-}
-
 func (e *env) subject() string { return strings.TrimSpace(e.git("log", "-1", "--format=%s")) }
 
 func (e *env) text(id string) string {
@@ -94,7 +79,7 @@ func mkCrit(t *testing.T, s *core.Store, title, column string) string {
 
 func seed(t *testing.T, s *core.Store, title, column string, crit bool) string {
 	t.Helper()
-	checked := column == "todo" || column == "blocked" || column == "done"
+	checked := column == "open" || column == "blocked" || column == "closed"
 	into := column
 	if checked {
 		into = "idea"
@@ -103,15 +88,15 @@ func seed(t *testing.T, s *core.Store, title, column string, crit bool) string {
 	if err != nil {
 		t.Fatalf("Create(%q): %v", title, err)
 	}
-	if crit || column == "todo" {
+	if crit || column == "open" {
 		if r, err = s.Edit(r.ID, r.Rev, critBody, "tester"); err != nil {
 			t.Fatalf("Edit %s: %v", r.ID, err)
 		}
 	}
 	if checked {
 		o := core.MoveOpts{}
-		if column != "todo" {
-			o.Message, o.Force = "seed", column == "done"
+		if column != "open" {
+			o.Message, o.Force = "seed", column == "closed"
 		}
 		if _, err := s.Move(r.ID, column, o, "tester"); err != nil {
 			t.Fatalf("Move %s to %s: %v", r.ID, column, err)
@@ -167,9 +152,9 @@ func (l *lifecycle) takeAndRefuseForeign() {
 	if err != nil {
 		l.t.Fatalf("Take: %v", err)
 	}
-	l.ensure(strings.Contains(r.Info, "todo > doing"), "Info = %q, want `todo > doing  @... until ...`", r.Info)
-	l.ensure(get(l.t, l.s, l.id).Status == "doing" && strings.Contains(l.e.text(l.id), "claim: claude:a until 2026-10-20T15:00"),
-		"after Take there is no status doing and a 3-hour claim:\n%s", l.e.text(l.id))
+	l.ensure(strings.Contains(r.Info, "open > in_progress"), "Info = %q, want `open > in_progress  @... until ...`", r.Info)
+	l.ensure(get(l.t, l.s, l.id).Status == "in_progress" && strings.Contains(l.e.text(l.id), "claim: claude:a until 2026-10-20T15:00"),
+		"after Take there is no status in_progress and a 3-hour claim:\n%s", l.e.text(l.id))
 	l.ensure(l.e.subject() == l.id+": take", "commit subject %q, want %q", l.e.subject(), l.id+": take")
 
 	// Another actor on a live claim: a refusal with the owner and a hint, the history is intact.
@@ -225,7 +210,7 @@ func (l *lifecycle) stealAndRelease() {
 	tk := get(l.t, l.s, l.id)
 	_, ok := tk.ClaimInfo()
 	l.ensure(!ok, "the claim remained after Release")
-	l.ensure(tk.Status == "todo", "status after Release %q, want todo: active means someone works on it", tk.Status)
+	l.ensure(tk.Status == "open", "status after Release %q, want open: active means someone works on it", tk.Status)
 	l.ensure(l.e.subject() == l.id+": release", "subject %q, want %q", l.e.subject(), l.id+": release")
 	n := l.e.count()
 	_, err = l.s.Take(l.id, core.Release, "claude:b")
@@ -251,7 +236,7 @@ func TestTake_ClaimLifecycle_ExtendExpireStealRelease(t *testing.T) {
 	e := newEnv(t)
 	clk := newClock()
 	s := e.openAt(clk)
-	l := &lifecycle{t: t, e: e, clk: clk, s: s, id: mkIn(t, s, "Work", "todo")}
+	l := &lifecycle{t: t, e: e, clk: clk, s: s, id: mkIn(t, s, "Work", "open")}
 	l.takeAndRefuseForeign()
 	l.extend()
 	l.stealAndRelease()
@@ -264,15 +249,13 @@ func TestTake_Refusals_NothingChanges(t *testing.T) {
 	clk := newClock()
 	s := e.openAt(clk)
 	inbox := mkIn(t, s, "Idea", "idea")
-	closed := mkIn(t, s, "Old", "done")
-	s = e.withConfig(clk, reviewConfig)
-	norole := mkIn(t, s, "Review", "review")
-	ready := mkIn(t, s, "Ready", "todo")
+	closed := mkIn(t, s, "Old", "closed")
+	ready := mkIn(t, s, "Ready", "open")
 
 	n := e.count()
 	before := e.text(ready)
 	inboxBefore := e.text(inbox)
-	for _, c := range []struct{ name, id string }{{"inbox", inbox}, {"closed", closed}, {"column without a role", norole}} {
+	for _, c := range []struct{ name, id string }{{"idea", inbox}, {"closed", closed}} {
 		_, err := s.Take(c.id, core.Take, "claude:a")
 		wantRule(t, "Take from "+c.name, err, "tix move")
 	}
@@ -315,10 +298,10 @@ func TestTake_InboxWithCriterion(t *testing.T) {
 	}
 	tk := get(t, s, id)
 	claim, has := tk.ClaimInfo()
-	if tk.Status != "doing" || !has || claim.Actor != "codex:a" || !claim.Until.Equal(clk.now().Add(3*time.Hour)) {
-		t.Errorf("Take from inbox: status %q, claim %+v, want doing with a three-hour claim", tk.Status, claim)
+	if tk.Status != "in_progress" || !has || claim.Actor != "codex:a" || !claim.Until.Equal(clk.now().Add(3*time.Hour)) {
+		t.Errorf("Take from inbox: status %q, claim %+v, want in_progress with a three-hour claim", tk.Status, claim)
 	}
-	if e.count() != n+1 || !strings.Contains(r.Info, "idea > doing") {
+	if e.count() != n+1 || !strings.Contains(r.Info, "idea > in_progress") {
 		t.Errorf("Take from inbox: commits %d (was %d), info %q", e.count(), n, r.Info)
 	}
 	if _, err := s.Take(id, core.Take, "codex:a"); err != nil || e.count() != n+1 {
@@ -331,7 +314,7 @@ func TestTake_Release_KeepsNonActiveColumn(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	id := mkCrit(t, s, "A", "todo")
+	id := mkCrit(t, s, "A", "open")
 	if _, err := s.Take(id, core.Take, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
@@ -352,8 +335,8 @@ func TestTake_Release_ExpiredForeignClaimToHeadOfReady(t *testing.T) {
 	e := newEnv(t)
 	clk := newClock()
 	s := e.openAt(clk)
-	id := mkCrit(t, s, "A", "todo")
-	mkCrit(t, s, "B", "todo")
+	id := mkCrit(t, s, "A", "open")
+	mkCrit(t, s, "B", "open")
 	if _, err := s.Take(id, core.Take, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
@@ -362,34 +345,27 @@ func TestTake_Release_ExpiredForeignClaimToHeadOfReady(t *testing.T) {
 		t.Fatalf("Release of an expired foreign claim: %v", err)
 	}
 	tk := get(t, s, id)
-	if _, ok := tk.ClaimInfo(); ok || tk.Status != "todo" {
-		t.Errorf("after Release: status %q, claim kept %v; want todo without a claim", tk.Status, ok)
+	if _, ok := tk.ClaimInfo(); ok || tk.Status != "open" {
+		t.Errorf("after Release: status %q, claim kept %v; want open without a claim", tk.Status, ok)
 	}
-	if got := order(t, s, "todo"); len(got) == 0 || got[0] != id {
-		t.Errorf("todo order %v, want %s first: the released task stays next", got, id)
+	if got := order(t, s, "open"); len(got) == 0 || got[0] != id {
+		t.Errorf("open order %v, want %s first: the released task stays next", got, id)
 	}
 }
 
-// Closing clears ask: a closed task does not keep the yellow star.
-func TestMove_Close_ClearsAsk(t *testing.T) {
+// The ask field is gone: Set refuses it like any unknown field and writes nothing.
+func TestSet_Ask_UnknownField(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	id := mkIn(t, s, "A", "doing")
-	if _, err := s.Set(id, []core.Field{{Name: "ask", Value: "which port?"}}, "claude:a"); err != nil {
-		t.Fatal(err)
+	id := mkIn(t, s, "A", "in_progress")
+	n := e.count()
+	_, err := s.Set(id, []core.Field{{Name: "ask", Value: "which port?"}}, "claude:a")
+	if !errors.Is(err, core.ErrRule) || !strings.Contains(err.Error(), "allowed: title project waiting tags external") {
+		t.Errorf("Set ask = %v, want a rule refusal listing the allowed fields", err)
 	}
-	if _, err := s.Move(id, "blocked", core.MoveOpts{Message: "need key"}, "claude:a"); err != nil {
-		t.Fatal(err)
-	}
-	if tk := get(t, s, id); tk.Ask != "which port?" {
-		t.Errorf("ask after a move to blocked %q, want it kept", tk.Ask)
-	}
-	if _, err := s.Move(id, "done", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
-		t.Fatal(err)
-	}
-	if tk := get(t, s, id); tk.Ask != "" {
-		t.Errorf("ask after done %q, want empty", tk.Ask)
+	if e.count() != n {
+		t.Error("a refused Set wrote a commit")
 	}
 }
 
@@ -400,35 +376,33 @@ func TestMove_Rules(t *testing.T) {
 	clk := newClock()
 	s := e.openAt(clk)
 	bare := mkIn(t, s, "NoCriteria", "idea")
-	s = e.withConfig(clk, reviewConfig)
-	norole := mkIn(t, s, "NoRole", "review")
 	good := mkCrit(t, s, "Good", "idea")
-	act := mkCrit(t, s, "Active", "doing")
+	act := mkCrit(t, s, "Active", "in_progress")
 
 	n := e.count()
-	_, err := s.Move(bare, "todo", core.MoveOpts{}, "claude:a")
-	wantRule(t, "to ready without a criterion", err, "ready needs a criterion")
+	_, err := s.Move(bare, "open", core.MoveOpts{}, "claude:a")
+	wantRule(t, "to ready without a criterion", err, "open needs a criterion")
 	_, err = s.Move(good, "review", core.MoveOpts{}, "claude:a")
-	wantRule(t, "to a column without a role", err, "review has no role")
-	_, err = s.Move(norole, "todo", core.MoveOpts{}, "claude:a")
-	wantRule(t, "from a column without a role", err, "review has no role")
+	wantRule(t, "to an unknown status", err, `unknown status "review"`)
+	_, err = s.Move(good, "todo", core.MoveOpts{}, "claude:a")
+	wantRule(t, "to an old column word", err, "maybe open?")
 	_, err = s.Move(act, "blocked", core.MoveOpts{}, "claude:a")
-	wantRule(t, "to waiting without a field and -m", err, "waiting needs a reason")
-	_, err = s.Move(act, "todo", core.MoveOpts{Message: "x"}, "claude:a")
+	wantRule(t, "to waiting without a field and -m", err, "blocked needs a reason")
+	_, err = s.Move(act, "open", core.MoveOpts{Message: "x"}, "claude:a")
 	wantRule(t, "-m outside waiting and closed", err, "")
 	if e.count() != n {
 		t.Fatalf("Move refusals added commits: %d, was %d", e.count(), n)
 	}
 
-	if _, err := s.Move(good, "todo", core.MoveOpts{}, "claude:a"); err != nil {
+	if _, err := s.Move(good, "open", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatalf("Move to ready with a criterion: %v", err)
 	}
-	if got := e.subject(); got != good+": move idea > todo" {
-		t.Errorf("subject %q, want `%s: move idea > todo`", got, good)
+	if got := e.subject(); got != good+": move idea > open" {
+		t.Errorf("subject %q, want `%s: move idea > open`", got, good)
 	}
 	// Repeat: the same column - ok without a commit.
 	n = e.count()
-	if _, err := s.Move(good, "todo", core.MoveOpts{}, "claude:a"); err != nil || e.count() != n {
+	if _, err := s.Move(good, "open", core.MoveOpts{}, "claude:a"); err != nil || e.count() != n {
 		t.Errorf("Move to the same column: err %v, commits %d, was %d", err, e.count(), n)
 	}
 
@@ -439,7 +413,7 @@ func TestMove_Rules(t *testing.T) {
 	if w := get(t, s, act).Waiting; w != "need key" {
 		t.Errorf("waiting field = %q, want `need key`", w)
 	}
-	if _, err := s.Move(act, "todo", core.MoveOpts{}, "claude:a"); err != nil {
+	if _, err := s.Move(act, "open", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	if w := get(t, s, act).Waiting; w != "" {
@@ -456,11 +430,11 @@ func TestMove_Rules(t *testing.T) {
 	if _, err := s.Take(act, core.Take, "claude:a"); err != nil {
 		t.Fatalf("Take from waiting: %v", err)
 	}
-	if tk := get(t, s, act); tk.Waiting != "" || tk.Status != "doing" {
+	if tk := get(t, s, act); tk.Waiting != "" || tk.Status != "in_progress" {
 		t.Errorf("after Take from waiting: status %q, waiting %q", tk.Status, tk.Waiting)
 	}
 	// Leaving active drops the claim.
-	if _, err := s.Move(act, "todo", core.MoveOpts{}, "claude:a"); err != nil {
+	if _, err := s.Move(act, "open", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := get(t, s, act).ClaimInfo(); ok {
@@ -474,22 +448,22 @@ func TestMove_Close_CriteriaForceResult(t *testing.T) {
 	e := newEnv(t)
 	clk := newClock()
 	s := e.openAt(clk)
-	a := mkCrit(t, s, "A", "doing")
+	a := mkCrit(t, s, "A", "in_progress")
 	if _, err := s.Check(a, []int{1}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	n := e.count()
-	_, err := s.Move(a, "done", core.MoveOpts{}, "claude:a")
+	_, err := s.Move(a, "closed", core.MoveOpts{}, "claude:a")
 	wantRule(t, "closing with unchecked", err, "1/3 criteria checked")
 	if err != nil && !strings.Contains(err.Error(), "tix check "+a+" 2 3") {
 		t.Errorf("text %q, want the hint `tix check %s 2 3`", err, a)
 	}
-	_, err = s.Move(a, "done", core.MoveOpts{Force: true}, "claude:a")
+	_, err = s.Move(a, "closed", core.MoveOpts{Force: true}, "claude:a")
 	wantRule(t, "--force without -m", err, "")
 	if e.count() != n {
 		t.Fatalf("refusals changed the history: %d, was %d", e.count(), n)
 	}
-	if _, err := s.Move(a, "done", core.MoveOpts{Force: true, Message: "skip rest"}, "claude:a"); err != nil {
+	if _, err := s.Move(a, "closed", core.MoveOpts{Force: true, Message: "skip rest"}, "claude:a"); err != nil {
 		t.Fatalf("--force -m: %v", err)
 	}
 	if got := e.subject(); got != a+": done force" {
@@ -500,34 +474,34 @@ func TestMove_Close_CriteriaForceResult(t *testing.T) {
 	}
 
 	// All checked: closing without -m; the claim is dropped.
-	b := mkCrit(t, s, "B", "todo")
+	b := mkCrit(t, s, "B", "open")
 	if _, err := s.Take(b, core.Take, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Check(b, []int{1, 2, 3}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.Move(b, "done", core.MoveOpts{}, "claude:a"); err != nil {
+	if _, err := s.Move(b, "closed", core.MoveOpts{}, "claude:a"); err != nil {
 		t.Fatalf("closing with checked: %v", err)
 	}
 	if got := e.subject(); got != b+": done" {
 		t.Errorf("subject %q, want %q", got, b+": done")
 	}
-	if tk := get(t, s, b); tk.Status != "done" {
-		t.Errorf("status %q, want done", tk.Status)
+	if tk := get(t, s, b); tk.Status != "closed" {
+		t.Errorf("status %q, want closed", tk.Status)
 	} else if _, ok := tk.ClaimInfo(); ok {
 		t.Error("closing did not drop the claim")
 	}
 
 	// Without criteria: -m is required; a repeated -m on a closed task does not write a second result.
-	c := mkIn(t, s, "C", "doing")
-	_, err = s.Move(c, "done", core.MoveOpts{}, "claude:a")
+	c := mkIn(t, s, "C", "in_progress")
+	_, err = s.Move(c, "closed", core.MoveOpts{}, "claude:a")
 	wantRule(t, "0 criteria without -m", err, "no criteria")
-	if _, err := s.Move(c, "done", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
+	if _, err := s.Move(c, "closed", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	n = e.count()
-	if _, err := s.Move(c, "done", core.MoveOpts{Message: "shipped again"}, "claude:a"); err != nil {
+	if _, err := s.Move(c, "closed", core.MoveOpts{Message: "shipped again"}, "claude:a"); err != nil {
 		t.Fatalf("repeated done: %v", err)
 	}
 	if e.count() != n || strings.Contains(e.text(c), "shipped again") {
@@ -557,47 +531,47 @@ func TestMove_Order_FirstAfterForeignColumn(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	a, b, c := mkIn(t, s, "A", "todo"), mkIn(t, s, "B", "todo"), mkIn(t, s, "C", "todo")
+	a, b, c := mkIn(t, s, "A", "open"), mkIn(t, s, "B", "open"), mkIn(t, s, "C", "open")
 	foreign := mkIn(t, s, "F", "idea")
 	for _, id := range []string{a, b, c} {
-		if _, err := s.Move(id, "doing", core.MoveOpts{}, "x:1"); err != nil {
+		if _, err := s.Move(id, "in_progress", core.MoveOpts{}, "x:1"); err != nil {
 			t.Fatal(err)
 		}
 	}
 	want := func(ids ...string) {
 		t.Helper()
-		if got := order(t, s, "doing"); strings.Join(got, ",") != strings.Join(ids, ",") {
-			t.Errorf("doing order %v, want %v", got, ids)
+		if got := order(t, s, "in_progress"); strings.Join(got, ",") != strings.Join(ids, ",") {
+			t.Errorf("in_progress order %v, want %v", got, ids)
 		}
 	}
 	want(a, b, c)
-	d := mkIn(t, s, "D", "todo")
-	if _, err := s.Move(d, "doing", core.MoveOpts{Place: core.Place{First: true}}, "x:1"); err != nil {
+	d := mkIn(t, s, "D", "open")
+	if _, err := s.Move(d, "in_progress", core.MoveOpts{Place: core.Place{First: true}}, "x:1"); err != nil {
 		t.Fatal(err)
 	}
 	want(d, a, b, c)
-	if _, err := s.Move(c, "doing", core.MoveOpts{Place: core.Place{After: a}}, "x:1"); err != nil {
+	if _, err := s.Move(c, "in_progress", core.MoveOpts{Place: core.Place{After: a}}, "x:1"); err != nil {
 		t.Fatal(err)
 	}
 	want(d, a, c, b)
-	_, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{After: foreign}}, "x:1")
+	_, err := s.Move(b, "in_progress", core.MoveOpts{Place: core.Place{After: foreign}}, "x:1")
 	wantRule(t, "--after a task from another column", err, "")
 	want(d, a, c, b)
 
 	// The same column: without a place - ok without a commit; with --first and --after the order changes by a commit (TUI, S4).
 	n := e.count()
-	if _, err := s.Move(b, "doing", core.MoveOpts{}, "x:1"); err != nil || e.count() != n {
+	if _, err := s.Move(b, "in_progress", core.MoveOpts{}, "x:1"); err != nil || e.count() != n {
 		t.Errorf("move to the same column without a place: err %v, commits %d, was %d", err, e.count(), n)
 	}
 	want(d, a, c, b)
-	if _, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{First: true}}, "x:1"); err != nil {
+	if _, err := s.Move(b, "in_progress", core.MoveOpts{Place: core.Place{First: true}}, "x:1"); err != nil {
 		t.Fatalf("--first in the same column: %v", err)
 	}
 	if e.count() != n+1 {
 		t.Errorf("--first in the same column: commits %d, want %d", e.count(), n+1)
 	}
 	want(b, d, a, c)
-	if _, err := s.Move(b, "doing", core.MoveOpts{Place: core.Place{After: a}}, "x:1"); err != nil {
+	if _, err := s.Move(b, "in_progress", core.MoveOpts{Place: core.Place{After: a}}, "x:1"); err != nil {
 		t.Fatalf("--after in the same column: %v", err)
 	}
 	if e.count() != n+2 {
@@ -613,13 +587,13 @@ func TestMove_100InsertsAfterSameAnchor_OrderStaysTotal(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	anchor := mkIn(t, s, "Anchor", "doing")
+	anchor := mkIn(t, s, "Anchor", "in_progress")
 	var ids []string
 	for i := 0; i < 100; i++ {
-		ids = append(ids, mkIn(t, s, fmt.Sprintf("N%d", i), "todo"))
+		ids = append(ids, mkIn(t, s, fmt.Sprintf("N%d", i), "open"))
 	}
 	for _, id := range ids {
-		if _, err := s.Move(id, "doing", core.MoveOpts{Place: core.Place{After: anchor}}, "x:1"); err != nil {
+		if _, err := s.Move(id, "in_progress", core.MoveOpts{Place: core.Place{After: anchor}}, "x:1"); err != nil {
 			t.Fatalf("Move %s after %s: %v", id, anchor, err)
 		}
 	}
@@ -627,7 +601,7 @@ func TestMove_100InsertsAfterSameAnchor_OrderStaysTotal(t *testing.T) {
 	for i := len(ids) - 1; i >= 0; i-- {
 		want = append(want, ids[i])
 	}
-	got := order(t, s, "doing")
+	got := order(t, s, "in_progress")
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("order after 100 inserts is broken:\n%v\nwant:\n%v", got, want)
 	}
@@ -637,7 +611,7 @@ func TestMove_100InsertsAfterSameAnchor_OrderStaysTotal(t *testing.T) {
 	}
 	seen := map[float64]bool{}
 	for _, tk := range all {
-		if tk.Status == "doing" && seen[tk.Rank] {
+		if tk.Status == "in_progress" && seen[tk.Rank] {
 			t.Fatalf("rank %v repeats: the order holds by chance", tk.Rank)
 		}
 		seen[tk.Rank] = true
@@ -650,8 +624,8 @@ func TestSet_Rules(t *testing.T) {
 	e := newEnv(t)
 	clk := newClock()
 	s := e.openAt(clk)
-	id := mkIn(t, s, "Work", "todo")
-	w := mkIn(t, s, "Wait", "todo")
+	id := mkIn(t, s, "Work", "open")
+	w := mkIn(t, s, "Wait", "open")
 	if _, err := s.Move(w, "blocked", core.MoveOpts{Message: "reason"}, "x:1"); err != nil {
 		t.Fatal(err)
 	}
@@ -660,7 +634,7 @@ func TestSet_Rules(t *testing.T) {
 		_, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1")
 		wantRule(t, "Set "+name, err, "tix move")
 	}
-	for _, name := range []string{"id", "created", "nosuch"} {
+	for _, name := range []string{"id", "created", "nosuch", "due"} {
 		if _, err := s.Set(id, []core.Field{{Name: name, Value: "x"}}, "x:1"); err == nil {
 			t.Errorf("Set %s accepted", name)
 		}
@@ -676,50 +650,22 @@ func TestSet_Rules(t *testing.T) {
 		t.Fatal("Set refusals changed the history or the file")
 	}
 
-	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}, {Name: "tags", Value: "a,b"}, {Name: "summary", Value: "x=y"}}, "x:1"); err != nil {
+	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}, {Name: "tags", Value: "a,b"}, {Name: "abstract", Value: "x=y"}}, "x:1"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
 	tk := get(t, s, id)
-	if tk.Title != "New" || strings.Join(tk.Tags, ",") != "a,b" || tk.Summary() != "x=y" {
-		t.Errorf("after Set: title %q tags %v summary %q", tk.Title, tk.Tags, tk.Summary())
+	if tk.Title != "New" || strings.Join(tk.Tags, ",") != "a,b" || !strings.Contains(tk.Body, "x=y") {
+		t.Errorf("after Set: title %q tags %v body %q", tk.Title, tk.Tags, tk.Body)
 	}
 	subj := e.subject()
-	if !strings.HasPrefix(subj, id+": set ") || !strings.Contains(subj, "title") || !strings.Contains(subj, "summary") {
-		t.Errorf("subject %q, want `%s: set title tags summary`", subj, id)
+	if !strings.HasPrefix(subj, id+": set ") || !strings.Contains(subj, "title") || !strings.Contains(subj, "abstract") {
+		t.Errorf("subject %q, want `%s: set title tags abstract`", subj, id)
 	}
 	n = e.count()
+	_, err = s.Set(id, []core.Field{{Name: "summary", Value: "x"}}, "x:1")
+	wantRule(t, "summary is gone", err, "")
 	if _, err := s.Set(id, []core.Field{{Name: "title", Value: "New"}}, "x:1"); err != nil || e.count() != n {
 		t.Errorf("Set with the same value: err %v, commits %d, was %d", err, e.count(), n)
-	}
-}
-
-func TestCheckAt_ConcurrentReorderRefused(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkCrit(t, s, "Epic", "doing")
-	_, rev, err := s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reordered := strings.Replace(critBody, "one\n- [ ] two", "two\n- [ ] one", 1)
-	core.SetAfterRead(s, func(path string, _ int) {
-		if err := os.WriteFile(path, []byte(strings.Replace(e.text(id), critBody, reordered, 1)), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		core.SetAfterRead(s, nil)
-	})
-	if _, err := s.CheckAt(id, []int{1}, "x:1", rev); !errors.Is(err, core.ErrConflict) {
-		t.Fatalf("concurrent reorder: %v, want conflict", err)
-	}
-	ensure(t, strings.Contains(e.text(id), reordered), "reordered criteria must stay unchecked")
-	_, rev, err = s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := s.CheckAt(id, []int{2}, "x:1", rev)
-	if err != nil || r.Info != "1/3" {
-		t.Fatalf("fresh revision: info %q, err %v", r.Info, err)
 	}
 }
 
@@ -727,7 +673,7 @@ func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	id := mkCrit(t, s, "Work", "doing")
+	id := mkCrit(t, s, "Work", "in_progress")
 	r, err := s.Check(id, []int{1, 2}, "x:1")
 	if err != nil || r.Info != "2/3" {
 		t.Fatalf("Check 1 2: info %q, err %v; want `2/3`", r.Info, err)
@@ -747,102 +693,6 @@ func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	}
 }
 
-// Backup: bare, an edit around the core, a broken path, no origin, no store.
-func newBareDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	if out, err := exec.CommandContext(context.Background(), gitBin, "init", "--bare", "-q", dir).CombinedOutput(); err != nil {
-		t.Fatalf("init --bare: %v\n%s", err, out)
-	}
-	return dir
-}
-
-func (e *env) bareMatchesLocal(bare string) (local, remote string) {
-	e.t.Helper()
-	local = strings.TrimSpace(e.git("rev-parse", "HEAD"))
-	br := strings.TrimSpace(e.git("symbolic-ref", "--short", "HEAD"))
-	out, _ := exec.CommandContext(context.Background(), gitBin, "-C", bare, "rev-parse", "refs/heads/"+br).CombinedOutput()
-	return local, strings.TrimSpace(string(out))
-}
-
-func TestBackup_PushesHeadAfterCommittingOutsideEdit(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkIn(t, s, "Work", "todo")
-	bare := newBareDir(t)
-	e.git("remote", "add", "origin", bare)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if _, err := s.Backup(ctx); err != nil {
-		t.Fatalf("Backup: %v", err)
-	}
-	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Fatalf("HEAD bare %q != local %q", remote, local)
-	}
-
-	// An edit around the core: Backup commits it and pushes.
-	f := e.file(id)
-	d, _ := os.ReadFile(f)
-	if err := os.WriteFile(f, append(d, []byte("edited in Obsidian\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Backup(ctx); err != nil {
-		t.Fatalf("Backup with an external edit: %v", err)
-	}
-	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("after Backup the tree is not clean:\n%s", st)
-	}
-	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Errorf("HEAD bare %q != local %q after an external edit", remote, local)
-	}
-}
-
-func TestBackup_NoOriginBadPathBadCredentials_ErrorsOneKind(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkIn(t, s, "Work", "todo")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if _, err := s.Backup(ctx); !errors.Is(err, core.ErrNoRemote) || !strings.Contains(err.Error(), "git remote add origin") {
-		t.Errorf("Backup without origin = %v, want ErrNoRemote with the hint `git remote add origin <url>`", err)
-	}
-
-	// A broken path: an error, but the edit around the core is still committed (the lock is released before push).
-	e.git("remote", "add", "origin", filepath.Join(e.root, "no", "such.git"))
-	f := e.file(id)
-	d, _ := os.ReadFile(f)
-	if err := os.WriteFile(f, append(d, []byte("outside\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Backup(ctx); err == nil || errors.Is(err, core.ErrNoRemote) {
-		t.Errorf("Backup to a broken path = %v, want a push error", err)
-	}
-	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("on a push failure the edit is not committed:\n%s", st)
-	}
-
-	// user:pass@ in the error text is cut out.
-	e.git("remote", "set-url", "origin", "http://user:s3cretpw@127.0.0.1:1/r.git")
-	_, err := s.Backup(ctx)
-	if err == nil {
-		t.Fatal("Backup to an unreachable address passed")
-	}
-	if strings.Contains(err.Error(), "s3cretpw") {
-		t.Errorf("remote password in the error text: %v", err)
-	}
-}
-
-func TestBackup_NoBase_Error(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	if _, err := s.Backup(context.Background()); err == nil {
-		t.Error("Backup without a store passed")
-	}
-}
-
 // Every 300 commits gc starts in the background after the lock. Replacement - a git wrapper:
 // gc and commit-graph do not run but are written to gc.log; the threshold is checked with a margin.
 func TestGC_EveryThreeHundredCommits(t *testing.T) {
@@ -857,7 +707,7 @@ func TestGC_EveryThreeHundredCommits(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := e.openAt(newClock())
-	id := mkIn(t, s, "Work", "todo")
+	id := mkIn(t, s, "Work", "open")
 	gcLog := func() string { d, _ := os.ReadFile(filepath.Join(e.fake, "gc.log")); return string(d) }
 	for i := 2; i <= 250; i++ {
 		if _, err := s.Note(id, fmt.Sprintf("step %d", i), "x:1"); err != nil {
@@ -883,14 +733,16 @@ func TestGC_EveryThreeHundredCommits(t *testing.T) {
 	}
 }
 
-// move by role name: there is no waiting column, there is blocked with role waiting - the task goes to blocked.
-func TestMove_RoleName_GoesToColumnWithRole(t *testing.T) {
+// move to blocked with -m; an old word and an empty name are refused with the five statuses named.
+func TestMove_Blocked_OldWordsRefused(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
-	a := mkCrit(t, s, "A", "doing")
-	if _, err := s.Move(a, "waiting", core.MoveOpts{Message: "waiting for a reply"}, "claude:a"); err != nil {
-		t.Fatalf("move %s waiting: %v", a, err)
+	a := mkCrit(t, s, "A", "in_progress")
+	_, err := s.Move(a, "waiting", core.MoveOpts{Message: "waiting for a reply"}, "claude:a")
+	wantRule(t, "old role word", err, "maybe blocked?")
+	if _, err := s.Move(a, "blocked", core.MoveOpts{Message: "waiting for a reply"}, "claude:a"); err != nil {
+		t.Fatalf("move %s blocked: %v", a, err)
 	}
 	got, _, err := s.Get(a)
 	if err != nil {
@@ -899,29 +751,45 @@ func TestMove_RoleName_GoesToColumnWithRole(t *testing.T) {
 	if got.Status != "blocked" {
 		t.Errorf("status %q, want blocked", got.Status)
 	}
-	if subj := e.subject(); !strings.Contains(subj, "move doing > blocked") {
-		t.Errorf("commit subject %q, want the column name: move doing > blocked", subj)
+	if subj := e.subject(); !strings.Contains(subj, "move in_progress > blocked") {
+		t.Errorf("commit subject %q, want the column name: move in_progress > blocked", subj)
 	}
 	_, err = s.Move(a, "nowhere", core.MoveOpts{}, "claude:a")
-	wantRule(t, "unknown name", err, `unknown column "nowhere"; columns: idea=inbox todo=ready`)
+	wantRule(t, "unknown name", err, `unknown status "nowhere"; statuses: idea open in_progress blocked closed`)
 	_, err = s.Move(a, "", core.MoveOpts{}, "claude:a")
-	wantRule(t, "empty name", err, `unknown column ""`)
+	wantRule(t, "empty name", err, `unknown status ""`)
 }
 
-// A column name outranks a role: column "waiting" with role ready takes the task, not blocked.
-func TestMove_ColumnNameBeatsRole(t *testing.T) {
+func TestMove_EpicEditedMeanwhileGivesWarning(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
-	clk := newClock()
-	mkIn(t, e.openAt(clk), "Seed", "idea")
-	s := e.withConfig(clk, "[[column]]\nname = \"idea\"\nrole = \"inbox\"\n\n[[column]]\nname = \"waiting\"\nrole = \"ready\"\n\n"+
-		"[[column]]\nname = \"doing\"\nrole = \"active\"\n\n[[column]]\nname = \"blocked\"\nrole = \"waiting\"\n\n"+
-		"[[column]]\nname = \"done\"\nrole = \"closed\"\n")
-	a := mkCrit(t, s, "A", "doing")
-	if _, err := s.Move(a, "waiting", core.MoveOpts{}, "claude:a"); err != nil {
-		t.Fatalf("move %s waiting: %v", a, err)
+	s := e.openAt(newClock())
+	child := mkCrit(t, s, "Child", "in_progress")
+	r, err := s.Create("Epic", "proj", "idea", "tester")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got, _, _ := s.Get(a); got == nil || got.Status != "waiting" {
-		t.Errorf("the task did not go to column waiting: %+v", got)
+	if _, err = s.Set(r.ID, []core.Field{{Name: "tags", Value: "epic"}}, "tester"); err != nil {
+		t.Fatal(err)
 	}
+	_, rev, _ := s.Get(r.ID)
+	if _, err = s.Edit(r.ID, rev, "## Details\n- [ ] "+child+"\n", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	core.SetAfterRead(s, func(path string, _ int) {
+		if strings.Contains(path, child) {
+			f, err := os.OpenFile(e.file(r.ID), os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = f.WriteString("\nedited elsewhere\n")
+			_ = f.Close()
+			core.SetAfterRead(s, nil)
+		}
+	})
+	res, err := s.Move(child, "closed", core.MoveOpts{Force: true, Message: "x"}, "tester")
+	if err != nil || !strings.Contains(res.Warning, r.ID) {
+		t.Fatalf("Move: warning %q, err %v; want a warning naming the epic", res.Warning, err)
+	}
+	ensure(t, strings.Contains(e.text(r.ID), "- [ ] "+child) && strings.Contains(e.text(r.ID), "edited elsewhere"), "the foreign edit must stay")
 }

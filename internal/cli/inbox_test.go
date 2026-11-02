@@ -35,7 +35,7 @@ func newInboxBox(t *testing.T) *box {
 // hold creates T-1 and claims it with session c1.
 func (b *box) hold() {
 	b.t.Helper()
-	b.newTask("Work", "todo")
+	b.newTask("Work", "open")
 	b.ok("", "take", "T-1")
 }
 
@@ -188,8 +188,8 @@ func TestInbox_UnclaimedAndForeignClaim_NotDelivered(t *testing.T) {
 	defer guard(t)
 	b := newInboxBox(t)
 	b.hold()
-	b.newTask("Free", "todo")
-	b.newTask("Foreign", "todo")
+	b.newTask("Free", "open")
+	b.newTask("Foreign", "open")
 	b.ok("", "take", "T-3", "--as", "claude:other")
 	b.inbox("PostToolUse")
 

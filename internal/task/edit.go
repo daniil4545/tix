@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 )
 
-// sections - body sections in canonical order; SetSection writes the first two.
+// sections - body sections in canonical order; SetSection writes only Abstract. Summary stays
+// in the list so an old file keeps its place for the insertion order.
 var sections = []string{"Abstract", "Summary", "Details"}
 
-// SetField changes a frontmatter field: title, project, waiting, due, tags, ask, external.
-// The value is one line; title is never empty; due is 2006-01-02 or empty.
+// SetField changes a frontmatter field: title, project, waiting, tags, external.
+// The value is one line; title is never empty.
 func (t *Task) SetField(name, value string) error {
 	switch name {
-	case "title", "project", "waiting", "due", "ask", "external":
+	case "title", "project", "waiting", "external":
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("%s must be one line", name)
 		}
@@ -23,15 +23,10 @@ func (t *Task) SetField(name, value string) error {
 		t.Tags = splitTags(value)
 		return nil
 	default:
-		return fmt.Errorf("field %q cannot be set: allowed title project waiting due tags ask external", name)
+		return fmt.Errorf("field %q cannot be set: allowed title project waiting tags external", name)
 	}
 	if name == "title" && strings.TrimSpace(value) == "" {
 		return errors.New("title is empty")
-	}
-	if name == "due" && value != "" {
-		if _, err := time.Parse(time.DateOnly, value); err != nil {
-			return fmt.Errorf("due %q: want 2006-01-02", value)
-		}
 	}
 	*t.stringField(name) = value
 	return nil
@@ -48,12 +43,12 @@ func splitTags(value string) []string {
 	return tags
 }
 
-// SetSection replaces the section text (Abstract, Summary). "## " inside the text is an error.
+// SetSection replaces the section text (Abstract). "## " inside the text is an error.
 // No section - it is inserted by the canonical order Abstract, Summary, Details.
 func (t *Task) SetSection(name, text string) error {
-	i := slices.IndexFunc(sections[:2], func(s string) bool { return strings.EqualFold(s, name) })
+	i := slices.IndexFunc(sections[:1], func(s string) bool { return strings.EqualFold(s, name) })
 	if i < 0 {
-		return fmt.Errorf("section %q cannot be set: allowed Abstract Summary", name)
+		return fmt.Errorf("section %q cannot be set: allowed Abstract", name)
 	}
 	heading := "## " + sections[i]
 	text = strings.TrimRight(strings.ReplaceAll(text, "\r\n", "\n"), " \t\n")

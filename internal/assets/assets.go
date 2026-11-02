@@ -15,11 +15,15 @@ var Rules string
 
 // RulesHash - sha256 of Rules. A test keeps it equal to RULES.md: when the text changes, the old
 // hash moves into previousRules, so a store with an untouched old copy gets the new text.
-const RulesHash = "39c1d03b2c59e2252fd06cf35eef614695d327b3a38194f289f6d2e0e2c1f2b6"
+const RulesHash = "0d3303412cf80eb27db48634e211bc744ea52528600fb198ddc5088b748db05a"
 
 // previousRules - sha256 of RULES.md texts shipped by earlier versions. An empty file is not here:
 // the owner may have emptied it on purpose.
 var previousRules = map[string]bool{
+	"f1e0f5e1aaef7404cead2d39c926c422a71a3e0d1e75396a92a34f8b36bd5f34": true,
+	"b3556ac040a632d6a9a1e2e2e55c41bc7b8781dd1ddf320843a8f7feae85e29a": true,
+	"2c1238b48f9fa4ea82de5d32c5237eeb08eaa773000baec6aec2fd8583508900": true,
+	"5f96e07d234feeeaf200831331b3d2cb2f18f01bc88c3b7d7f7b0cdb200228e8": true,
 	"c56259fbb08875c39ee29e4d93cfa3bed99a0e9427247f0e0e10670e763e7cba": true,
 	"5d390bc8cb3b7642b757e75f82c5efe6de935d45db3ad3e7a1db73a6184e676f": true,
 	"5086330dcf376195052547a558e048d28ac25f322e77f9fc26edb0387a3bbaee": true,
@@ -29,6 +33,10 @@ var previousRules = map[string]bool{
 	"74216bc959fefe9656b5c443232418d0abe4db6eb386a32e2401068398be8160": true,
 	"da3782a3c15c4b9af356f0885f693c6b2fc95ba50a4ef8313d70cd8d4c5125a3": true,
 	"f2eacf1430eb91434e062aab2aca854b44837b5859be5007d610330ec7be4fe5": true,
+	"39c1d03b2c59e2252fd06cf35eef614695d327b3a38194f289f6d2e0e2c1f2b6": true,
+	"3485ae0aec3c6e9354614ee7eec1359ff46b48e136ed83df836ae0f17ec06172": true,
+	"da5d3b95d377ea677c5894b54357d984d082339bb3f6407a3df0541022277134": true,
+	"742f6f37750602970f8ac8eb6b3b064d0dbc74616da808c5669fdd56bd23799b": true,
 }
 
 // OutdatedRules reports whether text is an untouched RULES.md of an earlier version.

@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -25,8 +27,11 @@ func (a *app) reply(p *parsed, res core.Result, id, what string) {
 		line += " " + res.Commit
 	}
 	a.out("%s", line)
+	for _, e := range res.Ready {
+		a.out("epic %s: all tasks closed, ready for acceptance", e)
+	}
 	if res.Warning != "" {
-		a.warn("%s: commit not recorded", id)
+		a.warn("%s: %s", id, res.Warning)
 	}
 }
 
@@ -101,26 +106,12 @@ func (a *app) newBody(path string) (string, error) {
 	return string(data), nil
 }
 
-// column returns the column of a new task: --to by name or role, else the inbox role column, else the first.
+// column returns the status of a new task: --to, else idea.
 func (a *app) column(p *parsed) (string, error) {
-	cols := a.store.Config().Columns
-	if len(cols) == 0 {
-		return "", errors.New("config.toml has no columns")
-	}
-	want := a.store.Config().Resolve(p.vals["to"])
-	for _, c := range cols {
-		if p.set["to"] && c.Name == want || !p.set["to"] && c.Role == "inbox" {
-			return c.Name, nil
-		}
-	}
 	if !p.set["to"] {
-		return cols[0].Name, nil
+		return config.Idea, nil
 	}
-	names := make([]string, len(cols))
-	for i, c := range cols {
-		names[i] = c.Name
-	}
-	return "", inputf("unknown column %q; available: %s", want, strings.Join(names, ", "))
+	return p.vals["to"], checkStatus(p.vals["to"])
 }
 
 func (a *app) cmdText(args []string) error {
@@ -244,6 +235,9 @@ func (a *app) cmdShow(args []string) error {
 		}
 		// The file as is: Obsidian may have written it in a non-canonical form.
 		a.out("rev %s", sh.Rev)
+		for _, e := range a.store.EpicsOf(id) {
+			a.out("Epic: %s", e)
+		}
 		_, _ = a.env.Stdout.Write(sh.Data)
 		a.printNotes(id, sh, p.set["v"])
 		return nil
@@ -311,8 +305,6 @@ type listItem struct {
 	External string   `json:"external"`
 	Waiting  string   `json:"waiting"`
 	Claim    string   `json:"claim"`
-	Due      string   `json:"due"`
-	Ask      string   `json:"ask"`
 	Rank     float64  `json:"rank"`
 	Created  string   `json:"created"`
 	Tags     []string `json:"tags"`
@@ -349,17 +341,20 @@ func (a *app) cmdList(args []string) error {
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
 	}
-	// an explicit --status shows its column even when it is the closed one
-	closed, hasClosed := a.store.Config().ByRole("closed")
-	hide := hasClosed && !p.set["all"] && !p.set["status"]
+	if p.set["status"] {
+		if err := checkStatus(p.vals["status"]); err != nil {
+			return err
+		}
+	}
+	// an explicit --status shows its status even when it is closed
+	hide := !p.set["all"] && !p.set["status"]
 	needle := strings.ToLower(p.vals["grep"])
 	var matched []*task.Task
 	for _, t := range tasks {
-		if hide && t.Status == closed.Name {
+		if hide && t.Status == config.Closed {
 			continue
 		}
-		if !strings.Contains(strings.ToLower(t.Title), needle) &&
-			!summaryContains(t.Body, needle) {
+		if !strings.Contains(strings.ToLower(t.Title), needle) {
 			continue
 		}
 		matched = append(matched, t)
@@ -367,34 +362,14 @@ func (a *app) cmdList(args []string) error {
 	return a.printTasks(p, a.filter(matched, proj, p.vals["status"]))
 }
 
-func summaryContains(body, needle string) bool {
-	inSummary := false
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "## ") {
-			if inSummary {
-				return false
-			}
-			inSummary = line == "## Summary"
-		} else if inSummary && strings.Contains(strings.ToLower(line), needle) {
-			return true
-		}
-	}
-	return false
-}
-
 // filter keeps the tasks of the project and column (an empty value means no filter)
-// and sorts: columns by config.toml, within a column by rank, then by number.
+// and sorts: statuses in board order, within a status by rank, then by number.
 func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
-	order := map[string]int{}
-	for i, c := range a.store.Config().Columns {
-		order[c.Name] = i
-	}
 	pos := func(s string) int {
-		if i, ok := order[s]; ok {
+		if i := slices.Index(config.Statuses, s); i >= 0 {
 			return i
 		}
-		return len(order)
+		return len(config.Statuses)
 	}
 	var out []*task.Task
 	for _, t := range tasks {
@@ -425,8 +400,8 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 			}
 			items = append(items, listItem{
 				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status,
-				External: t.External, Waiting: t.Waiting, Claim: t.Claim, Due: t.Due,
-				Ask: t.Ask, Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
+				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
+				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
 			})
 		}
 		return a.printJSON(items)
@@ -441,8 +416,8 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 			status = "?"
 		}
 		line := status + " " + t.ID + " " + t.Title
-		if sum := t.Summary(); sum != "" {
-			line += " | " + sum
+		if t.IsEpic() {
+			line = status + " " + t.ID + " [epic] " + t.Title
 		}
 		a.out("%s", line)
 	}

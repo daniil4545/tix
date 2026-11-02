@@ -34,10 +34,6 @@ func (m *Model) startGrab() {
 }
 
 func (m *Model) grabStatus() {
-	if m.board.ByDue {
-		m.setStatus("moving "+m.grab.id+": order by due: place off, space drop, esc cancel", false)
-		return
-	}
 	m.setStatus("moving "+m.grab.id+": arrows move, space drop, esc cancel", false)
 }
 
@@ -84,12 +80,9 @@ func (m *Model) grabColumn(dir int) {
 	m.rebuild()
 }
 
-// grabRow changes the card place in a column; in due order the place is not chosen.
+// grabRow changes the card place in a column.
 func (m *Model) grabRow(dir int) {
 	g := m.grab
-	if m.board.ByDue {
-		return
-	}
 	g.idx = min(max(g.idx+dir, 0), len(m.colTasks[g.col])-1)
 	m.rebuild()
 }
@@ -102,7 +95,6 @@ func (m *Model) drop() tea.Cmd {
 	if row > 0 {
 		above = m.colTasks[col][row-1].ID
 	}
-	byDue := m.board.ByDue
 	m.grab = nil
 	m.setStatus("", false)
 	m.rebuild()
@@ -111,17 +103,15 @@ func (m *Model) drop() tea.Cmd {
 	case t == nil:
 		m.setStatus(g.id+" removed", true)
 		return nil
-	case target == g.baseCol && (byDue || above == g.baseAbove):
+	case target == g.baseCol && above == g.baseAbove:
 		return nil
-	case byDue:
-		return m.moveTo(t, target, core.MoveOpts{})
 	}
 	return m.moveTo(t, target, core.MoveOpts{Place: core.Place{First: row == 0, After: above}})
 }
 
 // place takes the grabbed task out of its column (remembers who was above it) and inserts it
-// into the shown column target; in due order - by due date. ts is already sorted.
-func (g *grab) place(name string, ts []*task.Task, target string, byDue bool) []*task.Task {
+// into the shown column target. ts is already sorted.
+func (g *grab) place(name string, ts []*task.Task, target string) []*task.Task {
 	if name == g.baseCol {
 		i := slices.IndexFunc(ts, func(t *task.Task) bool { return t.ID == g.id })
 		g.baseAbove = ""
@@ -131,11 +121,6 @@ func (g *grab) place(name string, ts []*task.Task, target string, byDue bool) []
 		ts = slices.Delete(slices.Clone(ts), i, i+1)
 	}
 	if name != target {
-		return ts
-	}
-	if byDue {
-		ts = append(slices.Clone(ts), g.held)
-		sortTasks(ts, true)
 		return ts
 	}
 	return slices.Insert(slices.Clone(ts), min(g.idx, len(ts)), g.held)

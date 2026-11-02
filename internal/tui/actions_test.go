@@ -7,7 +7,6 @@ package tui
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,15 +17,12 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/exp/teatest/v2"
 
-	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
 
 const (
-	acHint     = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  o order  p project  ? help  q quit"
-	acFieldRow = "t title  d due  g tags  a ask  w waiting  s summary  x external"
-	acFocusURL = "warp://session/0123456789abcdef0123456789abcdef"
-	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
+	acHint   = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
+	acMoving = "moving T-1: arrows move, space drop, esc cancel"
 )
 
 // ---------------------------------------------------------------------------------------------
@@ -210,25 +206,6 @@ func (s *acEditor) seen(n int) string {
 	return string(b)
 }
 
-// acFakeOpen replaces the open command with a script in PATH; returns the call log path (one line per call).
-func acFakeOpen(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	log := filepath.Join(dir, "open.log")
-	script := "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$TIX_AC_OPEN_LOG\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "open"), []byte(script), 0o700); err != nil { //nolint:gosec // test stub
-		t.Fatal(err)
-	}
-	t.Setenv("TIX_AC_OPEN_LOG", log)
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return log
-}
-
-func acRead(path string) string {
-	b, _ := os.ReadFile(path) //nolint:gosec // test path
-	return string(b)
-}
-
 // ---------------------------------------------------------------------------------------------
 // Scenario 1: hint buttons
 // ---------------------------------------------------------------------------------------------
@@ -264,8 +241,6 @@ func TestHint_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"n new", "title:"},
 		{"c comment", "comment:"},
-		{"a answer", "T-1: no question"},
-		{"o order", "order: due"},
 	}
 	for _, c := range cases {
 		t.Run(c.pair, func(t *testing.T) {
@@ -295,7 +270,7 @@ func TestHint_ClickNonButton_DoesNothing(t *testing.T) {
 	_, y := e.acFind("p project")
 	e.click(gap, y)
 	e.settle()
-	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
+	for _, bad := range []string{"title:", "comment:", "answer:", "no question"} {
 		if strings.Contains(e.text(), bad) {
 			t.Errorf("a click off a button triggered %q:\n%s", bad, e.text())
 		}
@@ -370,7 +345,7 @@ func TestGrab_RightThenDrop_MovesToNeighborWithOneCommit(t *testing.T) {
 				t.Fatalf("written before the release: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 			e.key(drop)
-			e.acWaitStatus("T-1", "todo")
+			e.acWaitStatus("T-1", "open")
 			e.settle()
 			if after := e.acCommitsSettled(before + 1); after != before+1 {
 				t.Errorf("commits %d -> %d, expected exactly one", before, after)
@@ -473,11 +448,11 @@ func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 	before := e.acCommitCount()
 	e.key(" ")
 	e.screenHas("moving T-1")
-	e.key("n", "a", "c", "o", "p", "q")
+	e.key("n", "a", "c", "p", "q")
 	e.click(mvX(0)+3, mvY(1)) // click on Bravo
-	e.click(mvX(1)+22, 2)     // and on "+" of column todo
+	e.click(mvX(1)+22, 2)     // and on "+" of column open
 	e.settle()
-	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
+	for _, bad := range []string{"title:", "comment:", "answer:", "no question"} {
 		if strings.Contains(e.text(), bad) {
 			t.Fatalf("%q fired during the grab:\n%s", bad, e.text())
 		}
@@ -491,11 +466,12 @@ func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 // A move to waiting and closed asks for a reason, like m; esc of the input line leaves the task.
 func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 	setup := func(t *testing.T) *mvEnv {
-		e := mvNewEnv(t, mvCfgWork)
-		e.create("Alpha", "work")
-		e.create("Bravo", "work")
+		e := mvNewEnv(t, "")
+		e.create("Alpha", "in_progress")
+		e.create("Bravo", "in_progress")
 		e.start(140, 30)
 		e.screenHas("Alpha", "Bravo")
+		e.key("l", "l") // the cursor from idea to in_progress
 		return e
 	}
 	t.Run("waiting: a reason moves", func(t *testing.T) {
@@ -505,12 +481,12 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.acPress("right")
 		e.key(" ")
 		e.screenHas("waiting for:")
-		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+		if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 			t.Fatalf("written before the answer: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "vendor reply" })
+		e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "blocked" && w == "vendor reply" })
 		e.settle()
 		if after := e.acCommitsSettled(before + 1); after != before+1 {
 			t.Errorf("commits %d -> %d, expected one", before, after)
@@ -526,7 +502,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.key("esc")
 		e.until("line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
 		e.settle()
-		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+		if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 			t.Errorf("esc wrote: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 	})
@@ -538,7 +514,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.screenHas("close reason:")
 		e.tm.Type("shipped")
 		e.key("enter")
-		e.acWaitStatus("T-1", "fin")
+		e.acWaitStatus("T-1", "closed")
 	})
 }
 
@@ -547,7 +523,7 @@ func TestGrab_TaskRemovedMeanwhile_ReportsRemovedAndReleases(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
-	canary := e.create("canary", "done")
+	canary := e.create("canary", "closed")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
 	e.awaitWatcher(canary)
@@ -578,7 +554,7 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
-	canary := e.create("canary", "done")
+	canary := e.create("canary", "closed")
 	e.acCriterion("T-1")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
@@ -590,36 +566,14 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e.acStillOn("moving T-1")
 	e.acPress("right")
 	e.key(" ")
-	e.acWaitStatus("T-1", "todo")
-}
-
-// Due order is on - the grab changes only the column, the status line says so.
-func TestGrab_OrderByDue_ColumnOnly(t *testing.T) {
-	e := mvNewEnv(t, "")
-	e.create("Alpha", "idea")
-	e.create("Bravo", "todo")
-	e.acCriterion("T-1")
-	e.start(140, 30)
-	e.screenHas("Alpha", "Bravo")
-	e.key("o")
-	e.screenHas("order: due")
-	e.key(" ")
-	e.screenHas("order by due: place off")
-	before := e.acCommitCount()
-	e.acPress("right")
-	e.key(" ")
-	e.acWaitStatus("T-1", "todo")
-	e.settle()
-	if after := e.acCommitsSettled(before + 1); after != before+1 {
-		t.Errorf("commits %d -> %d, expected one", before, after)
-	}
+	e.acWaitStatus("T-1", "open")
 }
 
 // ---------------------------------------------------------------------------------------------
 // Scenario 4: new task
 // ---------------------------------------------------------------------------------------------
 
-// New task: a click on "+" of column doing, title, editor; the cursor on the new task.
+// New task: a click on "+" of column in_progress, title, editor; the cursor on the new task.
 func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 	cases := []struct{ name, script, wantBody string }{
 		{"editor without an edit", "", ""},
@@ -630,7 +584,7 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			st := acStubEditor(t, c.script)
 			e := mvNewEnv(t, "")
 			e.create("Alpha", "idea")
-			e.create("Beta", "doing")
+			e.create("Beta", "in_progress")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Beta")
 			plusX := 2*mvColStep + 23 // the last character of the third column cell
@@ -644,8 +598,8 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			e.until("editor called", func() bool { return st.calls() == 1 && st.seen(1) != "" })
 			e.until("task created", func() bool { return e.acByTitle("Brand new") != nil })
 			tk := e.acByTitle("Brand new")
-			if tk.Status != "doing" || tk.Project != "personal" {
-				t.Errorf("task: column %q, project %q, expected doing and personal", tk.Status, tk.Project)
+			if tk.Status != "in_progress" || tk.Project != "personal" {
+				t.Errorf("task: column %q, project %q, expected in_progress and personal", tk.Status, tk.Project)
 			}
 			acCheckTemplate(t, st.seen(1))
 			e.settle()
@@ -657,7 +611,7 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 
 func acCheckTemplate(t *testing.T, seen string) {
 	t.Helper()
-	for _, part := range []string{"## Abstract", "## Summary", "## Details", "- [ ] "} {
+	for _, part := range []string{"## Abstract", "## Details", "- [ ] "} {
 		if !strings.Contains(seen, part) {
 			t.Errorf("body template in the editor without %q:\n%s", part, seen)
 		}
@@ -689,17 +643,17 @@ func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 			if _, err := e.store.Create("Alpha", c.seed, "idea", "seed"); err != nil {
 				t.Fatal(err)
 			}
-			e.createIn("Beta", c.seed, "doing")
+			e.createIn("Beta", c.seed, "in_progress")
 			e.acStartIn(c.launch, 140, 30)
 			e.screenHas("Alpha", "Beta")
-			e.key("l", "l", "n") // column doing
+			e.key("l", "l", "n") // column in_progress
 			e.screenHas("title:")
 			e.tm.Type("From key")
 			e.key("enter")
 			e.until("task created", func() bool { return e.acByTitle("From key") != nil })
 			tk := e.acByTitle("From key")
-			if tk.Status != "doing" || tk.Project != c.want {
-				t.Errorf("task: column %q, project %q, expected doing and %q", tk.Status, tk.Project, c.want)
+			if tk.Status != "in_progress" || tk.Project != c.want {
+				t.Errorf("task: column %q, project %q, expected in_progress and %q", tk.Status, tk.Project, c.want)
 			}
 		})
 	}
@@ -713,7 +667,7 @@ func TestNewTask_N_InReadyColumn_CreatedInInbox(t *testing.T) {
 	e.create("Alpha", "idea")
 	e.start(140, 30)
 	e.screenHas("Alpha")
-	e.key("l", "n") // column todo, ready role
+	e.key("l", "n") // column open, ready role
 	e.screenHas("title:")
 	e.tm.Type("Fallback")
 	e.key("enter")
@@ -743,235 +697,15 @@ func TestNewTask_EmptyTitleOrEsc_Cancels(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------------------------
-// Scenario 5: answer to an agent question
-// ---------------------------------------------------------------------------------------------
-
-func acAsked(t *testing.T, ask string) *mvEnv {
+// acAsked starts the board with one task, Alpha.
+func acAsked(t *testing.T) *mvEnv {
 	t.Helper()
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
-	if ask != "" {
-		e.set("T-1", "ask", ask)
-	}
 	e.start(140, 30)
 	e.screenHas("Alpha")
 	e.settle()
 	return e
-}
-
-// Without a question - "no question", nothing is written (board and card).
-func TestAnswer_NoQuestion_SaysNoQuestion(t *testing.T) {
-	for _, where := range []string{"board", "card"} {
-		t.Run(where, func(t *testing.T) {
-			e := acAsked(t, "")
-			if where == "card" {
-				e.acOpenCard("Alpha")
-			}
-			before := e.acCommitCount()
-			e.key("a")
-			e.screenHas("T-1: no question")
-			e.settle()
-			if strings.Contains(e.text(), "answer:") || e.acCommitCount() != before {
-				t.Errorf("an answer without a question opened a line or wrote, commits %d -> %d", before, e.acCommitCount())
-			}
-		})
-	}
-}
-
-// With a question - a comment "Answer: ..." from the human, ask is cleared (board and card).
-func TestAnswer_WithQuestion_CommentsAndClearsAsk(t *testing.T) {
-	for _, where := range []string{"board", "card"} {
-		t.Run(where, func(t *testing.T) {
-			e := acAsked(t, "pick A or B")
-			if where == "card" {
-				e.acOpenCard("Alpha")
-			}
-			e.key("a")
-			e.screenHas("answer:")
-			e.tm.Type("use B")
-			e.key("enter")
-			e.until("comment and empty ask", func() bool {
-				tk := e.acTask("T-1")
-				return tk.Ask == "" && len(tk.Comments) == 1
-			})
-			c := e.acTask("T-1").Comments[0]
-			if c.Text != "Answer: use B" || c.Actor != "human" {
-				t.Errorf("comment %q from %q, expected %q from human", c.Text, c.Actor, "Answer: use B")
-			}
-		})
-	}
-}
-
-// The agent managed to ask a new question - the answer is written, the new question stays, line "new question".
-func TestAnswer_AgentAskedAgain_KeepsNewQuestion(t *testing.T) {
-	e := acAsked(t, "pick A or B")
-	e.key("a")
-	e.screenHas("answer:")
-	e.tm.Type("use B")
-	e.set("T-1", "ask", "second question")
-	e.key("enter")
-	e.screenHas("T-1: new question")
-	e.until("comment written", func() bool { return len(e.acTask("T-1").Comments) == 1 })
-	if tk := e.acTask("T-1"); tk.Ask != "second question" || tk.Comments[0].Text != "Answer: use B" {
-		t.Errorf("ask %q, comment %q: expected the new question and the written answer", tk.Ask, tk.Comments[0].Text)
-	}
-}
-
-// Empty or esc - cancel without a write.
-func TestAnswer_EmptyOrEsc_Cancels(t *testing.T) {
-	for _, cancel := range []string{"enter", "esc"} {
-		t.Run(cancel, func(t *testing.T) {
-			e := acAsked(t, "pick A or B")
-			before := e.acCommitCount()
-			e.key("a")
-			e.screenHas("answer:")
-			e.key(cancel)
-			e.until("line closed", func() bool { return !strings.Contains(e.text(), "answer:") })
-			e.settle()
-			if tk := e.acTask("T-1"); tk.Ask != "pick A or B" || len(tk.Comments) != 0 || e.acCommitCount() != before {
-				t.Errorf("cancel wrote: ask %q, comments %d, commits %d -> %d",
-					tk.Ask, len(tk.Comments), before, e.acCommitCount())
-			}
-		})
-	}
-}
-
-// A click on the line "* needs you:" in the card opens "answer:".
-func TestAnswer_ClickNeedsYouLine_OpensAnswerLine(t *testing.T) {
-	e := acAsked(t, "pick A or B")
-	e.acOpenCard("Alpha")
-	e.screenHas("needs you")
-	_, y := e.acFind("needs you")
-	e.click(4, y)
-	e.screenHas("answer:")
-}
-
-// ---------------------------------------------------------------------------------------------
-// Scenario 6: fields
-// ---------------------------------------------------------------------------------------------
-
-// acFieldCard: the Alpha card (project projx) is open; due - the initial due.
-func acFieldCard(t *testing.T, due string) *mvEnv {
-	t.Helper()
-	e := mvNewEnv(t, "")
-	if _, err := e.store.Create("Alpha", "projx", "idea", "seed"); err != nil {
-		t.Fatal(err)
-	}
-	if due != "" {
-		e.set("T-1", "due", due)
-	}
-	e.start(140, 30)
-	e.screenHas("Alpha")
-	e.acOpenCard("Alpha")
-	return e
-}
-
-type acDueCase struct {
-	name, initial, typed, wantDue, wantStatus string
-	erase, wantCommit                         bool
-}
-
-// enterDue goes through f, d, the value edit and enter.
-func (e *mvEnv) enterDue(c acDueCase) {
-	e.t.Helper()
-	e.key("f")
-	e.screenHas(acFieldRow)
-	e.key("d")
-	e.screenHas("due:")
-	if c.erase {
-		e.acPress(strings.Split(strings.Repeat("backspace,", 30), ",")[:30]...)
-	}
-	if c.typed != "" {
-		e.tm.Type(c.typed)
-	}
-	e.key("enter")
-}
-
-// Due is written; an empty value clears; a core refusal is visible; without a change there is no write.
-func TestField_Due_SetClearRefusedUnchanged(t *testing.T) {
-	cases := []acDueCase{
-		{"write", "", "2026-11-01", "2026-11-01", "", false, true},
-		{"clear with empty", "2026-10-01", "", "", "", true, true},
-		{"core refusal", "", "not-a-date", "", "due must be", false, false},
-		{"no change", "2026-10-01", "", "2026-10-01", "", false, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			e := acFieldCard(t, c.initial)
-			before := e.acCommitCount()
-			e.enterDue(c)
-			if c.wantStatus != "" {
-				e.screenHas(c.wantStatus)
-			}
-			want := before
-			if c.wantCommit {
-				want++
-			}
-			if after := e.acCommitsSettled(want); after != want {
-				t.Errorf("commits %d -> %d, expected %d", before, after, want)
-			}
-			if tk := e.acTask("T-1"); tk.Due != c.wantDue {
-				t.Errorf("due %q, expected %q", tk.Due, c.wantDue)
-			}
-		})
-	}
-}
-
-// The field line opens with the current value (an edit appends to it).
-func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
-	e := acFieldCard(t, "")
-	e.key("f")
-	e.screenHas(acFieldRow)
-	e.key("t")
-	e.screenHas("title:")
-	e.tm.Type("X")
-	e.key("enter")
-	e.until("title AlphaX", func() bool { return e.acTask("T-1").Title == "AlphaX" })
-}
-
-// A multi-line field is not edited through the line; a one-line one is.
-func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
-	t.Run("several lines", func(t *testing.T) {
-		e := mvNewEnv(t, "")
-		e.create("Alpha", "idea")
-		e.summary("T-1", "first line\nsecond line")
-		e.start(140, 30)
-		e.screenHas("Alpha")
-		e.acOpenCard("Alpha")
-		before := e.acCommitCount()
-		e.key("f", "s")
-		e.screenHas("T-1: summary has several lines, use e")
-		e.settle()
-		if strings.Contains(e.text(), "summary:") || e.acCommitCount() != before {
-			t.Errorf("the line opened or wrote, commits %d -> %d", before, e.acCommitCount())
-		}
-	})
-	t.Run("one line", func(t *testing.T) {
-		e := mvNewEnv(t, "")
-		e.create("Alpha", "idea")
-		e.summary("T-1", "only line")
-		e.start(140, 30)
-		e.screenHas("Alpha")
-		e.acOpenCard("Alpha")
-		e.key("f", "s")
-		e.screenHas("summary:")
-	})
-}
-
-// Field choice - by a click on a pair; a click on the card fields line opens the same choice.
-func TestField_SelectByClick_AndFieldsRowOpensSelect(t *testing.T) {
-	e := acFieldCard(t, "")
-	e.screenHas("projx")
-	e.settle()
-	_, y := e.acFind("projx") // fields line: project first
-	e.click(2, y)
-	e.screenHas(acFieldRow)
-	e.acClickOn("d due")
-	e.screenHas("due:")
-	e.tm.Type("2026-12-24")
-	e.key("enter")
-	e.until("due written", func() bool { return e.acTask("T-1").Due == "2026-12-24" })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -992,7 +726,7 @@ func (e *mvEnv) acLastLine() int {
 // The actions line is the last card line and is visible with a non-empty status line;
 // the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
-	const row = "e edit  c comment  a answer  f field  g session  del delete  j k history  esc back"
+	const row = "e edit  c comment  del delete  j k history  left right task  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int
@@ -1012,14 +746,15 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 			e.start(tc.w, tc.h)
 			e.screenHas("Alpha")
 			e.acOpenCard("Alpha")
-			e.key("a")
-			e.screenHas("T-1: no question")
+			acStubEditor(t, "")
+			e.key("e")
+			e.screenHas("T-1 no changes")
 			e.settle()
 			last := e.acLastLine()
 			if last < 1 || strings.TrimSpace(e.lines()[last]) != row {
 				t.Fatalf("last card line %q, expected %q:\n%s", e.lines()[max(last, 0)], row, e.text())
 			}
-			if !strings.Contains(e.lines()[last-1], "T-1: no question") {
+			if !strings.Contains(e.lines()[last-1], "T-1 no changes") {
 				t.Errorf("above the actions line %q, expected the status line", e.lines()[last-1])
 			}
 		})
@@ -1030,14 +765,11 @@ func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
 func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	cases := []struct{ pair, want string }{
 		{"c comment", "comment:"},
-		{"a answer", "T-1: no question"},
-		{"f field", acFieldRow},
-		{"g session", "T-1: no session to open"},
 		{"esc back", "arrows select"},
 	}
 	for _, c := range cases {
 		t.Run(c.pair, func(t *testing.T) {
-			e := acAsked(t, "")
+			e := acAsked(t)
 			e.acOpenCard("Alpha")
 			e.acClickOn(c.pair)
 			e.screenHas(c.want)
@@ -1045,7 +777,7 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 	}
 	t.Run("e edit", func(t *testing.T) {
 		st := acStubEditor(t, "")
-		e := acAsked(t, "")
+		e := acAsked(t)
 		e.acOpenCard("Alpha")
 		e.acClickOn("e edit")
 		e.until("editor called", func() bool { return st.calls() == 1 })
@@ -1054,7 +786,7 @@ func TestCardActions_ClickButton_ActsAsKey(t *testing.T) {
 
 // A click on an empty place of the card - nothing.
 func TestCardActions_ClickEmptySpace_DoesNothing(t *testing.T) {
-	e := acAsked(t, "")
+	e := acAsked(t)
 	e.acOpenCard("Alpha")
 	e.screenHas("seed") // history loads after the card opens: the baseline waits for it
 	e.settle()
@@ -1130,16 +862,14 @@ func TestCriteria_Click_TogglesCriterion(t *testing.T) {
 	e.until("check removed", func() bool { return e.acDone() == "false false" })
 }
 
-// ---------------------------------------------------------------------------------------------
-// Scenarios 8 (delete, help, m M removed) and 9 (the jump into an agent session, the TUI side)
-// ---------------------------------------------------------------------------------------------
+// Scenario 8: delete, help, m M removed.
 
 // m and M are removed - no reason line, no write, on the board and in the card.
 func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		t.Run(where, func(t *testing.T) {
-			e := mvNewEnv(t, mvCfgWork)
-			e.create("Alpha", "work")
+			e := mvNewEnv(t, "")
+			e.create("Alpha", "in_progress")
 			e.start(140, 30)
 			e.screenHas("Alpha")
 			if where == "card" {
@@ -1151,7 +881,7 @@ func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 			if strings.Contains(e.text(), "waiting for:") || strings.Contains(e.text(), "close reason:") {
 				t.Errorf("m or M opened the move line:\n%s", e.text())
 			}
-			if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+			if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 				t.Errorf("m M wrote: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 		})
@@ -1169,7 +899,7 @@ func (e *mvEnv) acPressDelete(name string) {
 
 func acDeleteEnv(t *testing.T, where string) *mvEnv {
 	t.Helper()
-	e := acAsked(t, "")
+	e := acAsked(t)
 	if where == "card" {
 		e.acOpenCard("Alpha")
 	}
@@ -1221,7 +951,7 @@ func TestDelete_OtherKeyCancels(t *testing.T) {
 
 // A click on the "del delete" button of the card actions line equals the key.
 func TestDelete_CardButton_AsksConfirmation(t *testing.T) {
-	e := acAsked(t, "")
+	e := acAsked(t)
 	e.acOpenCard("Alpha")
 	e.acClickOn("del delete")
 	e.screenHas("delete T-1? y/n")
@@ -1250,91 +980,6 @@ func TestHelp_QuestionMark_OpensAndCloses(t *testing.T) {
 		e.acClickOn("? help")
 		e.until("help instead of the board", func() bool { return e.text() != board && !strings.Contains(e.text(), "arrows select") })
 	})
-}
-
-type acFocusCase struct {
-	name     string
-	claim    bool
-	fileName string // "" - no file
-	content  string
-	wantOpen bool
-	ways     []string
-}
-
-// acFocusEnv prepares task Alpha with a claim (if claim) and a focus file in directory dir.
-func acFocusEnv(t *testing.T, c acFocusCase, dir string) *mvEnv {
-	t.Helper()
-	steps := 0 // how many columns right from idea to the task
-	e := mvNewEnv(t, "")
-	e.create("Alpha", "idea")
-	e.acCriterion("T-1")
-	if c.claim {
-		// Take takes a task from ready and moves it to active: the cursor column is found by status
-		if _, err := e.store.Move("T-1", "todo", core.MoveOpts{}, "seed"); err != nil {
-			t.Fatalf("Move: %v", err)
-		}
-		if _, err := e.store.Take("T-1", core.Take, "claude:c1"); err != nil {
-			t.Fatalf("Take: %v", err)
-		}
-		steps = slices.Index(mvDefaultCols, e.acTask("T-1").Status)
-	}
-	if c.fileName != "" {
-		if err := os.WriteFile(filepath.Join(dir, c.fileName), []byte(c.content+"\n"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	e.start(140, 30)
-	e.screenHas("Alpha")
-	e.key(strings.Repeat("l", steps))
-	e.settle()
-	return e
-}
-
-// g - only with a live claim and the owner focus file that passed the form check; otherwise
-// "no session to open". The open call is a substituted command in PATH.
-func TestFocus_G_OpensOnlyForLiveClaimWithValidFile(t *testing.T) {
-	all := []string{"board", "card", "button"}
-	cases := []acFocusCase{
-		{"claim and owner file", true, "claude-c1", acFocusURL, true, all},
-		{"no claim", false, "claude-c1", acFocusURL, false, all},
-		{"claim exists, no file", true, "", "", false, all},
-		{"another agent file", true, "codex-x9", acFocusURL, false, []string{"board"}},
-		{"value of the wrong form", true, "claude-c1", "warp://session/XYZ", false, []string{"board"}},
-		{"other scheme", true, "claude-c1", "https://example.com/s", false, []string{"board"}},
-	}
-	for _, c := range cases {
-		for _, way := range c.ways {
-			t.Run(c.name+"/"+way, func(t *testing.T) {
-				dir := t.TempDir()
-				t.Setenv("TIX_FOCUS_DIR", dir)
-				log := acFakeOpen(t)
-				e := acFocusEnv(t, c, dir)
-				e.acPressG(way)
-				if c.wantOpen {
-					e.until("open called with the address", func() bool { return strings.TrimSpace(acRead(log)) == acFocusURL })
-					return
-				}
-				e.screenHas("T-1: no session to open")
-				e.settle()
-				if got := acRead(log); got != "" {
-					t.Errorf("open called without the right: %q", got)
-				}
-			})
-		}
-	}
-}
-
-// acPressG: g on the board, g in the card or the "g session" button of the card.
-func (e *mvEnv) acPressG(way string) {
-	e.t.Helper()
-	if way != "board" {
-		e.acOpenCard("Alpha")
-	}
-	if way == "button" {
-		e.acClickOn("g session")
-		return
-	}
-	e.key("g")
 }
 
 // The launch project (a folder name) filters the board whatever its case: tasks are stored in lower case.

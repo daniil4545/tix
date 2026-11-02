@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	boardHintFull = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  o order  p project  ? help  q quit"
-	cardRowFull   = "e edit  c comment  a answer  f field  g session  del delete  j k history  esc back"
+	boardHintFull = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
+	cardRowFull   = "e edit  c comment  del delete  j k history  left right task  esc back"
 )
 
 func lastNonEmpty(lines []string) (int, string) {
@@ -57,7 +57,7 @@ func TestRenderBoard_Hint_NarrowWidthCutNotWrapped(t *testing.T) {
 // New task: "+" is the last (24th) character of the cell of every shown column in the names line.
 func TestRenderBoard_PlusAtLastCellOfEachColumnName(t *testing.T) {
 	cols := []view.Col{oneCol(), oneCol(), oneCol()}
-	cols[0].Name, cols[1].Name, cols[2].Name = "idea", "todo", "doing"
+	cols[0].Name, cols[1].Name, cols[2].Name = "idea", "open", "in_progress"
 	b := view.Board{Total: 0, W: 120, H: 24, Cols: cols}
 	names := []rune(frameLines(b)[2])
 	for i := range cols {
@@ -77,8 +77,8 @@ func TestRenderCard_ActionRowLastStatusAbove(t *testing.T) {
 	for _, status := range []string{"", "T-1: no question"} {
 		for _, h := range []int{24, 10} {
 			t.Run(fmt.Sprintf("status=%q/h=%d", status, h), func(t *testing.T) {
-				c := view.Card{ID: "T-1", Title: "Alpha", Column: "doing", W: 120, H: h, Status: status,
-					Summary: "s1\ns2\ns3\ns4\ns5\ns6\ns7\ns8\ns9\ns10\ns11\ns12"}
+				c := view.Card{ID: "T-1", Title: "Alpha", Column: "in_progress", W: 120, H: h, Status: status,
+					Details: "s1\ns2\ns3\ns4\ns5\ns6\ns7\ns8\ns9\ns10\ns11\ns12"}
 				out := view.RenderCard(c)
 				fits(t, "card", out, 120, h)
 				ls := strings.Split(plain(out), "\n")
@@ -97,7 +97,7 @@ func TestRenderCard_ActionRowLastStatusAbove(t *testing.T) {
 // The actions line is cut by the width, not wrapped; the keys m M are gone from it.
 func TestRenderCard_ActionRowNarrowCutNotWrapped(t *testing.T) {
 	for _, w := range []int{60, 30} {
-		c := view.Card{ID: "T-1", Title: "Alpha", Column: "doing", W: w, H: 12, Status: "status"}
+		c := view.Card{ID: "T-1", Title: "Alpha", Column: "in_progress", W: w, H: 12, Status: "status"}
 		out := view.RenderCard(c)
 		fits(t, fmt.Sprintf("card %dx12", w), out, w, 12)
 		ls := strings.Split(plain(out), "\n")
@@ -107,23 +107,5 @@ func TestRenderCard_ActionRowNarrowCutNotWrapped(t *testing.T) {
 		if strings.Contains(plain(out), "m M move") {
 			t.Errorf("width %d: the hint m M move stayed", w)
 		}
-	}
-}
-
-// The card ask line is still "* needs you: <ask>" and stays above the body.
-func TestRenderCard_AskLineStaysAboveBody(t *testing.T) {
-	c := view.Card{ID: "T-1", Title: "Alpha", Column: "doing", W: 120, H: 24, Ask: "pick A or B", Summary: "sum"}
-	ls := strings.Split(plain(view.RenderCard(c)), "\n")
-	ask, body := -1, -1
-	for i, ln := range ls {
-		switch {
-		case strings.Contains(ln, "* needs you: pick A or B"):
-			ask = i
-		case strings.Contains(ln, "summary"):
-			body = i
-		}
-	}
-	if ask < 0 || body < 0 || ask > body {
-		t.Errorf("ask line at %d, body at %d:\n%s", ask, body, strings.Join(ls, "\n"))
 	}
 }

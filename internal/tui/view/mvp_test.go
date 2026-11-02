@@ -13,7 +13,7 @@ import (
 
 const (
 	selBg    = "48;2;127;209;195" // #7FD1C3, highlight of the selected line
-	hintHead = "arrows select  space grab  enter open"
+	hintHead = "arrows select  enter open  space grab"
 )
 
 // frameLines draws the board and cuts the frame into lines (text without color).
@@ -21,26 +21,14 @@ func frameLines(b view.Board) []string {
 	return strings.Split(strings.TrimRight(plain(view.RenderBoard(b)), "\n"), "\n")
 }
 
-// lineWith returns the raw line (with color codes) whose text contains sub.
-func lineWith(t *testing.T, raw, sub string) string {
-	t.Helper()
-	for _, ln := range strings.Split(raw, "\n") {
-		if strings.Contains(plain(ln), sub) {
-			return ln
-		}
-	}
-	t.Fatalf("no line with %q in the frame:\n%s", sub, plain(raw))
-	return ""
-}
-
-func oneCol(rows ...view.Row) view.Col { return view.Col{Name: "doing", Rows: rows} }
+func oneCol(rows ...view.Row) view.Col { return view.Col{Name: "in_progress", Rows: rows} }
 
 // Scenario: the hint is always the last line, the status line is above it.
 func TestRenderBoard_StatusSet_HintStaysLastLine(t *testing.T) {
-	for _, status := range []string{"", "moved T-1 to doing"} {
+	for _, status := range []string{"", "moved T-1 to in_progress"} {
 		t.Run(fmt.Sprintf("status=%q", status), func(t *testing.T) {
 			b := view.Board{Total: 1, W: 120, H: 24, Status: status,
-				Cols: []view.Col{oneCol(view.Row{ID: "T-1", Title: "Alpha", Summary: "s"})}}
+				Cols: []view.Col{oneCol(view.Row{ID: "T-1", Title: "Alpha", Note: "s"})}}
 			ls := frameLines(b)
 			if len(ls) != 24 {
 				t.Fatalf("lines in the frame %d, expected 24 (window height)", len(ls))
@@ -66,49 +54,16 @@ func TestRenderBoard_NarrowWidth_HintTruncatedNotWrapped(t *testing.T) {
 	}
 }
 
-// Scenario: the ask color (decide kind, live claim) is the table color in both the selected and the unselected line.
-func TestRenderBoard_Ask_KindColorSelectedAndNot(t *testing.T) {
-	b := view.Board{Total: 3, W: 120, H: 40, Col: 0, Row: 0, Cols: []view.Col{oneCol(
-		view.Row{ID: "T-1", Title: "Alpha", Ask: "alpha-question", Meta: "m", Live: true},
-		view.Row{ID: "T-2", Title: "Bravo", Ask: "bravo-question", Meta: "m", Live: true},
-		view.Row{ID: "T-3", Title: "Charlie", Summary: "charlie-summary", Meta: "m", Live: true},
-	)}}
-	raw := view.RenderBoard(b)
-	yellowFg := strings.TrimSuffix(strings.TrimPrefix(view.KindSGR("decide"), "\x1b["), "m")
-
-	sel := lineWith(t, raw, "alpha-question")
-	if !strings.Contains(sel, yellowFg) {
-		t.Errorf("selected line with ask without yellow foreground %s: %q", yellowFg, sel)
-	}
-	if !strings.Contains(sel, selBg) {
-		t.Errorf("selected line is not highlighted with background %s: %q", selBg, sel)
-	}
-	unsel := lineWith(t, raw, "bravo-question")
-	if !strings.Contains(unsel, yellowFg) {
-		t.Errorf("unselected line with ask without yellow %s: %q", yellowFg, unsel)
-	}
-	if strings.Contains(unsel, selBg) {
-		t.Errorf("unselected line is highlighted: %q", unsel)
-	}
-	if plainLine := lineWith(t, raw, "charlie-summary"); strings.Contains(plainLine, yellowFg) {
-		t.Errorf("line without ask is colored yellow: %q", plainLine)
-	}
-}
-
-// Scenario (view): the third line is chosen by view: ask, then note, then summary.
-func TestRenderBoard_ThirdLine_AskThenNoteThenSummary(t *testing.T) {
+// Scenario (view): the third line is the note; without a note it is empty.
+func TestRenderBoard_ThirdLine_NoteOrEmpty(t *testing.T) {
 	cases := []struct {
 		name    string
 		row     view.Row
 		want    string
 		notWant []string
 	}{
-		{"ask outranks the note and the summary", view.Row{Ask: "pick A or B", Note: "3h did things", Summary: "the summary"},
-			"? pick A or B", []string{"did things", "the summary"}},
-		{"no ask - the note instead of the summary", view.Row{Note: "3h did things", Summary: "the summary"},
-			"3h did things", []string{"the summary", "?"}},
-		{"no ask and no note - the summary", view.Row{Summary: "the summary"},
-			"the summary", []string{"?"}},
+		{"the note", view.Row{Note: "3h did things"}, "3h did things", []string{"?"}},
+		{"no note - empty", view.Row{}, "", []string{"3h", "?"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -192,7 +147,7 @@ func TestRenderBoard_RowWindowScrolled_CursorCardVisibleOnGrid(t *testing.T) {
 	b := bigBoard(30)
 	b.Col, b.Row, b.W, b.H = 1, 17, 120, 24
 	ls := frameLines(b)
-	want := fmt.Sprintf("T-%d", 30+17+1) // column todo: numbers 31..60
+	want := fmt.Sprintf("T-%d", 30+17+1) // column open: numbers 31..60
 	seenAt := -1
 	for y, ln := range ls {
 		if strings.Contains(ln, want) {

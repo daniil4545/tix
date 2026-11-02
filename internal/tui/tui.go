@@ -13,7 +13,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
@@ -69,7 +68,6 @@ func Run(ctx context.Context, d Deps) error {
 type Model struct {
 	d    Deps
 	log  *slog.Logger
-	cfg  *config.Config
 	done <-chan struct{}
 
 	queue  chan job
@@ -87,8 +85,7 @@ type Model struct {
 	showing bool // the card is open
 	help    bool // the help screen is open
 	input   *prompt
-	acts    cardActs // card actions: field choice
-	grab    *grab    // a card grab on the board; nil outside a grab
+	grab    *grab // a card grab on the board; nil outside a grab
 
 	notes map[string]gitx.Note // the latest task notes for the pulse; nil until git answers
 	now   func() time.Time     // the model clock: meta, pulse, double click
@@ -109,7 +106,6 @@ func New(ctx context.Context, d Deps) *Model {
 	m := &Model{
 		d:       d,
 		log:     d.Log,
-		cfg:     d.Store.Config(),
 		done:    ctx.Done(),
 		queue:   make(chan job, queueSize),
 		events:  make(chan struct{}, 1),

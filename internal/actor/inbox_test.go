@@ -3,6 +3,7 @@ package actor_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/daniil4545/tix/internal/actor"
@@ -60,5 +61,20 @@ func TestMarks_RoundTripAndUnreadable(t *testing.T) {
 		if m, ok := actor.ReadMarks(dir, "claude-a"); ok || len(m) != 0 {
 			t.Errorf("unreadable %q accepted: %v", bad, m)
 		}
+	}
+}
+
+func TestMarksFile(t *testing.T) {
+	cases := map[string]string{
+		"claude:8f3a": "claude-8f3a", "human": "", "unknown": "", "": "",
+		"x:../../evil": "x-.._.._evil", "..": "",
+	}
+	for in, want := range cases {
+		if got := actor.MarksFile(in); got != want {
+			t.Errorf("MarksFile(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := actor.MarksFile("a/b"); strings.Contains(got, "/") {
+		t.Errorf("slash in name: %q", got)
 	}
 }

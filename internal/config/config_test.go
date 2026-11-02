@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/daniil4545/tix/internal/config"
@@ -16,14 +17,11 @@ func guard(t *testing.T) {
 	}
 }
 
-func TestDefault_FiveRolesOneColumnEach(t *testing.T) {
+func TestStatuses_FiveInBoardOrder(t *testing.T) {
 	defer guard(t)
-	want := []config.Column{
-		{Name: "idea", Role: "inbox"}, {Name: "todo", Role: "ready"}, {Name: "doing", Role: "active"},
-		{Name: "blocked", Role: "waiting"}, {Name: "done", Role: "closed"},
-	}
-	if got := config.Default().Columns; !reflect.DeepEqual(got, want) {
-		t.Errorf("default columns %+v, want (spec 2.5) %+v", got, want)
+	want := []string{"idea", "open", "in_progress", "blocked", "closed"}
+	if !reflect.DeepEqual(config.Statuses, want) {
+		t.Errorf("statuses %v, want (spec 2.5) %v", config.Statuses, want)
 	}
 }
 
@@ -33,25 +31,21 @@ func TestLoad_MissingFile_Default(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(c.Columns, config.Default().Columns) {
-		t.Errorf("no file: %+v, want Default", c.Columns)
+	if len(c.Projects) != 0 {
+		t.Errorf("no file: %+v, want Default", c)
 	}
 }
 
-func TestLoad_CustomFile_ColumnsOrderAndProjects(t *testing.T) {
+func TestLoad_OldColumnsSkipped_ProjectsKept(t *testing.T) {
 	defer guard(t)
 	p := filepath.Join(t.TempDir(), "config.toml")
-	src := "[[column]]\nname = \"backlog\"\nrole = \"inbox\"\n\n[[column]]\nname = \"wip\"\nrole = \"active\"\n\n[[column]]\nname = \"misc\"\n\n[projects]\ntracker = \"трекер\"\n"
+	src := "[[column]]\nname = \"backlog\"\nrole = \"inbox\"\n\n[projects]\ntracker = \"трекер\"\n"
 	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	c, err := config.Load(p)
 	if err != nil {
 		t.Fatal(err)
-	}
-	want := []config.Column{{Name: "backlog", Role: "inbox"}, {Name: "wip", Role: "active"}, {Name: "misc"}}
-	if !reflect.DeepEqual(c.Columns, want) {
-		t.Errorf("columns %+v, want %+v", c.Columns, want)
 	}
 	if c.Projects["tracker"] != "трекер" {
 		t.Errorf("projects %v", c.Projects)
@@ -60,10 +54,7 @@ func TestLoad_CustomFile_ColumnsOrderAndProjects(t *testing.T) {
 
 func TestRender_RoundTrip(t *testing.T) {
 	defer guard(t)
-	in := &config.Config{
-		Columns:  []config.Column{{Name: "a", Role: "inbox"}, {Name: "б", Role: "closed"}},
-		Projects: map[string]string{"dir": "имя"},
-	}
+	in := &config.Config{Projects: map[string]string{"dir": "имя"}}
 	p := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(p, in.Render(), 0o644); err != nil {
 		t.Fatal(err)
@@ -72,15 +63,18 @@ func TestRender_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load cannot parse Render output: %v\n%s", err, in.Render())
 	}
-	if !reflect.DeepEqual(out.Columns, in.Columns) || !reflect.DeepEqual(out.Projects, in.Projects) {
+	if !reflect.DeepEqual(out.Projects, in.Projects) {
 		t.Errorf("Render-Load round trip: %+v, want %+v", out, in)
+	}
+	if strings.Contains(string(in.Render()), "column") {
+		t.Errorf("Render writes columns:\n%s", in.Render())
 	}
 }
 
 func TestLoad_Broken_ErrorHasPathAndLine(t *testing.T) {
 	defer guard(t)
 	p := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(p, []byte("[[column]]\nname = \"idea\"\nrole = \n"), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte("[projects]\nname = \n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	_, err := config.Load(p)
@@ -92,57 +86,47 @@ func TestLoad_Broken_ErrorHasPathAndLine(t *testing.T) {
 	}
 }
 
-const customConfig = `[[column]]
-name = "ideas"
-role = "inbox"
-
-[[column]]
-name = "todo"
-role = "ready"
-
-[[column]]
-name = "review"
-
-[[column]]
-name = "doing"
-role = "active"
-`
-
-func TestByRoleAndRoleOf(t *testing.T) {
+func TestCheck_FiveAccepted_OldWordsHinted(t *testing.T) {
 	defer guard(t)
-	path := filepath.Join(t.TempDir(), "config.toml")
-	if err := os.WriteFile(path, []byte(customConfig), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	c, err := config.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if col, ok := c.ByRole("inbox"); !ok || col.Name != "ideas" {
-		t.Errorf("ByRole(inbox) = %+v, %v; want ideas", col, ok)
-	}
-	if col, ok := c.ByRole("waiting"); ok {
-		t.Errorf("ByRole(waiting) = %+v, true; the config has no such role", col)
-	}
-	for name, want := range map[string]string{"ideas": "inbox", "doing": "active", "review": "", "nosuch": ""} {
-		if got := c.RoleOf(name); got != want {
-			t.Errorf("RoleOf(%q) = %q, want %q", name, got, want)
+	for _, s := range config.Statuses {
+		if err := config.Check(s); err != nil {
+			t.Errorf("Check(%q) = %v", s, err)
 		}
 	}
-	if got := config.Default().RoleOf("blocked"); got != "waiting" {
-		t.Errorf("RoleOf(blocked) in the default config = %q, want waiting", got)
+	for old, want := range map[string]string{"todo": "open", "ready": "open", "doing": "in_progress",
+		"active": "in_progress", "waiting": "blocked", "inbox": "idea", "done": "closed"} {
+		err := config.Check(old)
+		if err == nil || !strings.Contains(err.Error(), "maybe "+want+"?") {
+			t.Errorf("Check(%q) = %v, want the hint %q", old, err, "maybe "+want+"?")
+		}
+	}
+	if err := config.Check("later"); err == nil || strings.Contains(err.Error(), "maybe") {
+		t.Errorf("Check(later) = %v, want a refusal without a hint", err)
 	}
 }
 
-// Resolve: a column name wins over a role; a role gives the column with that role; an unknown name stays as is.
-func TestResolve_NameBeforeRole(t *testing.T) {
+func TestLegacyMap_ByRoleNotByName(t *testing.T) {
 	defer guard(t)
-	c := &config.Config{Columns: []config.Column{
-		{Name: "todo", Role: "ready"}, {Name: "ready", Role: "inbox"}, {Name: "blocked", Role: "waiting"},
-	}}
-	for in, want := range map[string]string{"waiting": "blocked", "ready": "ready", "todo": "todo", "nope": "nope"} {
-		if got := c.Resolve(in); got != want {
-			t.Errorf("Resolve(%q) = %q, want %q", in, got, want)
-		}
+	src := "[[column]]\nname = \"ideas\"\nrole = \"inbox\"\n[[column]]\nname = \"open\"\nrole = \"active\"\n" +
+		"[[column]]\nname = \"review\"\n[[column]]\nname = \"fin\"\nrole = \"closed\"\n"
+	m, has, err := config.LegacyMap(src)
+	if err != nil || !has {
+		t.Fatalf("LegacyMap: %v, has %v", err, has)
+	}
+	want := map[string]string{"ideas": "idea", "open": "in_progress", "fin": "closed"}
+	if !reflect.DeepEqual(m, want) {
+		t.Errorf("map %v, want %v (a column without a role is absent)", m, want)
+	}
+}
+
+func TestLegacyMap_NoColumns_DefaultNames(t *testing.T) {
+	defer guard(t)
+	m, has, err := config.LegacyMap("[projects]\na = \"b\"\n")
+	if err != nil || has {
+		t.Fatalf("LegacyMap: %v, has %v", err, has)
+	}
+	want := map[string]string{"idea": "idea", "todo": "open", "doing": "in_progress", "blocked": "blocked", "done": "closed"}
+	if !reflect.DeepEqual(m, want) {
+		t.Errorf("map %v, want %v", m, want)
 	}
 }

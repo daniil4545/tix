@@ -187,12 +187,14 @@ func TestPrepare_OutdatedRules_Refreshed_EditedKept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	dev := mustRead(t, filepath.Join("testdata", "rules-2026-11-02.md"))
 	for _, c := range []struct {
 		name string
 		text []byte
 		want string
 	}{
 		{"untouched old", old, assets.Rules},
+		{"untouched text of the last dev build", dev, assets.Rules},
 		{"edited by owner", append(old[:len(old):len(old)], "\nMy own rule.\n"...), string(old) + "\nMy own rule.\n"},
 	} {
 		t.Run(c.name, func(t *testing.T) {
@@ -224,4 +226,13 @@ func TestPrepare_OutdatedRules_Refreshed_EditedKept(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	b, err := os.ReadFile(path) //nolint:gosec // test fixture path
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

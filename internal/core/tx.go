@@ -256,6 +256,7 @@ type opInfo struct{ kind, subject string }
 type pendingWrite struct {
 	path     string
 	old, new []byte
+	warn     string // the reply Warning if this write is refused; empty - only the log
 }
 
 // modify - the common path to edit an existing task: read, mutate, temp, check, rename,
@@ -322,25 +323,29 @@ func (s *Store) modifyOnce(tx *txEnv, id, actor string, op *opInfo, attempt int,
 		return Result{}, false, err
 	}
 	res := Result{ID: id, Rev: blobID(out)}
-	files := append([]gitx.File{{Path: filepath.Base(path), Data: out}}, s.writePending(tx)...)
+	pend, warn := s.writePending(tx)
+	files := append([]gitx.File{{Path: filepath.Base(path), Data: out}}, pend...)
 	files = append(files, tx.extra...)
+	res.Warning = warn
 	s.commit(tx, &res, files, id+": "+op.subject, actor)
 	return res, true, nil
 }
 
 // writePending writes the neighboring files of the operation after the main one. A neighbor changed since the read -
 // its rank stays as it was (the column order does not break: renumbering preserves it).
-func (s *Store) writePending(tx *txEnv) []gitx.File {
-	var files []gitx.File
+func (s *Store) writePending(tx *txEnv) (files []gitx.File, warn string) {
 	for _, p := range tx.pending {
 		ok, err := s.replace(p.path, p.old, p.new)
 		if err != nil || !ok {
-			s.log.Warn("rank of neighbour not renumbered", "op", "renumber", "path", p.path, "err", err)
+			s.log.Warn("pending write refused", "op", "pending", "path", p.path, "err", err)
+			if warn == "" {
+				warn = p.warn
+			}
 			continue
 		}
 		files = append(files, gitx.File{Path: filepath.Base(p.path), Data: p.new})
 	}
-	return files
+	return files, warn
 }
 
 // mergeBody returns the body for SetBody. The base matches the file - the new body as is;
