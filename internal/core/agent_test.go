@@ -790,3 +790,37 @@ func TestMove_ColumnNameBeatsRole(t *testing.T) {
 		t.Errorf("the task did not go to column waiting: %+v", got)
 	}
 }
+
+func TestMove_EpicEditedMeanwhileGivesWarning(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	child := mkCrit(t, s, "Child", "doing")
+	r, err := s.Create("Epic", "proj", "idea", "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Set(r.ID, []core.Field{{Name: "tags", Value: "epic"}}, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	_, rev, _ := s.Get(r.ID)
+	if _, err = s.Edit(r.ID, rev, "## Details\n- [ ] "+child+"\n", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	core.SetAfterRead(s, func(path string, _ int) {
+		if strings.Contains(path, child) {
+			f, err := os.OpenFile(e.file(r.ID), os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = f.WriteString("\nedited elsewhere\n")
+			_ = f.Close()
+			core.SetAfterRead(s, nil)
+		}
+	})
+	res, err := s.Move(child, "done", core.MoveOpts{Force: true, Message: "x"}, "tester")
+	if err != nil || !strings.Contains(res.Warning, r.ID) {
+		t.Fatalf("Move: warning %q, err %v; want a warning naming the epic", res.Warning, err)
+	}
+	ensure(t, strings.Contains(e.text(r.ID), "- [ ] "+child) && strings.Contains(e.text(r.ID), "edited elsewhere"), "the foreign edit must stay")
+}

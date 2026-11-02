@@ -195,6 +195,7 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 	}
 	op := &opInfo{kind: "move"}
 	var info string
+	var ready []string
 	res, err := s.modifyTx(id, actor, op, func(tx *txEnv, t *task.Task, _ string) error {
 		cfg, err := s.loadConfig()
 		if err != nil {
@@ -202,13 +203,20 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 		}
 		column = cfg.Resolve(column)
 		wasClosed := cfg.RoleOf(t.Status) == roleClosed
+		nowClosed := cfg.RoleOf(column) == roleClosed
+		if nowClosed && !wasClosed && t.IsEpic() {
+			if err := s.settleLines(t, cfg); err != nil {
+				return err
+			}
+		}
 		info, err = s.move(tx, t, cfg, column, o, actor, op)
-		if err == nil && wasClosed != (cfg.RoleOf(column) == roleClosed) {
-			s.syncEpics(tx, t.ID, !wasClosed)
+		if err == nil && wasClosed != nowClosed {
+			ready = s.syncEpics(tx, t.ID, nowClosed)
 		}
 		return err
 	})
 	res.Info = info
+	res.Ready = ready
 	return res, err
 }
 
@@ -320,13 +328,6 @@ func closeChecks(t *task.Task, msg string, force bool) (bool, error) {
 		return false, rule("--force needs -m result")
 	}
 	crit := t.Criteria()
-	if t.IsEpic() {
-		for _, c := range crit {
-			if id := task.LineTask(c.Text); id != "" && !c.Done {
-				return false, rule("epic has an unchecked line of %s; close or move that task first", id)
-			}
-		}
-	}
 	if len(crit) == 0 {
 		if msg == "" {
 			return false, rule("no criteria; use -m result")

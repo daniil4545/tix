@@ -49,7 +49,7 @@ func TestCLI_Epic_ShowListCtx(t *testing.T) {
 	defer guard(t)
 	b, epic, c1, c2 := epicBox(t)
 	out := b.ok("", "show", c1).out
-	ensure(t, strings.Contains(out, "Epic: "+epic+"\n"), "show: %q", out)
+	ensure(t, strings.HasPrefix(strings.SplitN(out, "\n", 2)[1], "Epic: "+epic+"\n"), "show: %q", out)
 	ensure(t, !strings.Contains(b.ok("", "show", epic).out, "Epic: T"), "an epic has no Epic line")
 	ensure(t, strings.Contains(b.ok("", "list").out, epic+" [epic] Epic"), "list")
 	ensure(t, strings.Contains(b.ok("", "ctx", "--project", "personal").out, epic+" [epic] Epic"), "ctx")
@@ -58,4 +58,35 @@ func TestCLI_Epic_ShowListCtx(t *testing.T) {
 	b.edit(c2, "Epic: "+epic+"\n## Details\n- [x] shipped\n")
 	b.ok("", "done", c2)
 	ensure(t, strings.Contains(b.ok("", "show", epic).out, "- [x] "+c2+"\n"), "line ticks by the epic list")
+}
+
+func TestCLI_Epic_ForceBoundaryAndReady(t *testing.T) {
+	defer guard(t)
+	b, epic, c1, c2 := epicBox(t)
+	b.edit(epic, "## Details\n- [ ] "+c1+" one\n- [ ] "+c2+"\n- [ ] T-20 other\n- [ ] "+c1+"suffix\n")
+	b.edit(c1, "## Details\n- [ ] open\n")
+	b.ok("", "done", c1, "--force", "-m", "x")
+	body := b.ok("", "show", epic).out
+	ensure(t, strings.Contains(body, "- [x] "+c1+" one") && strings.Contains(body, "- [ ] T-20 other") &&
+		strings.Contains(body, "- [ ] "+c1+"suffix"), "forced close or id boundary: %q", body)
+	b.ok("", "move", c1, "todo")
+	b.edit(epic, "## Details\n- [ ] "+c1+" one\n- [ ] "+c2+"\n- [ ] acceptance\n")
+	b.ok("", "check", c1, "1")
+	b.ok("", "done", c1)
+	r := b.ok("", "done", c2)
+	ensure(t, strings.Contains(r.out, "epic "+epic+": all tasks closed, ready for acceptance\n"), "ready signal: %q", r.out)
+}
+
+func TestCLI_Epic_DoneTakesTruthFromTasks(t *testing.T) {
+	defer guard(t)
+	b, epic, c1, c2 := epicBox(t)
+	b.ok("", "done", c1)
+	b.edit(epic, "## Details\n- [ ] "+c1+"\n- [ ] "+c2+"\n- [ ] T-99\n")
+	msg := b.rule("done", epic, "--force", "-m", "x")
+	ensure(t, strings.Contains(msg, c2+" (not closed)") && strings.Contains(msg, "T-99 (not found)"), "refusal text: %q", msg)
+	b.ok("", "done", c2)
+	b.edit(epic, "## Details\n- [ ] "+c1+"\n- [ ] "+c2+"\n")
+	b.ok("", "done", epic, "--force", "-m", "x")
+	body := b.ok("", "show", epic).out
+	ensure(t, strings.Contains(body, "- [x] "+c1+"\n") && strings.Contains(body, "- [x] "+c2+"\n"), "lines of closed tasks: %q", body)
 }
