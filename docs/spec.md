@@ -148,7 +148,7 @@ flowchart TD
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); a first body line `Epic: T-M` ticks `- [ ] T-N` in T-M by a second commit, a failed tick only warns; all `T-N` lines ticked (other criteria do not count) prints "epic T-M ready for acceptance" |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; an epic with an unchecked task line is not closed, even with `--force`; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
 | `rm` | delete |
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,

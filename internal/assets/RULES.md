@@ -47,7 +47,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Scope
 
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
-- Bigger work is an epic: a task tagged `epic` whose `## Details` lists its tasks as `- [ ] T-N <gist>` plus the acceptance criterion. Each child task starts its body with `Epic: T-N`. `tix done` of a child ticks its line in the epic and says when all task lines are ticked (the acceptance criterion does not count); the epic stays open for acceptance.
+- Bigger work is an epic: a task tagged `epic` whose `## Details` lists its tasks as `- [ ] T-N <gist>`; a line without T-N is an acceptance criterion. The list lives only in the epic, a child task has no `Epic:` line (`tix show` prints it). The mark of a task line follows the task status by itself: `tix done` ticks it, a move out of closed clears it, `tix check` refuses it. An epic with an unchecked task line cannot be closed, even with `--force`.
 - Frozen work stays in the inbox column with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.

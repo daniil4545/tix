@@ -16,8 +16,8 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary` |
-| `tix check T-12 1 2` | ticks criteria by number |
-| `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; a task whose body starts with `Epic: T-M` ticks its line in that epic |
+| `tix check T-12 1 2` | ticks criteria by number; a task line (`- [ ] T-N ...`) of an epic is refused, it follows the status of T-N |
+| `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; its line in every epic (tag `epic`) is ticked in the same commit, a move out of closed clears it; an epic with an unchecked task line is not closed, even with `--force` |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
 
 An id works with or without the prefix: `12` means `T-12`. Every command takes
