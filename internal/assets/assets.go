@@ -15,11 +15,12 @@ var Rules string
 
 // RulesHash - sha256 of Rules. A test keeps it equal to RULES.md: when the text changes, the old
 // hash moves into previousRules, so a store with an untouched old copy gets the new text.
-const RulesHash = "2c1238b48f9fa4ea82de5d32c5237eeb08eaa773000baec6aec2fd8583508900"
+const RulesHash = "40daa684d2fdd42b2d5399d80e89bc48d44ea87788e66077e112c3e13db9bf37"
 
 // previousRules - sha256 of RULES.md texts shipped by earlier versions. An empty file is not here:
 // the owner may have emptied it on purpose.
 var previousRules = map[string]bool{
+	"2c1238b48f9fa4ea82de5d32c5237eeb08eaa773000baec6aec2fd8583508900": true,
 	"5f96e07d234feeeaf200831331b3d2cb2f18f01bc88c3b7d7f7b0cdb200228e8": true,
 	"c56259fbb08875c39ee29e4d93cfa3bed99a0e9427247f0e0e10670e763e7cba": true,
 	"5d390bc8cb3b7642b757e75f82c5efe6de935d45db3ad3e7a1db73a6184e676f": true,
