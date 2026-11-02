@@ -74,7 +74,7 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | cli | parses commands, prints `ok`/`err`/`warn`, maps errors to exit codes | `internal/cli` (`cli.go` common, `agent.go` agent cycle, `commands.go` base commands) | works |
 | core | the only write path: lock, temp, rename, commit, transition rules | `internal/core` (`tx.go` write, `agent.go` take/move/set/check, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
 | task | parses and prints the task file, claim, criteria; no IO | `internal/task` | works |
-| config | reads `.tix/config.toml`: columns and their roles, project map | `internal/config` | works |
+| config | reads `.tix/config.toml`: project map; the five fixed statuses; the migration map from old columns | `internal/config` | works |
 | brief | builds the `tix ctx` output: text and JSON; no IO | `internal/brief` | works |
 | actor | write identity: sources, name check, shortening | `internal/actor` | works |
 | project | project name by working folder, project HEAD without calling git | `internal/project` (`project.go`, `head.go`) | works |
@@ -136,7 +136,7 @@ Failures at each step: section 6.
 
 Other scenarios:
 
-- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the columns `active`, `waiting`, `ready` (outside a project: `active` and `waiting`, the rest as counts); the text is trimmed to 2000 runes. Git and the lock are not involved.
+- `tix ctx`: `cli` reads all files (`core.List`, 4 workers), `project.Detect` finds the project by folder, `brief.Build` builds the statuses `in_progress`, `blocked`, `open` (outside a project: `in_progress` and `blocked`, the rest as counts); the text is trimmed to 2000 runes. Git and the lock are not involved.
 - `move`, `done`, `set`, `check` follow the same path; only the rule at step 5 differs (section 4).
 
 ## 3. Processes
@@ -155,29 +155,30 @@ The counter lives in `.tix/lock`.
 | Entity | Source of truth | Changed by | Key or constraint |
 |---|---|---|---|
 | Task | file `T-<N> <title>.md` in the store root | `core` under the lock | id `T-<N>`; number from `.tix/next_id`, never reused |
-| Columns and roles | `.tix/config.toml` | human; the core creates it on the first write | roles: `inbox`, `ready`, `active`, `waiting`, `closed` |
-| Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `active` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
+| Statuses | field `status` of the task | `core` | five fixed: `idea`, `open`, `in_progress`, `blocked`, `closed`; `core.migrateStatuses` converts a store with `[[column]]` once, in one commit |
+| Project map | `.tix/config.toml` | human; the core creates it on the first write | `[projects]` |
+| Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `in_progress` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
 | Order in a column | field `rank` | `core.place` | floating-point number; a gap below 1e-6 renumbers the column in one commit |
 | History | git repository `~/tasks` | `core` through `gitx` | one commit per edit; trailers `Actor:`, `Code:` |
 | Agent rules | `RULES.md` in the store | the core creates it if the file is missing | text embedded in the binary; an existing file is not overwritten |
 | gc counter, log | `.tix/lock`, `.tix/log` | `core`, `cli` | not in git |
 
-The task lifecycle by column roles. Default column names: `idea`, `todo`, `doing`, `blocked`, `done`.
+The task lifecycle by status.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> inbox: new
-  inbox --> ready: move [has criterion]
-  ready --> active: take
-  waiting --> active: take
-  active --> waiting: move [has reason]
-  active --> ready: move
-  active --> closed: done [criteria checked or --force -m]
-  waiting --> closed: done
+  [*] --> idea: new
+  idea --> open: move [has criterion]
+  open --> in_progress: take
+  blocked --> in_progress: take
+  in_progress --> blocked: move [has reason]
+  in_progress --> open: move
+  in_progress --> closed: done [criteria checked or --force -m]
+  blocked --> closed: done
   closed --> [*]
 ```
 
-The diagram shows the main paths: `move` is allowed between any columns that have a role. Rules of `core.enter`: `ready` needs a criterion; `waiting` needs a reason (`-m` or the field `waiting`); `closed` needs all criteria checked, otherwise `--force` with `-m`, and a task without criteria needs `-m`. Leaving `waiting` clears the field, leaving `active` and closing release the claim. An agent or a human starts the transitions; the final column is `closed`.
+The diagram shows the main paths: `move` is allowed between any two statuses. Rules of `core.enter`: `open` needs a criterion; `blocked` needs a reason (`-m` or the field `waiting`); `closed` needs all criteria checked, otherwise `--force` with `-m`, and a task without criteria needs `-m`. Leaving `blocked` clears the field, leaving `in_progress` and closing release the claim. An agent or a human starts the transitions; the final status is `closed`.
 
 ## 5. External systems and trust boundaries
 
@@ -218,13 +219,13 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Variable or mode | What it enables | Where set |
 |---|---|---|
 | `TIX_ACTOR` | identity, if there is no flag and no agent environment | environment |
-| columns, roles, project map | column behavior | `.tix/config.toml` in the store |
+| project map | folder to project name | `.tix/config.toml` in the store |
 
 ## 9. Where to change
 
 | I want to change | Module | What else to check |
 |---|---|---|
-| A transition rule (`ready`, `waiting`, closing) | `core.enter`, `core.closeChecks` in `internal/core/agent.go` | `RULES.md`, tests `core/agent_test.go`, `e2e/cycle_test.go` |
+| A transition rule (`open`, `blocked`, closing) | `core.enter`, `core.closeChecks` in `internal/core/agent.go` | `RULES.md`, tests `core/agent_test.go`, `e2e/cycle_test.go` |
 | Claim term, extension rule | `core.claimTTL`, `core.extendClaim` | `RULES.md`, the `take` output line |
 | Write order, lock | `internal/core/tx.go` | invariants of section 1, `e2e` |
 | A new command | `cli.dispatch`, `internal/cli/agent.go` or `commands.go`, a `Store` method | usage in `cli.go`, exit codes, `RULES.md`, `README.md` |
@@ -232,7 +233,7 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
-| Columns and roles | `.tix/config.toml`, `internal/config` | the code finds columns by role, names are not hardcoded |
+| The statuses | `config.Statuses`, `config.Check`, `core.migrateStatuses` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
 | `RULES.md` text | `internal/assets/RULES.md` | move the old `assets.RulesHash` into `previousRules`: stores with an untouched copy get the new text |
 
 ## 10. Limits and open items

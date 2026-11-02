@@ -39,7 +39,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | Pulse on the board row: last note with its age (2.3) | yes | priority field, filters by date and priority | |
 | Work log in the task (`RULES.md`): a note for each decision, question and stage change; `summary` is replaced; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
-| Columns with roles in `config.toml`; fields `waiting`, `claim`, `tags` | yes | custom fields, theme choice, theme `cards` | |
+| Five fixed statuses; fields `waiting`, `claim`, `tags` | yes | custom fields, theme choice, theme `cards` | |
 | Board colors: green title with a live claim, grey card without a live claim, project colors (2.3) | yes | reply to the agent from the card | |
 | Connectors for Claude Code, Codex, OpenCode (2.4) | the agent installs one once | `setup` | |
 | `RULES.md`, home session in `~/tasks` | yes | | |
@@ -140,11 +140,11 @@ flowchart TD
 
 | Command | What it does |
 |---|---|
-| `ctx` | rules in brief, columns with roles (`idea=inbox ...`), project tasks in `active`, `waiting`, `ready` (up to 5 per column by `rank`, then "K more"), next task; outside a project (`all`) tasks in `active` and `waiting`, every other column as a count; up to 2000 characters |
-| `list`, `show` | list with filters, without the `closed` column unless `--all` or `--status` names it; `--grep` matches title and `## Summary`, case-insensitive; alias `ls`; the whole task, with `rev` |
-| `new` | new task, in `inbox` by default; `--to` takes a column name or a role, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
-| `take` | into `active` and `claim`, also from `inbox` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `active` goes back to the head of `ready` |
-| `move` | move with the checks of 2.5; column by name or by role, name wins; order `--first` or `--after T-9`, the core computes `rank` under the lock |
+| `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters |
+| `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches title and `## Summary`, case-insensitive; alias `ls`; the whole task, with `rev` |
+| `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
+| `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open` |
+| `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
@@ -171,14 +171,14 @@ flowchart TD
      label has its own muted color from a palette of 6 by a hash of the lower-cased name. The scheme is
      one table in `internal/tui/view/scheme.go`;
    - board: number, project, title, first line of the summary, criteria, `claim`;
-     an unknown column is the column `?`;
+     a status outside the five is the column `?`; a card in `blocked` has `*` before its number;
    - card: title and column, fields in one line, abstract, summary, details,
      history: moves, closes, takes, releases, notes and comments are always visible; two or more
      edits in a row by the same `Actor` (`set`, `check`, `edit`, external edits) - one line "N edits",
      `enter` expands it; `external` is a separate author (D60), its edits fold only with each other;
    - the human main path without the CLI, by keys and mouse (D66):
      board - arrows, `enter` and double click, grab a card by `space`-arrow-`space` and by drag,
-     `n` and `+` new task (a column with an entry check gets it in the inbox column), `g` agent session, `e`, `c`, `p` project,
+     `n` and `+` new task (a status with an entry check gets it in `idea`), `g` agent session, `e`, `c`, `p` project,
      Delete with `y/n`, `?` help, `q`; card - up-down arrows over criteria and history
      (`enter` checks an item or unfolds an entry), left-right the neighbor task, `f` field,
      `esc`. The mouse in the card: a click on a criterion or a history line selects it, the
@@ -191,7 +191,7 @@ flowchart TD
    - `$EDITOR` edits a copy of the body in `.tix/tmp/`; unchanged - cancel; changed - `edit` with
      the base that was opened before the editor; conflict - the editor again with markers, the base is the version against
      which the conflict is shown; on any refusal the copy stays, the path is in the error line;
-   - a move to `waiting` and `done` with unchecked criteria asks one line at the bottom of the screen:
+   - a move to `blocked` and `closed` with unchecked criteria asks one line at the bottom of the screen:
      what we wait for, or the reason for closing;
    - a panic is caught, the terminal is restored, the error goes to the log.
 
@@ -222,26 +222,30 @@ flowchart TD
    - Codex takes `tix` out of the sandbox only for a single command, without `;`, `&&`, pipes, `cd`
      (`docs/api/codex.md`).
 
-### 2.5 Columns
+### 2.5 Statuses
 
-The column role tells the program what the column means, regardless of the name (D24). One role is one
-column; the agent does not touch a column without a role; a column with tasks cannot be deleted without a move.
-A `config.toml` error gives the path and the line.
+Five fixed statuses, in board order, one board column each. There are no roles, no `[[column]]` in
+`config.toml` and no custom statuses. A `config.toml` error gives the path and the line.
 
-| Role | Default | Check on move |
-|---|---|---|
-| `inbox` | idea | - |
-| `ready` | todo | at least one criterion; `ctx` takes the next task from here; `take --release` puts an active task at its head without the check |
-| `active` | doing | execution time is counted here |
-| `waiting` | blocked | `waiting` is required (D41) |
-| `closed` | done | all criteria checked, or `--force -m` (D40) |
+| Status | Check on move |
+|---|---|
+| `idea` | - (the status of a new task) |
+| `open` | at least one criterion; `ctx` takes the next task from here; `take --release` puts an `in_progress` task at its head without the check |
+| `in_progress` | `take` and `claim` come here; execution time is counted here |
+| `blocked` | `waiting` is required (D41), `-m "reason"` sets it; the board marks the card with `*` |
+| `closed` | all criteria checked, or `--force -m` (D40); `list` hides it |
+
+Migration (on opening a store that still has `[[column]]`, or has no `config.toml` and old statuses): the status of every
+task file is renamed by the role of its column (`inbox` to `idea`, `ready` to `open`, `active` to `in_progress`,
+`waiting` to `blocked`, `closed` to `closed`; without `[[column]]` by the default names `idea todo doing blocked done`),
+and `[[column]]` leaves `config.toml`, in one commit. A status in no column stays as it is and shows in the column `?`.
 
 ## 3. Scenarios
 
 | Scenario | Steps | Result |
 |---|---|---|
 | Happy path | The hook gave `ctx`; the agent runs `take`, `note`, `check`, `set summary=`, `comment`, `done -m` | The task is in `closed`, the history of steps is in git |
-| Idea | The user in the home session: "write down an idea" | A task in `inbox`, project `personal` |
+| Idea | The user in the home session: "write down an idea" | A task in `idea`, project `personal` |
 | Two agents, different tasks | They write at the same time | The lock queues the writes |
 | Foreign claim | A second session runs `take` | Refusal with the owner and the deadline; `--steal` takes over, the takeover is in history |
 | `edit` on an old base | The file managed to change | Merge; conflict - refusal, the agent rereads |
@@ -293,7 +297,7 @@ The user does not read the code (D33), so acceptance is automatic.
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 
-- `make e2e-agents`: fixture - a task in `ready` with one criterion and one prompt; `claude -p
+- `make e2e-agents`: fixture - a task in `open` with one criterion and one prompt; `claude -p
   --allowedTools "Bash(tix *)"`, `codex exec` with `prefix_rule`, `opencode run`. Pass - commits take,
   note, done with the agent's `Actor:`. It spends subscription limits: at the end of the stage, with the user's consent.
 - Not automated: the look of the TUI and Obsidian - the user, by eye; a simultaneous edit in
@@ -303,13 +307,13 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Entity | States and transitions | Frozen | Writer | Storage |
 |---|---|---|---|---|
-| Task | the columns of the config; a transition between any of them with the checks of 2.5; delete | `id`, `created`, file name | core; Obsidian bypassing it | `~/tasks/T-12 <slug>.md` |
+| Task | the five statuses; a transition between any of them with the checks of 2.5; delete | `id`, `created`, file name | core; Obsidian bypassing it | `~/tasks/T-12 <slug>.md` |
 | Comment | created | everything | core | section in the file |
 | Note | created | everything | core | empty commit |
 | Claim | free; held 3 h with extension; dropped, stolen, expired | - | core | `claim` |
-| Config | columns change | five roles | core or human | `.tix/config.toml` |
+| Config | project map changes | - | core or human | `.tix/config.toml` |
 
-Agent rights: creates, moves from `inbox` to `ready`, closes, deletes, changes the config.
+Agent rights: creates, moves from `idea` to `open`, closes, deletes, changes the config.
 
 ## 9. External facts
 

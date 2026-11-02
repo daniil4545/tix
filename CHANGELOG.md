@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with roles. A store with `[[column]]` is migrated when it is opened: task statuses are renamed by the role of their column and `[[column]]` is removed from `config.toml`, in one commit. The old words (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) are refused with exit code 6 and a hint. `tix ctx` no longer prints the `columns:` line; the board marks `blocked` cards with `*`.
+
 ### Removed
 
 - The jump into an agent session: the `g` key and `g session` button in the TUI, and the Warp tab address the CLI cached after agent writes (`WARP_FOCUS_URL`, `TIX_FOCUS_DIR`).

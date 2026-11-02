@@ -99,3 +99,6 @@ Accepted on 2026-10-20:
   whole history and the internal docs are public. The tix repository becomes the bench of the admitd agent farm:
   agents send PRs, the owner reviews and merges. User decision 2026-10-23 ("tix is fully public, a pet project,
   no reason to hide"). Cancels the snapshot from D47; `scripts/snapshot.sh` is removed.
+- D69. Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with
+  roles (D5, D20, D24 are superseded): agents confused the two names of each column. Stores with `[[column]]` are
+  migrated on opening by the role of the column, in one commit. User decision 2026-10-30, confirmed 2026-11-02.
