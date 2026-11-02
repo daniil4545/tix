@@ -4,14 +4,14 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 
 ## Cycle
 
-1. `tix take T-12`: the task moves to the active column and you hold it for 3 hours.
+1. `tix take T-12`: the task moves to in_progress and you hold it for 3 hours.
 2. Work. Log progress with `tix note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
 3. `tix check T-12 1 2`: mark finished criteria.
 4. `tix set T-12 summary="what is next"`: the first line shows on the board. Replace the summary, do not append to it.
 5. `tix comment T-12 "text"`: comments are only appended.
 6. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
-When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to the ready column.
+When a session ends without closing, write the comment `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open.
 
 ## Progress
 
@@ -29,16 +29,16 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- `take` works from ready, waiting and active columns, and from the inbox when the task has a criterion. From any other column move the task first: `tix move T-12 ready`. `tix <command> --help` prints the flags of a command. `move` takes a column name or a role; `tix ctx` prints which column has which role.
+- The five statuses: idea, open, in_progress, blocked, closed. No others, no aliases: an old word (todo, doing, done, ready, active, waiting, inbox) is refused with exit code 6.
+- `take` works from open, blocked and in_progress, and from idea when the task has a criterion. From closed move the task first: `tix move T-12 open`. `tix <command> --help` prints the flags of a command.
 
 ## Checks
 
-- Into ready: at least one criterion.
-- Into waiting: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving waiting clears the field. Waiting is for an external resource; it drops your hold. Waiting for the human is a move to blocked with a reason.
+- Into open: at least one criterion.
+- Into blocked: say why with `-m "reason"` or `tix set T-12 waiting="reason"`. Leaving blocked clears the field. Blocked drops your hold; the board marks it with `*` for the human.
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
-- `tix new "title" --to ready --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to ready` is refused; `--to` waiting or closed is refused: create the task, then `tix move` or `tix done`.
-- `tix list` hides closed tasks; `--all` or `--status <closed column>` shows them, `--grep TEXT` matches title and summary.
-- A column without a role is not yours.
+- `tix new "title" --to open --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to open` is refused; `--to` blocked or closed is refused: create the task, then `tix move` or `tix done`.
+- `tix list` hides closed tasks; `--all` or `--status closed` shows them, `--grep TEXT` matches title and summary.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
 - `set` takes: title, project, waiting, tags, external, abstract, summary.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
@@ -48,11 +48,11 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
 - Bigger work is an epic: a task tagged `epic` whose `## Details` lists its tasks as `- [ ] T-N <gist>`; a line without T-N is an acceptance criterion. The list lives only in the epic, a child task has no `Epic:` line (`tix show` prints it). The mark of a task line follows the task status by itself: `tix done` ticks it, a move out of closed clears it, `tix check` refuses it. When the last task line is ticked, `tix done` says the epic is ready for acceptance. Closing the epic ticks the lines of closed tasks; a line of an open or missing task refuses it, even with `--force`.
-- Frozen work stays in the inbox column with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.
+- Frozen work stays in idea with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
-- You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
-- An idea outside a project goes to the inbox column with project `personal`.
-- A task needs the user? Move it to the waiting role with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The human answers with a comment and moves it back.
+- You may create tasks, move them from idea to open, close and delete them, and edit `config.toml`.
+- An idea outside a project goes to idea with project `personal`.
+- A task needs the user? Move it to blocked with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The human answers with a comment and moves it back.
 
 ## Ticket template
 

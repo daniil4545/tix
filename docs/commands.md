@@ -5,16 +5,16 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 
 | Command | What it does |
 |---|---|
-| `tix new "title" [--to column] [--project p] [--body-file f]` | creates a task, by default in the `inbox` column, with the body of file `f` (`-` is stdin); `--to ready` needs criteria in the body, a column that needs a reason is refused |
-| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists open tasks; `--all` or `--status` of the closed column adds closed ones, `--grep` matches title and summary; alias `ls` |
+| `tix new "title" [--to status] [--project p] [--body-file f]` | creates a task, by default in `idea`, with the body of file `f` (`-` is stdin); `--to open` needs criteria in the body, `--to blocked` and `--to closed` are refused |
+| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones, `--grep` matches title and summary; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
 | `tix note T-12 "text"` | logs a step in the history |
 | `tix rm T-12` | deletes a task |
-| `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task; outside a project active and waiting, the rest as counts |
-| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
-| `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
+| `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, next task; outside a project in_progress and blocked, the rest as counts |
+| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open |
+| `tix move T-12 <status> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `open`, `blocked`, `closed`; `-m` is for `blocked` and `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number; a task line (`- [ ] T-N ...`) of an epic is refused, it follows the status of T-N |
 | `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; its line in every epic (tag `epic`) is ticked in the same commit, a move out of closed clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force` |
@@ -43,16 +43,19 @@ refuses a body that contains its heading, so cut it before pasting a task back.
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,
 5 rule refused, 6 bad input.
 
-Columns and their roles live in `~/tasks/.tix/config.toml`. The defaults:
+Five fixed statuses, in board order. An old word (`todo`, `doing`, `done`, `ready`, `active`,
+`waiting`, `inbox`) is refused with exit code 6 and a hint such as "maybe open?".
 
-| Column | Role | Rule on entering |
-|---|---|---|
-| `idea` | inbox | none |
-| `todo` | ready | at least one criterion |
-| `doing` | active | none |
-| `blocked` | waiting | needs the `waiting` field, `-m "reason"` sets it |
-| `done` | closed | all criteria ticked, or `--force -m "result"` |
+| Status | Rule on entering |
+|---|---|
+| `idea` | none; a new task starts here |
+| `open` | at least one criterion |
+| `in_progress` | none; `take` moves a task here |
+| `blocked` | needs the `waiting` field, `-m "reason"` sets it; the board marks the card with `*` |
+| `closed` | all criteria ticked, or `--force -m "result"` |
 
+A store that still has `[[column]]` in `~/tasks/.tix/config.toml` is migrated when it is opened: the
+statuses of all tasks are renamed by the role of their column and `[[column]]` is removed, in one commit.
 The same file has a `[projects]` table to rename a project folder.
 
 ## Board
@@ -69,7 +72,7 @@ label has its own muted color.
 | `h j k l`, arrows | select a column and a card |
 | `space` | grab the card; arrows move it, `space` or `enter` drops it, `esc` cancels |
 | `enter` | open the card |
-| `n` | new task in the selected column (in the inbox column if that column needs criteria): asks for a title, then opens `$EDITOR` |
+| `n` | new task in the selected column (in `idea` if that status needs criteria): asks for a title, then opens `$EDITOR` |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
 | `p` | cycle the project filter |
 | `J`, `K` | move the card down or up in its column |

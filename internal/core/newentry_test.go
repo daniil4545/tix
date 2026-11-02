@@ -8,7 +8,7 @@ import (
 // spec: T-82 scenario 5 (the core refuses before any write)
 func TestStore_Create_CheckedColumn_RuleErrorNothingWritten(t *testing.T) {
 	defer guard(t)
-	for _, column := range []string{"todo", "blocked", "done"} {
+	for _, column := range []string{"open", "blocked", "closed"} {
 		t.Run(column, func(t *testing.T) {
 			e := newEnv(t)
 			s := e.open(2 * time.Second)
@@ -29,7 +29,7 @@ func TestStore_Create_UncheckedColumns_Allowed(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.open(2 * time.Second)
-	for _, column := range []string{"idea", "doing"} {
+	for _, column := range []string{"idea", "in_progress"} {
 		if _, err := s.Create("Task "+column, "proj", column, "tester"); err != nil {
 			t.Errorf("Create into %s: %v", column, err)
 		}

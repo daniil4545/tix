@@ -196,7 +196,7 @@ func TestCLI_EmptyBase_ListOneLine_NewCreatesHome(t *testing.T) {
 func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	if id := b.newTask("Alpha", "todo"); id != "T-1" {
+	if id := b.newTask("Alpha", "open"); id != "T-1" {
 		t.Errorf("first task id %q, want T-1", id)
 	}
 	b.ok("", "new", "Beta")
@@ -216,12 +216,12 @@ func TestCLI_ListShow_FormatsOrderFilters(t *testing.T) {
 		}
 		order = append(order, m[1]+" "+m[2])
 	}
-	want := "idea T-2,idea T-3,idea T-4,todo T-1"
+	want := "idea T-2,idea T-3,idea T-4,open T-1"
 	if got := strings.Join(order, ","); got != want {
 		t.Errorf("list order: %s, want by columns and rank: %s", got, want)
 	}
-	if got := strings.TrimSpace(b.ok("", "list", "--status", "todo").out); !strings.HasPrefix(got, "todo T-1 Alpha") || strings.Contains(got, "\n") {
-		t.Errorf("list --status todo: %q", got)
+	if got := strings.TrimSpace(b.ok("", "list", "--status", "open").out); !strings.HasPrefix(got, "open T-1 Alpha") || strings.Contains(got, "\n") {
+		t.Errorf("list --status open: %q", got)
 	}
 	if got := strings.TrimSpace(b.ok("", "list", "--project", "other").out); !strings.Contains(got, "T-4 Delta") || strings.Contains(got, "\n") {
 		t.Errorf("list --project other: %q", got)
@@ -261,15 +261,15 @@ func TestCLI_ListClosedAliasGrep(t *testing.T) {
 		want string
 	}{
 		{"default", nil, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
-		{"all", []string{"--all"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\ndone T-3 Closed Alpha\n"},
+		{"all", []string{"--all"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\nclosed T-3 Closed Alpha\n"},
 		{"title and summary", []string{"--grep", "ALPHA"}, "idea T-1 Alpha | MiXeD result\nidea T-2 Beta | alpha result\n"},
 		{"summary case", []string{"--grep", "mixed"}, "idea T-1 Alpha | MiXeD result\n"},
 		{"summary second line", []string{"--grep", "SECOND"}, "idea T-1 Alpha | MiXeD result\n"},
 		{"literal", []string{"--grep", "A.*"}, "no tasks\n"},
 		{"excluded sections", []string{"--grep", "hidden"}, "no tasks\n"},
 		{"project", []string{"--grep", "alpha", "--project", "other"}, "idea T-2 Beta | alpha result\n"},
-		{"closed by status", []string{"--status", "done"}, "done T-3 Closed Alpha\n"},
-		{"closed explicit", []string{"--all", "--status", "done", "--grep", "alpha"}, "done T-3 Closed Alpha\n"},
+		{"closed by status", []string{"--status", "closed"}, "closed T-3 Closed Alpha\n"},
+		{"closed explicit", []string{"--all", "--status", "closed", "--grep", "alpha"}, "closed T-3 Closed Alpha\n"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -297,24 +297,13 @@ func TestCLI_ListClosedAliasGrep(t *testing.T) {
 	}
 }
 
-func TestCLI_ListRenamedClosedColumn(t *testing.T) {
+// An old column word in --status is refused with code 6 and the hint, not read as an empty list.
+func TestCLI_List_OldStatusWordRefused(t *testing.T) {
 	b := newBox(t)
-	b.ok("", "new", "Closed Alpha")
-	path := filepath.Join(b.home, ".tix", "config.toml")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = bytes.ReplaceAll(data, []byte(`name = "done"`), []byte(`name = "archived"`))
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	b.ok("", "move", "T-1", "archived", "-m", "finished", "--as", "test:list")
-	if got := b.ok("", "list", "--grep", "closed").out; got != "no tasks\n" {
-		t.Errorf("renamed closed column: %q", got)
-	}
-	if got := b.ok("", "ls", "--all", "--grep", "closed").out; got != "archived T-1 Closed Alpha\n" {
-		t.Errorf("renamed closed column with --all: %q", got)
+	b.ok("", "new", "Alpha")
+	r := b.tix("", "list", "--status", "done")
+	if r.code != 6 || !strings.Contains(r.err, "maybe closed?") {
+		t.Errorf("list --status done: code %d, stderr %q, want 6 and `maybe closed?`", r.code, r.err)
 	}
 }
 
@@ -569,28 +558,18 @@ func TestCLI_BrokenConfig_ErrPathLine_NothingWritten(t *testing.T) {
 	}
 }
 
-// new without --to puts the task into the inbox role column, whatever its name and place
-// in the config. Turns red if the column is looked up by name or the first one is taken.
-func TestCLI_New_DefaultColumnByInboxRole(t *testing.T) {
+// new without --to puts the task into idea; --to takes the five statuses only, an old word is code 6.
+func TestCLI_New_DefaultIdea_ToFiveStatuses(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	b.ok("", "new", "Alpha")
-	cfg := filepath.Join(b.home, ".tix", "config.toml")
-	data := "[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n[[column]]\nname = \"ideas\"\nrole = \"inbox\"\n"
-	if err := os.WriteFile(cfg, []byte(data), 0o644); err != nil {
-		t.Fatal(err)
+	if r := b.ok("", "new", "Alpha"); r.out != "ok T-1 idea\n" {
+		t.Errorf("tix new Alpha: stdout %q, want %q", r.out, "ok T-1 idea\n")
 	}
-	if r := b.ok("", "new", "Beta"); r.out != "ok T-2 ideas\n" {
-		t.Errorf("tix new Beta: stdout %q, want %q", r.out, "ok T-2 ideas\n")
+	if r := b.ok("", "new", "Beta", "--to", "in_progress"); r.out != "ok T-2 in_progress\n" {
+		t.Errorf("new --to in_progress: stdout %q", r.out)
 	}
-}
-
-// new --to takes a role as move does: `--to active` lands in the active role column.
-func TestCLI_New_ToRole(t *testing.T) {
-	defer guard(t)
-	b := newBox(t)
-	if r := b.ok("", "new", "Alpha", "--to", "active"); r.out != "ok T-1 doing\n" {
-		t.Errorf("new --to active: stdout %q, want %q", r.out, "ok T-1 doing\n")
+	if r := b.tix("", "new", "Gamma", "--to", "active"); r.code != 6 || !strings.Contains(r.err, "maybe in_progress?") {
+		t.Errorf("new --to active: code %d, stderr %q, want 6 and the hint", r.code, r.err)
 	}
 }
 
@@ -621,7 +600,7 @@ func TestCLI_Ctx_BothAgentVariables_Works(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "c1", "CODEX_THREAD_ID": "x1"}
-	if r := b.ok("", "ctx"); !strings.Contains(r.out, "columns:") {
+	if r := b.ok("", "ctx"); !strings.Contains(r.out, "project ") {
 		t.Errorf("ctx with both variables: stdout %q, want the context", r.out)
 	}
 }

@@ -67,7 +67,7 @@ func ops(es []history.Entry) []string {
 func TestLoad_CommitsAndFileCommentsByTime_CommentCommitNotDuplicated(t *testing.T) {
 	s, repo := store(t)
 	clock(t, at(10, 0))
-	if _, err := s.Create("Alpha", "p", "doing", "claude:a"); err != nil {
+	if _, err := s.Create("Alpha", "p", "in_progress", "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	clock(t, at(10, 10))
@@ -83,7 +83,7 @@ func TestLoad_CommitsAndFileCommentsByTime_CommentCommitNotDuplicated(t *testing
 		t.Fatal(err)
 	}
 	clock(t, at(12, 0))
-	if _, err := s.Move("T-1", "done", core.MoveOpts{Message: "finished"}, "claude:a"); err != nil {
+	if _, err := s.Move("T-1", "closed", core.MoveOpts{Message: "finished"}, "claude:a"); err != nil {
 		t.Fatal(err)
 	}
 	tk, _, err := s.Get("T-1")

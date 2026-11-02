@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/daniil4545/tix/internal/actor"
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 	"github.com/daniil4545/tix/internal/tui/view"
@@ -41,10 +42,7 @@ func (m *Model) dropGone() {
 
 // rebuild builds the columns by the project filter and puts the cursor on selID.
 func (m *Model) rebuild() {
-	names := make([]string, 0, len(m.cfg.Columns)+1)
-	for _, c := range m.cfg.Columns {
-		names = append(names, c.Name)
-	}
+	names := slices.Clone(config.Statuses)
 	byCol := map[string][]*task.Task{}
 	total := 0
 	for _, t := range m.tasks {
@@ -178,7 +176,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 		out[i] = view.Row{
 			ProjectColor: colors[strings.ToLower(t.Project)],
 			ID:           t.ID, Project: t.Project, Title: t.Title, Summary: t.Summary(),
-			Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
+			Star: t.Status == config.Blocked, Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}

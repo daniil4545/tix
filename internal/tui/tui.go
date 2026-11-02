@@ -13,7 +13,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
@@ -69,7 +68,6 @@ func Run(ctx context.Context, d Deps) error {
 type Model struct {
 	d    Deps
 	log  *slog.Logger
-	cfg  *config.Config
 	done <-chan struct{}
 
 	queue  chan job
@@ -108,7 +106,6 @@ func New(ctx context.Context, d Deps) *Model {
 	m := &Model{
 		d:       d,
 		log:     d.Log,
-		cfg:     d.Store.Config(),
 		done:    ctx.Done(),
 		queue:   make(chan job, queueSize),
 		events:  make(chan struct{}, 1),

@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"os"
-	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,12 +22,12 @@ func reload(t *testing.T, m *Model) {
 
 // An agent moved the grabbed task: the grab is dropped, a release writes nothing.
 func TestGrab_AgentMovedHeldTask_GrabCancelledNoWrite(t *testing.T) {
-	e := mvNewEnv(t, stickyCfg)
-	id := e.create("A", "c3")
+	e := mvNewEnv(t, "")
+	id := e.create("A", "open")
 	m := newMouseModel(t, e, 140, 30)
 	m.selectTask(id)
 	feed(m, spaceKey())
-	if _, err := e.store.Move(id, "c4", core.MoveOpts{}, "agent"); err != nil {
+	if _, err := e.store.Move(id, "in_progress", core.MoveOpts{}, "agent"); err != nil {
 		t.Fatal(err)
 	}
 	before := e.commits()
@@ -38,36 +36,18 @@ func TestGrab_AgentMovedHeldTask_GrabCancelledNoWrite(t *testing.T) {
 		t.Fatalf("grab %v, status %q", m.grab, m.status)
 	}
 	feed(m, spaceKey())
-	if e.commits() != before || e.statusOf(t, id) != "c4" {
+	if e.commits() != before || e.statusOf(t, id) != "in_progress" {
 		t.Errorf("agent move was rolled back: status %s", e.statusOf(t, id))
 	}
 }
 
 // Column "?" vanished on reread while the grab stood on it: keys do not crash.
 func TestGrab_UnknownColumnVanishes_ArrowsStayInRange(t *testing.T) {
-	e := mvNewEnv(t, stickyCfg)
-	a := e.create("A", "c3")
-	x := e.create("X", "c3")
+	e := mvNewEnv(t, "")
+	a := e.create("A", "open")
+	x := e.create("X", "open")
 	m := newMouseModel(t, e, 140, 30)
-	setStatus := func(id, from, to string) {
-		t.Helper()
-		tk, _, err := e.store.Get(id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		data, err := os.ReadFile(tk.Path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		out := strings.Replace(string(data), "status: "+from, "status: "+to, 1)
-		if out == string(data) {
-			t.Fatalf("no status in %s: %s", tk.Path, from)
-		}
-		if err := os.WriteFile(tk.Path, []byte(out), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	setStatus(x, "c3", "ghost")
+	setRawStatus(t, e, x, "open", "ghost")
 	reload(t, m)
 	m.selectTask(a)
 	feed(m, spaceKey())
@@ -77,7 +57,7 @@ func TestGrab_UnknownColumnVanishes_ArrowsStayInRange(t *testing.T) {
 	if m.grab == nil || m.grab.col != len(m.colTasks)-1 {
 		t.Fatalf("grab did not reach column ?: %+v", m.grab)
 	}
-	setStatus(x, "ghost", "c1")
+	setRawStatus(t, e, x, "ghost", "idea")
 	reload(t, m)
 	feed(m, tea.KeyPressMsg{Code: 'j', Text: "j"})
 	feed(m, tea.KeyPressMsg{Code: 'k', Text: "k"})

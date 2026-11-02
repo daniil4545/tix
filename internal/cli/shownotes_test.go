@@ -50,7 +50,7 @@ func TestCLI_Show_Notes_SurviveMoveAndRename(t *testing.T) {
 	b.ok("", "new", "Alpha")
 	b.ok("", "note", "T-1", "before changes")
 	b.ok("", "set", "T-1", "title=Renamed")
-	b.ok("", "move", "T-1", "doing")
+	b.ok("", "move", "T-1", "in_progress")
 	b.ok("", "note", "T-1", "after changes")
 	out := b.ok("", "show", "T-1").out
 	if !strings.Contains(out, "before changes") || !strings.Contains(out, "after changes") {

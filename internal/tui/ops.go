@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
-	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -128,20 +127,18 @@ func (m *Model) checkStatus(id, status string) error {
 	return nil
 }
 
-// moveTo moves the task to column target with one Move write; opts.Place - the place in the column.
-// For waiting and closed the core requires a reason, the input line asks for it; a reorder inside
-// a column needs no reason. A shared step for drag and grab.
+// moveTo moves the task to target with one Move write; opts.Place - the place in it.
+// blocked and closed ask for a reason on the input line. A shared step for drag and grab.
 func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd {
 	if !m.configured(t.Status) {
-		m.setStatus(t.ID+": column "+t.Status+" is not in config", true)
+		m.setStatus(t.ID+": status "+t.Status+" is not one of the five", true)
 		return nil
 	}
-	i := slices.IndexFunc(m.cfg.Columns, func(c config.Column) bool { return c.Name == target })
-	if i < 0 {
+	if !m.configured(target) {
 		m.setStatus(t.ID+": unknown column", true)
 		return nil
 	}
-	col, from, label := m.cfg.Columns[i], t.Status, "moved"
+	from, label := t.Status, "moved"
 	if target != from {
 		label = from + " > " + target
 	}
@@ -164,12 +161,12 @@ func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd 
 		})
 		return nil
 	}
-	switch col.Role {
-	case "waiting":
+	switch target {
+	case config.Blocked:
 		if strings.TrimSpace(t.Waiting) == "" {
 			return ask("waiting for:", false)
 		}
-	case "closed":
+	case config.Closed:
 		total, open := countCriteria(t)
 		if total == 0 || open > 0 {
 			return ask("close reason:", open > 0)

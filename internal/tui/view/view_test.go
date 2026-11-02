@@ -38,7 +38,7 @@ func fits(t *testing.T, name, out string, w, h int) {
 	}
 }
 
-var colNames = []string{"idea", "todo", "doing", "blocked", "done"}
+var colNames = []string{"idea", "open", "in_progress", "blocked", "closed"}
 
 func bigBoard(rowsPerCol int) view.Board {
 	b := view.Board{Total: rowsPerCol * len(colNames), Col: 1, Row: 0}
@@ -71,10 +71,10 @@ func TestRenderBoard_AnySize_FitsScreen(t *testing.T) {
 func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 40, Cols: []view.Col{
 		{Name: "idea"},
-		{Name: "todo", Rows: []view.Row{
+		{Name: "open", Rows: []view.Row{
 			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
 		}},
-		{Name: "doing"}, {Name: "blocked"}, {Name: "done"},
+		{Name: "in_progress"}, {Name: "blocked"}, {Name: "closed"},
 	}}
 	out := plain(view.RenderBoard(b))
 	for _, want := range colNames {
@@ -86,6 +86,19 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("board without %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestRenderBoard_StarRow_MarkBeforeNumber(t *testing.T) {
+	b := view.Board{Project: "alpha", Total: 2, W: 200, H: 20, Cols: []view.Col{
+		{Name: "blocked", Rows: []view.Row{
+			{ID: "T-1", Project: "alpha", Title: "Waits", Star: true},
+			{ID: "T-2", Project: "alpha", Title: "Plain"},
+		}},
+	}}
+	out := plain(view.RenderBoard(b))
+	if !strings.Contains(out, "*T-1 alpha") || strings.Contains(out, "*T-2") {
+		t.Errorf("want a star before T-1 only:\n%s", out)
 	}
 }
 
@@ -138,7 +151,7 @@ func TestRenderBoard_SelectionAndErrorLookDifferent(t *testing.T) {
 func card() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
 	return view.Card{
-		ID: "T-12", Title: "Report on calls", Column: "doing", Fields: "alpha   #a   @claude",
+		ID: "T-12", Title: "Report on calls", Column: "in_progress", Fields: "alpha   #a   @claude",
 		Abstract: "abstract text", Summary: "summary text", Details: "details text", Checks: "1/3",
 		History: []history.Entry{
 			{At: at, Actor: "claude", Op: "new"},
@@ -152,7 +165,7 @@ func card() view.Card {
 
 func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 	out := plain(view.RenderCard(card()))
-	for _, want := range []string{"T-12", "Report on calls", "doing", "alpha", "abstract text", "summary text",
+	for _, want := range []string{"T-12", "Report on calls", "in_progress", "alpha", "abstract text", "summary text",
 		"details text", "claude", "new", "3 edits", "daniil", "use a dash for empty values"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("card without %q:\n%s", want, out)
@@ -184,7 +197,7 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 // entries, H is such that exactly three body lines fit.
 func stepCard() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
-	c := view.Card{ID: "T-1", Title: "Steps", Column: "doing", W: 60, H: 8}
+	c := view.Card{ID: "T-1", Title: "Steps", Column: "in_progress", W: 60, H: 8}
 	for i := 0; i < 6; i++ {
 		c.History = append(c.History, history.Entry{At: at, Actor: "claude", Op: "note", Text: fmt.Sprintf("step %d", i)})
 	}
@@ -283,15 +296,15 @@ func golden(t *testing.T, name, got string) {
 }
 
 func TestGolden_BoardAndCard(t *testing.T) {
-	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 todo > doing", Cols: []view.Col{
+	b := view.Board{Project: "alpha", Total: 4, Col: 1, Row: 0, W: 130, H: 14, Status: "ok T-7 open > in_progress", Cols: []view.Col{
 		{Name: "idea"},
-		{Name: "todo", Rows: []view.Row{
+		{Name: "open", Rows: []view.Row{
 			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
 			{ID: "T-9", Project: "alpha", Title: "Write docs", Summary: "which db?", Live: true},
 		}},
-		{Name: "doing", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
-		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice"}}},
-		{Name: "done"},
+		{Name: "in_progress", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
+		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice", Star: true}}},
+		{Name: "closed"},
 	}}
 	golden(t, "board", view.RenderBoard(b))
 	golden(t, "card", view.RenderCard(card()))

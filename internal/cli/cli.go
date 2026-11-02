@@ -54,12 +54,6 @@ func (e *inputError) Error() string { return e.msg }
 
 func inputf(format string, v ...any) error { return &inputError{msg: fmt.Sprintf(format, v...)} }
 
-// ruleError - a refusal by a rule outside the core. Exit code 5.
-type ruleError struct{ msg string }
-
-func (e *ruleError) Error() string        { return e.msg }
-func (e *ruleError) Is(target error) bool { return target == core.ErrRule }
-
 // exitCode maps an error to an exit code via errors.Is.
 func exitCode(err error) int {
 	var in *inputError
@@ -216,15 +210,15 @@ func editDistance(a, b string) int {
 var commandHelp = map[string]string{
 	"ctx":     "ctx [--project P] [--json] [--hook]",
 	"inbox":   "inbox [--hook]",
-	"new":     "new <title> [--to column|role] [--project P] [--body-file FILE|-]",
-	"list":    "list [--project P] [--status column] [--all] [--grep TEXT] [--json]; alias: ls",
+	"new":     "new <title> [--to status] [--project P] [--body-file FILE|-]",
+	"list":    "list [--project P] [--status status] [--all] [--grep TEXT] [--json]; alias: ls",
 	"show":    "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":    "edit <id> --base <rev> < body.md",
 	"comment": "comment <id> <text>",
 	"note":    "note <id> <text>",
 	"rm":      "rm <id>",
 	"take":    "take <id> [--steal|--release]",
-	"move":    "move <id> <column|role> [--first|--after T-9] [-m text] [--force]",
+	"move":    "move <id> <status> [--first|--after T-9] [-m text] [--force]",
 	"set":     "set <id> field=value...; fields: title project waiting tags external abstract summary",
 	"check":   "check <id> N...",
 	"done":    "done <id> [-m result] [--force]",

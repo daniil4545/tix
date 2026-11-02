@@ -27,7 +27,7 @@ Status: version 0.1, the file format may still change before 1.0.
 | Safe writes | lock, temporary file, rename; an unparsable file is never overwritten |
 | Edits outside `tix` survive | a change made in Obsidian is committed by the next operation |
 | Claim | `tix take` claims a task for 3 hours; another session needs `--steal` |
-| Short brief | `tix ctx` prints the active, waiting and ready tasks of the project in under 2000 characters; outside a project, active and waiting tasks and counts of the rest |
+| Short brief | `tix ctx` prints the in_progress, blocked and open tasks of the project in under 2000 characters; outside a project, in_progress and blocked tasks and counts of the rest |
 | Comments reach the agent | a hook hands your new comments to the agent that holds the task |
 | Board | `tix` without arguments opens a terminal board: keys, mouse, drag between columns |
 
@@ -58,21 +58,21 @@ Or take a macOS or Linux archive (amd64, arm64) from the
    ok T-1 idea
    ```
 
-2. Give it done criteria, then move it to `todo`. Criteria are `- [ ]` lines
+2. Give it done criteria, then move it to `open`. Criteria are `- [ ]` lines
    under `## Details`. `tix edit` reads the new body from stdin and needs the
    revision that `tix show` prints:
 
    ```sh
    printf '## Details\n- [ ] Failed sync retries 3 times\n' | tix edit 1 --base "$(tix show 1 --json | jq -r .rev)"
-   tix move 1 ready
+   tix move 1 open
    ```
 
    ```text
    ok T-1 edit
-   ok T-1 idea > todo
+   ok T-1 idea > open
    ```
 
-   `move` accepts a column name (`todo`) or a column role (`ready`).
+   The statuses are `idea`, `open`, `in_progress`, `blocked`, `closed`.
 
 3. An agent takes it, logs a step and ticks the criterion:
 
@@ -93,13 +93,12 @@ Or take a macOS or Linux archive (amd64, arm64) from the
 4. Open the board with `tix`, or list tasks with `tix list`.
 
 `tix ctx` is what an agent reads at the start of a session. It names the
-project, how to work, what each column means and the tasks that need attention:
+project, how to work, and the tasks that need attention:
 
 ```text
 project shop   rules: ~/tasks/RULES.md
 - take: tix take; step: tix note; end: tix set summary=
-- columns: idea=inbox todo=ready doing=active blocked=waiting done=closed
-todo T-1 Add retry to the sync job | 0/1
+open T-1 Add retry to the sync job | 0/1
 next T-1
 ```
 

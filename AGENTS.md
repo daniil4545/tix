@@ -26,7 +26,7 @@ Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `git
 | `internal/cli` | command parsing and reply printing |
 | `internal/core` | the only write path into `~/tasks`: lock, rename, commit |
 | `internal/task` | parsing and printing of the task file, no IO |
-| `internal/config` | `.tix/config.toml`: columns and roles |
+| `internal/config` | `.tix/config.toml`: project map; the five statuses |
 | `internal/actor` | write identity: sources, name check |
 | `internal/brief` | building the `tix ctx` output, no IO |
 | `internal/assets` | `RULES.md`, embedded in the binary |

@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -60,18 +59,8 @@ type MoveOpts struct {
 type Field struct{ Name, Value string }
 
 const (
-	roleReady   = "ready"
-	roleActive  = "active"
-	roleWaiting = "waiting"
-	roleClosed  = "closed"
-
 	allowedFields = "title project waiting tags external abstract summary"
 )
-
-// loadConfig reads config.toml again: under the lock the config could have been changed by hand.
-func (s *Store) loadConfig() (*config.Config, error) {
-	return config.Load(filepath.Join(s.root, tixDir, configFile))
-}
 
 func (s *Store) claimed(id string, c task.Claim) error {
 	return &kindErr{kind: ErrClaimed, msg: fmt.Sprintf("claimed by %s until %s; steal: tix take %s --steal",
@@ -91,24 +80,21 @@ func (s *Store) Take(id string, mode TakeMode, actor string) (Result, error) {
 	var info string
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
 		op.subject = "take"
-		cfg, err := s.loadConfig()
-		if err != nil {
-			return err
-		}
+		var err error
 		if mode == Release {
 			op.kind, op.subject = "release", "release"
-			info, err = s.release(t, cfg, actor)
+			info, err = s.release(t, actor)
 			return err
 		}
-		info, err = s.take(t, cfg, actor, mode == Steal, op)
+		info, err = s.take(t, actor, mode == Steal, op)
 		return err
 	})
 	res.Info = info
 	return res, err
 }
 
-// release drops the claim; a task in the active column goes back to the head of ready: active means someone works on it.
-func (s *Store) release(t *task.Task, cfg *config.Config, actor string) (string, error) {
+// release drops the claim; an in_progress task goes back to the head of open: in_progress means someone works on it.
+func (s *Store) release(t *task.Task, actor string) (string, error) {
 	claim, has := t.ClaimInfo()
 	if has && claim.Actor != actor && claim.Until.After(s.now()) {
 		return "", s.claimed(t.ID, claim)
@@ -116,39 +102,28 @@ func (s *Store) release(t *task.Task, cfg *config.Config, actor string) (string,
 	if has {
 		t.ClearClaim() // own or expired: a live foreign claim was refused above
 	}
-	col, ok := cfg.ByRole(roleReady)
-	if cfg.RoleOf(t.Status) != roleActive || !ok {
+	if t.Status != config.InProgress {
 		return "released", nil
 	}
-	pl, err := s.place(t, col.Name, Place{First: true})
+	pl, err := s.place(t, config.Open, Place{First: true})
 	if err != nil {
 		return "", err
 	}
-	from := t.Status
-	t.Status, t.Rank = col.Name, pl.rank
-	return "released  " + transition(from, col.Name), nil
+	t.Status, t.Rank = config.Open, pl.rank
+	return "released  " + transition(config.InProgress, config.Open), nil
 }
 
-func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool, op *opInfo) (string, error) {
-	role := cfg.RoleOf(t.Status)
-	canTake := slices.Contains([]string{roleReady, roleWaiting, roleActive}, role)
-	if role == "inbox" {
+func (s *Store) take(t *task.Task, actor string, steal bool, op *opInfo) (string, error) {
+	canTake := slices.Contains([]string{config.Open, config.Blocked, config.InProgress}, t.Status)
+	if t.Status == config.Idea {
 		canTake = len(t.Criteria()) > 0
 	}
 	if !canTake {
-		hint := "<ready column>"
-		if c, ok := cfg.ByRole(roleReady); ok {
-			hint = c.Name
-		}
 		if len(t.Criteria()) == 0 {
 			return "", rule("%s is in %s and has no criteria; add `- [ ]` lines under ## Details with tix edit, "+
-				"then run: tix move %s %s, then tix take %s", t.ID, t.Status, t.ID, hint, t.ID)
+				"then run: tix move %s open, then tix take %s", t.ID, t.Status, t.ID, t.ID)
 		}
-		return "", rule("%s is in %s; run: tix move %s %s", t.ID, t.Status, t.ID, hint)
-	}
-	active, ok := cfg.ByRole(roleActive)
-	if !ok {
-		return "", rule("config has no column with role %s", roleActive)
+		return "", rule("%s is in %s; run: tix move %s open", t.ID, t.Status, t.ID)
 	}
 	claim, has := t.ClaimInfo()
 	live := has && claim.Until.After(s.now())
@@ -160,23 +135,23 @@ func (s *Store) take(t *task.Task, cfg *config.Config, actor string, steal bool,
 		op.subject = "steal " + ident.Short(claim.Actor)
 	}
 	from := t.Status
-	if role == roleWaiting {
+	if from == config.Blocked {
 		if err := t.SetField("waiting", ""); err != nil {
 			return "", err
 		}
 	}
-	if from != active.Name {
-		pl, err := s.place(t, active.Name, Place{})
+	if from != config.InProgress {
+		pl, err := s.place(t, config.InProgress, Place{})
 		if err != nil {
 			return "", err
 		}
-		t.Status, t.Rank = active.Name, pl.rank
+		t.Status, t.Rank = config.InProgress, pl.rank
 	}
 	if !live || foreign {
 		t.SetClaim(task.Claim{Actor: actor, Until: s.now().Add(claimTTL)})
 	}
 	c, _ := t.ClaimInfo()
-	return fmt.Sprintf("%s  @%s until %s", transition(from, active.Name), ident.Short(c.Actor), c.Until.Format("15:04")), nil
+	return fmt.Sprintf("%s  @%s until %s", transition(from, config.InProgress), ident.Short(c.Actor), c.Until.Format("15:04")), nil
 }
 
 // transition prints "from > to"; a move into the same column is just its name.
@@ -187,7 +162,7 @@ func transition(from, to string) string {
 	return from + " > " + to
 }
 
-// Move moves a task into a column by the role rules.
+// Move moves a task into a status by the entry rules.
 func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
@@ -197,19 +172,18 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 	var info string
 	var ready []string
 	res, err := s.modifyTx(id, actor, op, func(tx *txEnv, t *task.Task, _ string) error {
-		cfg, err := s.loadConfig()
-		if err != nil {
-			return err
+		if err := config.Check(column); err != nil {
+			return rule("%v", err)
 		}
-		column = cfg.Resolve(column)
-		wasClosed := cfg.RoleOf(t.Status) == roleClosed
-		nowClosed := cfg.RoleOf(column) == roleClosed
+		wasClosed := t.Status == config.Closed
+		nowClosed := column == config.Closed
 		if nowClosed && !wasClosed && t.IsEpic() {
-			if err := s.settleLines(t, cfg); err != nil {
+			if err := s.settleLines(t); err != nil {
 				return err
 			}
 		}
-		info, err = s.move(tx, t, cfg, column, o, actor, op)
+		var err error
+		info, err = s.move(tx, t, column, o, actor, op)
 		if err == nil && wasClosed != nowClosed {
 			ready = s.syncEpics(tx, t.ID, nowClosed)
 		}
@@ -220,22 +194,21 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 	return res, err
 }
 
-func (s *Store) move(tx *txEnv, t *task.Task, cfg *config.Config, column string, o MoveOpts,
+func (s *Store) move(tx *txEnv, t *task.Task, column string, o MoveOpts,
 	actor string, op *opInfo) (string, error) {
 	from := t.Status
 	msg := strings.TrimSpace(o.Message)
-	fromRole, toRole, err := moveRoles(cfg, from, column, msg)
-	if err != nil {
-		return "", err
+	if msg != "" && column != config.Blocked && column != config.Closed {
+		return "", rule("-m is only for moves to %s and %s", config.Blocked, config.Closed)
 	}
 	op.subject = "move " + from + " > " + column
 	same := from == column
 	switch {
 	case !same:
-		if err := s.leave(t, fromRole, toRole, msg, o, actor, op); err != nil {
+		if err := s.leave(t, from, column, msg, o, actor, op); err != nil {
 			return "", err
 		}
-	case toRole == roleWaiting && msg != "":
+	case column == config.Blocked && msg != "":
 		if err := t.SetField("waiting", msg); err != nil {
 			return "", err
 		}
@@ -254,62 +227,45 @@ func (s *Store) move(tx *txEnv, t *task.Task, cfg *config.Config, column string,
 	return transition(from, column), nil
 }
 
-// moveRoles checks that both columns exist and have a role, and that -m is appropriate.
-func moveRoles(cfg *config.Config, from, column, msg string) (fromRole, toRole string, err error) {
-	if !slices.ContainsFunc(cfg.Columns, func(c config.Column) bool { return c.Name == column }) {
-		return "", "", rule("unknown column %q; columns: %s", column, cfg.Roles())
-	}
-	for _, c := range []string{from, column} {
-		if cfg.RoleOf(c) == "" {
-			return "", "", rule("column %s has no role", c)
-		}
-	}
-	toRole = cfg.RoleOf(column)
-	if msg != "" && toRole != roleWaiting && toRole != roleClosed {
-		return "", "", rule("-m is only for moves to %s and %s", roleWaiting, roleClosed)
-	}
-	return cfg.RoleOf(from), toRole, nil
-}
-
 // leave applies a transition between different columns: entry checks, fields and claim.
-func (s *Store) leave(t *task.Task, fromRole, toRole, msg string, o MoveOpts, actor string, op *opInfo) error {
-	forced, err := s.enter(t, toRole, msg, o, actor)
+func (s *Store) leave(t *task.Task, from, to, msg string, o MoveOpts, actor string, op *opInfo) error {
+	forced, err := s.enter(t, to, msg, o, actor)
 	if err != nil {
 		return err
 	}
-	if toRole == roleClosed {
+	if to == config.Closed {
 		op.kind, op.subject = "done", "done"
 		if forced {
 			op.subject = "done force"
 		}
 	}
-	if fromRole == roleWaiting {
+	if from == config.Blocked {
 		if err := t.SetField("waiting", ""); err != nil {
 			return err
 		}
 	}
-	if fromRole == roleActive || toRole == roleClosed {
+	if from == config.InProgress || to == config.Closed {
 		t.ClearClaim()
 	}
 	return nil
 }
 
-// enter checks the entry into a column of role toRole and writes its fields (waiting, the Result comment).
+// enter checks the entry into the status to and writes its fields (waiting, the Result comment).
 // forced: the closing bypassed unchecked criteria.
-func (s *Store) enter(t *task.Task, toRole, msg string, o MoveOpts, actor string) (bool, error) {
-	switch toRole {
-	case roleReady:
+func (s *Store) enter(t *task.Task, to, msg string, o MoveOpts, actor string) (bool, error) {
+	switch to {
+	case config.Open:
 		if len(t.Criteria()) == 0 {
-			return false, rule("ready needs a criterion")
+			return false, rule("open needs a criterion")
 		}
-	case roleWaiting:
+	case config.Blocked:
 		if msg == "" && strings.TrimSpace(t.Waiting) == "" {
-			return false, rule("waiting needs a reason: use -m")
+			return false, rule("blocked needs a reason: use -m")
 		}
 		if msg != "" {
 			return false, t.SetField("waiting", msg)
 		}
-	case roleClosed:
+	case config.Closed:
 		forced, err := closeChecks(t, msg, o.Force)
 		if err != nil {
 			return false, err
@@ -366,12 +322,8 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	list := strings.Join(names, " ")
 	op := &opInfo{kind: "set", subject: "set " + list}
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
-		cfg, err := s.loadConfig()
-		if err != nil {
-			return err
-		}
 		for _, f := range fields {
-			if err := setField(t, cfg.RoleOf(t.Status), f); err != nil {
+			if err := setField(t, f); err != nil {
 				return err
 			}
 		}
@@ -381,7 +333,7 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	return res, err
 }
 
-func setField(t *task.Task, role string, f Field) error {
+func setField(t *task.Task, f Field) error {
 	switch f.Name {
 	case "status", "claim", "rank":
 		return rule("%s is changed by tix move", f.Name)
@@ -403,8 +355,8 @@ func setField(t *task.Task, role string, f Field) error {
 		}
 		return t.SetField("project", project)
 	case "waiting":
-		if strings.TrimSpace(f.Value) == "" && role == roleWaiting {
-			return rule("waiting needs a reason: use -m, or leave with tix move")
+		if strings.TrimSpace(f.Value) == "" && t.Status == config.Blocked {
+			return rule("blocked needs a reason: use -m, or leave with tix move")
 		}
 	case "tags", "external":
 	default:

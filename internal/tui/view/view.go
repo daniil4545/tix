@@ -10,17 +10,18 @@ import (
 	"github.com/daniil4545/tix/internal/history"
 )
 
-// Row - a board column line. The third card line (the pulse) is the first of: the Note note (a ready line "<age> <text>", empty outside the active column), Summary.
+// Row - a board column line. The third card line (the pulse) is the first of: the Note note (a ready line "<age> <text>", empty outside in_progress), Summary.
 // The colors and the sign come from the scheme by the card state (scheme.go).
 type Row struct {
 	ID, Project, Title, Summary, Meta string
 	Note                              string
 	Live                              bool // the task has a live claim; without it the card is grey
+	Star                              bool // the task is blocked: a human looks at it, "*" before the number
 	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
 	ProjectColor                      int  // the project label slot in the palette, from ProjectColors
 }
 
-// UnknownColumn - the column name for tasks with a status that is not in config.toml.
+// UnknownColumn - the column name for tasks with a status that is not one of the five.
 const UnknownColumn = "?"
 
 // Col - a board column.

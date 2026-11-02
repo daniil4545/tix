@@ -346,7 +346,7 @@ func TestGrab_RightThenDrop_MovesToNeighborWithOneCommit(t *testing.T) {
 				t.Fatalf("written before the release: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 			e.key(drop)
-			e.acWaitStatus("T-1", "todo")
+			e.acWaitStatus("T-1", "open")
 			e.settle()
 			if after := e.acCommitsSettled(before + 1); after != before+1 {
 				t.Errorf("commits %d -> %d, expected exactly one", before, after)
@@ -451,7 +451,7 @@ func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 	e.screenHas("moving T-1")
 	e.key("n", "a", "c", "p", "q")
 	e.click(mvX(0)+3, mvY(1)) // click on Bravo
-	e.click(mvX(1)+22, 2)     // and on "+" of column todo
+	e.click(mvX(1)+22, 2)     // and on "+" of column open
 	e.settle()
 	for _, bad := range []string{"title:", "comment:", "answer:", "no question"} {
 		if strings.Contains(e.text(), bad) {
@@ -467,11 +467,12 @@ func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 // A move to waiting and closed asks for a reason, like m; esc of the input line leaves the task.
 func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 	setup := func(t *testing.T) *mvEnv {
-		e := mvNewEnv(t, mvCfgWork)
-		e.create("Alpha", "work")
-		e.create("Bravo", "work")
+		e := mvNewEnv(t, "")
+		e.create("Alpha", "in_progress")
+		e.create("Bravo", "in_progress")
 		e.start(140, 30)
 		e.screenHas("Alpha", "Bravo")
+		e.key("l", "l") // the cursor from idea to in_progress
 		return e
 	}
 	t.Run("waiting: a reason moves", func(t *testing.T) {
@@ -481,12 +482,12 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.acPress("right")
 		e.key(" ")
 		e.screenHas("waiting for:")
-		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+		if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 			t.Fatalf("written before the answer: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "vendor reply" })
+		e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "blocked" && w == "vendor reply" })
 		e.settle()
 		if after := e.acCommitsSettled(before + 1); after != before+1 {
 			t.Errorf("commits %d -> %d, expected one", before, after)
@@ -502,7 +503,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.key("esc")
 		e.until("line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
 		e.settle()
-		if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+		if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 			t.Errorf("esc wrote: %s, commits %d -> %d", st, before, e.acCommitCount())
 		}
 	})
@@ -514,7 +515,7 @@ func TestGrab_ToWaitingAndClosed_AsksReason(t *testing.T) {
 		e.screenHas("close reason:")
 		e.tm.Type("shipped")
 		e.key("enter")
-		e.acWaitStatus("T-1", "fin")
+		e.acWaitStatus("T-1", "closed")
 	})
 }
 
@@ -523,7 +524,7 @@ func TestGrab_TaskRemovedMeanwhile_ReportsRemovedAndReleases(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
-	canary := e.create("canary", "done")
+	canary := e.create("canary", "closed")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
 	e.awaitWatcher(canary)
@@ -554,7 +555,7 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
-	canary := e.create("canary", "done")
+	canary := e.create("canary", "closed")
 	e.acCriterion("T-1")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
@@ -566,14 +567,14 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e.acStillOn("moving T-1")
 	e.acPress("right")
 	e.key(" ")
-	e.acWaitStatus("T-1", "todo")
+	e.acWaitStatus("T-1", "open")
 }
 
 // ---------------------------------------------------------------------------------------------
 // Scenario 4: new task
 // ---------------------------------------------------------------------------------------------
 
-// New task: a click on "+" of column doing, title, editor; the cursor on the new task.
+// New task: a click on "+" of column in_progress, title, editor; the cursor on the new task.
 func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 	cases := []struct{ name, script, wantBody string }{
 		{"editor without an edit", "", ""},
@@ -584,7 +585,7 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			st := acStubEditor(t, c.script)
 			e := mvNewEnv(t, "")
 			e.create("Alpha", "idea")
-			e.create("Beta", "doing")
+			e.create("Beta", "in_progress")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Beta")
 			plusX := 2*mvColStep + 23 // the last character of the third column cell
@@ -598,8 +599,8 @@ func TestNewTask_ClickPlus_CreatesInColumnAndOpensEditor(t *testing.T) {
 			e.until("editor called", func() bool { return st.calls() == 1 && st.seen(1) != "" })
 			e.until("task created", func() bool { return e.acByTitle("Brand new") != nil })
 			tk := e.acByTitle("Brand new")
-			if tk.Status != "doing" || tk.Project != "personal" {
-				t.Errorf("task: column %q, project %q, expected doing and personal", tk.Status, tk.Project)
+			if tk.Status != "in_progress" || tk.Project != "personal" {
+				t.Errorf("task: column %q, project %q, expected in_progress and personal", tk.Status, tk.Project)
 			}
 			acCheckTemplate(t, st.seen(1))
 			e.settle()
@@ -643,17 +644,17 @@ func TestNewTask_N_UsesSelectedColumnAndProject(t *testing.T) {
 			if _, err := e.store.Create("Alpha", c.seed, "idea", "seed"); err != nil {
 				t.Fatal(err)
 			}
-			e.createIn("Beta", c.seed, "doing")
+			e.createIn("Beta", c.seed, "in_progress")
 			e.acStartIn(c.launch, 140, 30)
 			e.screenHas("Alpha", "Beta")
-			e.key("l", "l", "n") // column doing
+			e.key("l", "l", "n") // column in_progress
 			e.screenHas("title:")
 			e.tm.Type("From key")
 			e.key("enter")
 			e.until("task created", func() bool { return e.acByTitle("From key") != nil })
 			tk := e.acByTitle("From key")
-			if tk.Status != "doing" || tk.Project != c.want {
-				t.Errorf("task: column %q, project %q, expected doing and %q", tk.Status, tk.Project, c.want)
+			if tk.Status != "in_progress" || tk.Project != c.want {
+				t.Errorf("task: column %q, project %q, expected in_progress and %q", tk.Status, tk.Project, c.want)
 			}
 		})
 	}
@@ -667,7 +668,7 @@ func TestNewTask_N_InReadyColumn_CreatedInInbox(t *testing.T) {
 	e.create("Alpha", "idea")
 	e.start(140, 30)
 	e.screenHas("Alpha")
-	e.key("l", "n") // column todo, ready role
+	e.key("l", "n") // column open, ready role
 	e.screenHas("title:")
 	e.tm.Type("Fallback")
 	e.key("enter")
@@ -942,8 +943,8 @@ func TestCriteria_Click_TogglesCriterion(t *testing.T) {
 func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 	for _, where := range []string{"board", "card"} {
 		t.Run(where, func(t *testing.T) {
-			e := mvNewEnv(t, mvCfgWork)
-			e.create("Alpha", "work")
+			e := mvNewEnv(t, "")
+			e.create("Alpha", "in_progress")
 			e.start(140, 30)
 			e.screenHas("Alpha")
 			if where == "card" {
@@ -955,7 +956,7 @@ func TestKeys_MAndShiftM_DoNothing(t *testing.T) {
 			if strings.Contains(e.text(), "waiting for:") || strings.Contains(e.text(), "close reason:") {
 				t.Errorf("m or M opened the move line:\n%s", e.text())
 			}
-			if st, _ := e.status("T-1"); st != "work" || e.acCommitCount() != before {
+			if st, _ := e.status("T-1"); st != "in_progress" || e.acCommitCount() != before {
 				t.Errorf("m M wrote: status %s, commits %d -> %d", st, before, e.acCommitCount())
 			}
 		})

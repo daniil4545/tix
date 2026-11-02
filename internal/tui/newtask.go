@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 )
 
@@ -44,17 +45,16 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // createTask queues Create to the write queue; success arrives as taskCreated. A column whose entry
-// check refuses a new task (ready, waiting, closed) gets it in the inbox column, the title is kept.
+// check refuses a new task (open, blocked, closed) gets it in idea, the title is kept.
 func (m *Model) createTask(title, project, column string) tea.Cmd {
 	write := m.submit("new", "created", nil, func() (core.Result, error) {
 		res, err := m.d.Store.Create(title, project, column, m.d.Actor)
-		inbox, ok := m.d.Store.Config().ByRole("inbox")
-		if !errors.Is(err, core.ErrRule) || !ok || inbox.Name == column {
+		if !errors.Is(err, core.ErrRule) || column == config.Idea {
 			return res, err
 		}
-		res, err = m.d.Store.Create(title, project, inbox.Name, m.d.Actor)
+		res, err = m.d.Store.Create(title, project, config.Idea, m.d.Actor)
 		if err == nil {
-			res.Info = "created in " + inbox.Name + ": add criteria, then move it to " + column
+			res.Info = "created in idea: add criteria, then move it to " + column
 		}
 		return res, err
 	})

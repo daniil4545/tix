@@ -136,10 +136,8 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	return m.moveTo(t, target, core.MoveOpts{})
 }
 
-// configured: the column is described in config.toml.
-func (m *Model) configured(name string) bool {
-	return slices.ContainsFunc(m.cfg.Columns, func(c config.Column) bool { return c.Name == name })
-}
+// configured: the status is one of the five.
+func (m *Model) configured(name string) bool { return slices.Contains(config.Statuses, name) }
 
 // selectTask puts the cursor on task id; false if it is not on the board (project filter).
 func (m *Model) selectTask(id string) bool {

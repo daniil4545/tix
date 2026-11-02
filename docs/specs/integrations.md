@@ -43,20 +43,20 @@ Column mapping in `config.toml`:
 
 ```
 [adapters.kaiten.columns]
-todo = "Queue"
-doing = "In progress"
+open = "Queue"
+in_progress = "In progress"
 blocked = "In progress"
-done = "Done"
+closed = "Done"
 
 [adapters.gh]
-done = "close"
+closed = "close"
 project = "owner/3"
-status = { todo = "Todo", doing = "In Progress", done = "Done" }
+status = { open = "Todo", in_progress = "In Progress", closed = "Done" }
 ```
 
 ## 3. Critical rules
 
-- The column mapping can be ambiguous: `doing` and `blocked` both go to "In progress".
+- The column mapping can be ambiguous: `in_progress` and `blocked` both go to "In progress".
   An incoming status that matches the current column of the task does not change it; otherwise the task
   moves to the first column of the mapping (proposal).
 - A network error does not change `status`; a repeated `set_state` is safe.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/brief"
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -21,7 +22,6 @@ const (
 	ctxPerColumn   = 5
 	ctxTextLimit   = 2000
 	rulesFile      = "RULES.md"
-	closedRole     = "closed"
 	hookStdinLimit = 64 << 10
 )
 
@@ -113,7 +113,7 @@ func (a *app) cmdCtx(args []string) error {
 		return nil
 	}
 	in := brief.Input{
-		Tasks: tasks, Cfg: a.store.Config(), Project: proj,
+		Tasks: tasks, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
 		Now:       time.Now(), PerColumn: ctxPerColumn,
 	}
@@ -240,12 +240,15 @@ func (a *app) cmdMove(args []string) error {
 	if err != nil {
 		return err
 	}
-	id, err := target(p, 2, "tix move <id> <column> [--first|--after T-9] [-m text] [--force]")
+	id, err := target(p, 2, "tix move <id> <status> [--first|--after T-9] [-m text] [--force]")
 	if err != nil {
 		return err
 	}
 	opts, err := moveOpts(p)
 	if err != nil {
+		return &idError{ID: id, Err: err}
+	}
+	if err := checkStatus(p.pos[1]); err != nil {
 		return &idError{ID: id, Err: err}
 	}
 	who, err := a.actorOf(p)
@@ -368,14 +371,18 @@ func (a *app) cmdDone(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	col, ok := a.store.Config().ByRole(closedRole)
-	if !ok {
-		return &idError{ID: id, Err: &ruleError{msg: "config.toml has no column with role closed"}}
-	}
-	res, err := a.store.Move(id, col.Name, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
+	res, err := a.store.Move(id, config.Closed, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
 	if err != nil {
 		return wrap(id, err)
 	}
 	a.reply(p, res, id, what(res, "done"))
+	return nil
+}
+
+// checkStatus refuses a word that is not one of the five statuses; an old column word gets a hint. Exit code 6.
+func checkStatus(name string) error {
+	if err := config.Check(name); err != nil {
+		return inputf("%v", err)
+	}
 	return nil
 }

@@ -25,7 +25,7 @@ Type "tix new 'Write the release notes'" Enter
 Sleep 600ms
 
 Hide
-Type "printf '## Details\n- [ ] Failed sync retries 3 times\n' | tix edit 1 --base $(tix show 1 --json | jq -r .rev) && tix move 1 todo && clear" Enter
+Type "printf '## Details\n- [ ] Failed sync retries 3 times\n' | tix edit 1 --base $(tix show 1 --json | jq -r .rev) && tix move 1 open && clear" Enter
 Show
 
 Type "tix take 1" Enter

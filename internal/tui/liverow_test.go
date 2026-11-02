@@ -22,11 +22,11 @@ func liveRow(t *testing.T, m *Model, id string) bool {
 // A live claim decides the card state, by the model clock.
 func TestBoardRow_Live_ByClaimAndModelClock(t *testing.T) {
 	e := mvNewEnv(t, "")
-	live := e.create("live", "doing")
+	live := e.create("live", "in_progress")
 	if _, err := e.store.Take(live, core.Take, "claude:abcd1234"); err != nil {
 		t.Fatal(err)
 	}
-	none := e.create("none", "doing")
+	none := e.create("none", "in_progress")
 	m := newMouseModel(t, e, 120, 30)
 	caReload(m)
 

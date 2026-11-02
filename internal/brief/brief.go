@@ -20,14 +20,13 @@ const maxLine = 160
 // howto - the second line of ctx: the three commands of the agent cycle.
 const howto = "- take: tix take; step: tix note; end: tix set summary="
 
-// ctxRoles - column roles in display order.
-var ctxRoles = []string{"active", "waiting", "ready"}
+// ctxStatuses - the statuses a project ctx lists, in display order.
+var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}
 
 // Input - the input of Build. PerColumn - how many tasks per column before compression, Limit - the rune limit
 // of the text; 0 removes the limit (this is how JSON is built).
 type Input struct {
 	Tasks                     []*task.Task
-	Cfg                       *config.Config
 	Project, RulesPath, Actor string
 	Now                       time.Time
 	PerColumn, Limit          int
@@ -53,45 +52,37 @@ type Section struct {
 type Brief struct {
 	Project  string    `json:"project"`
 	Rules    string    `json:"rules"`
-	Columns  string    `json:"columns"` // columns with roles: RULES.md speaks in roles, the board shows names
 	Sections []Section `json:"sections"`
 	Next     string    `json:"next"`
 }
 
 // Build builds a Brief with compression down to Limit. The tasks in Input are already selected
-// by project. An empty Project counts tasks outside active and waiting instead of listing them.
+// by project. An empty Project counts tasks outside in_progress and blocked instead of listing them.
 func Build(in Input) Brief {
-	b := Brief{Project: in.Project, Rules: in.RulesPath, Columns: in.Cfg.Roles(), Sections: []Section{}}
+	b := Brief{Project: in.Project, Rules: in.RulesPath, Sections: []Section{}}
 	if b.Project == "" {
 		b.Project = "all"
 	}
-	var columns []config.Column
-	if in.Project == "" {
-		columns = in.Cfg.Columns
-	} else {
-		for _, role := range ctxRoles {
-			if col, ok := in.Cfg.ByRole(role); ok {
-				columns = append(columns, col)
-			}
-		}
+	statuses := config.Statuses
+	if in.Project != "" {
+		statuses = ctxStatuses
 	}
-	for _, col := range columns {
-		role := col.Role
-		tasks := ranked(in.Tasks, col.Name)
-		if role == "ready" {
+	for _, status := range statuses {
+		tasks := ranked(in.Tasks, status)
+		if status == config.Open {
 			b.Next = nextID(tasks, in)
 		}
 		if len(tasks) == 0 {
 			continue
 		}
-		sec := Section{Column: col.Name, Rows: make([]Row, 0, len(tasks))}
-		if in.Project == "" && role != "active" && role != "waiting" {
+		sec := Section{Column: status, Rows: make([]Row, 0, len(tasks))}
+		if in.Project == "" && status != config.InProgress && status != config.Blocked {
 			sec.More = len(tasks)
 			b.Sections = append(b.Sections, sec)
 			continue
 		}
 		for _, t := range tasks[:min(len(tasks), cmp.Or(in.PerColumn, len(tasks)))] {
-			sec.Rows = append(sec.Rows, makeRow(t, role, in))
+			sec.Rows = append(sec.Rows, makeRow(t, status, in))
 		}
 		sec.More = len(tasks) - len(sec.Rows)
 		b.Sections = append(b.Sections, sec)
@@ -100,7 +91,7 @@ func Build(in Input) Brief {
 }
 
 // fit reduces the number of tasks per column until the text fits into limit.
-// There is never less than one line per column: a column without lines hides an active task.
+// There is never less than one line per column: a status without lines hides an in_progress task.
 func (b Brief) fit(limit int) Brief {
 	if limit <= 0 {
 		return b
@@ -149,7 +140,7 @@ func liveClaim(t *task.Task, now time.Time) (task.Claim, bool) {
 	return c, ok && now.Before(c.Until)
 }
 
-// nextID returns the first ready task without a live claim of another actor.
+// nextID returns the first open task without a live claim of another actor.
 func nextID(ready []*task.Task, in Input) string {
 	for _, t := range ready {
 		if c, ok := liveClaim(t, in.Now); !ok || c.Actor == in.Actor {
@@ -159,8 +150,8 @@ func nextID(ready []*task.Task, in Input) string {
 	return ""
 }
 
-func makeRow(t *task.Task, role string, in Input) Row {
-	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, role), Epic: t.IsEpic()}
+func makeRow(t *task.Task, status string, in Input) Row {
+	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, status), Epic: t.IsEpic()}
 	if c, ok := liveClaim(t, in.Now); ok {
 		r.Claim = actor.Short(c.Actor)
 		if in.Actor != "" && c.Actor == in.Actor {
@@ -170,14 +161,14 @@ func makeRow(t *task.Task, role string, in Input) Row {
 	return r
 }
 
-// detail: for waiting - the reason, for ready - checked/total, for active - the summary.
-func detail(t *task.Task, role string) string {
-	switch role {
-	case "waiting":
+// detail: for blocked - the reason, for open - checked/total, otherwise the summary.
+func detail(t *task.Task, status string) string {
+	switch status {
+	case config.Blocked:
 		if t.Waiting != "" {
 			return "Waiting: " + oneLine(t.Waiting)
 		}
-	case "ready":
+	case config.Open:
 		if cs := t.Criteria(); len(cs) > 0 {
 			done := 0
 			for _, c := range cs {
@@ -203,9 +194,6 @@ func (b Brief) Text() string {
 		head += "   rules: " + b.Rules
 	}
 	lines := []string{head, howto}
-	if b.Columns != "" {
-		lines = append(lines, "- columns: "+b.Columns)
-	}
 	if len(b.Sections) == 0 {
 		lines = append(lines, "no tasks")
 	}

@@ -31,12 +31,10 @@ func (b *box) edit(id, body string) {
 // newTask creates a task with three criteria; to - the column.
 func (b *box) newTask(title, to string) string { return b.newTaskIn(b.cwd, title, to) }
 
-// newTaskIn is newTask run in the folder cwd; extra - more flags of new (--project).
-// A column with an entry check (todo, blocked, done) gets the task through the inbox:
-// created, edited, moved.
+// newTaskIn is newTask run in cwd; extra - more flags of new. A status with an entry check goes through idea.
 func (b *box) newTaskIn(cwd, title, to string, extra ...string) string {
 	b.t.Helper()
-	checked := to == "todo" || to == "blocked" || to == "done"
+	checked := to == "open" || to == "blocked" || to == "closed"
 	into := to
 	if checked {
 		into = "idea"
@@ -49,7 +47,7 @@ func (b *box) newTaskIn(cwd, title, to string, extra ...string) string {
 	b.edit(id, critBody)
 	if checked {
 		args := []string{"move", id, to}
-		if to != "todo" {
+		if to != "open" {
 			args = append(args, "-m", "seed", "--force")
 		}
 		b.ok("", args...)
@@ -111,7 +109,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 			defer guard(t)
 			b := newBox(t)
 			b.extra = c.extra
-			b.newTask("Work", "todo")
+			b.newTask("Work", "open")
 			args := []string{"take", "T-1"}
 			if c.flag != "" {
 				args = append(args, "--as", c.flag)
@@ -127,7 +125,7 @@ func TestCLI_Identity_Order(t *testing.T) {
 	}
 
 	b := newBox(t)
-	b.newTask("Work", "todo")
+	b.newTask("Work", "open")
 	n := b.commitCount()
 	for _, args := range [][]string{
 		{"take", "T-1"},
@@ -162,11 +160,11 @@ func TestCLI_Identity_Order(t *testing.T) {
 func TestCLI_Take_ForeignClaimStealReleaseCodes(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	b.newTask("Work", "todo")
+	b.newTask("Work", "open")
 	b.ok("", "new", "Idea")
-	reply := regexp.MustCompile(`^ok T-1 todo > doing  @\S+ until \d\d:\d\d\n$`)
+	reply := regexp.MustCompile(`^ok T-1 open > in_progress  @\S+ until \d\d:\d\d\n$`)
 	if r := b.ok("", "take", "T-1", "--as", "claude:a"); !reply.MatchString(r.out) {
-		t.Errorf("take: %q, want `ok T-1 todo > doing  @claude... until HH:MM`", r.out)
+		t.Errorf("take: %q, want `ok T-1 open > in_progress  @claude... until HH:MM`", r.out)
 	}
 	n := b.commitCount()
 	if r := b.ok("", "take", "T-1", "--as", "claude:a"); !strings.HasPrefix(r.out, "ok T-1") || b.commitCount() != n {
@@ -227,7 +225,7 @@ func TestCLI_Take_ForeignClaimStealReleaseCodes(t *testing.T) {
 func TestCLI_ExpiredClaim_TakenWithoutSteal(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	b.ok("", "new", "Work", "--to", "doing")
+	b.ok("", "new", "Work", "--to", "in_progress")
 	b.rewrite("T-1", func(s string) string {
 		return strings.Replace(s, "\n---\n", "\nclaim: claude:ghost until 2000-01-01T00:00\n---\n", 1)
 	})
@@ -243,10 +241,6 @@ func TestCLI_ExpiredClaim_TakenWithoutSteal(t *testing.T) {
 	}
 }
 
-const cliReviewConfig = "[[column]]\nname = \"idea\"\nrole = \"inbox\"\n\n[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n" +
-	"[[column]]\nname = \"review\"\n\n[[column]]\nname = \"doing\"\nrole = \"active\"\n\n" +
-	"[[column]]\nname = \"blocked\"\nrole = \"waiting\"\n\n[[column]]\nname = \"done\"\nrole = \"closed\"\n"
-
 func ensure(t *testing.T, ok bool, format string, args ...any) {
 	t.Helper()
 	if !ok {
@@ -254,20 +248,14 @@ func ensure(t *testing.T, ok bool, format string, args ...any) {
 	}
 }
 
-// ruleBox - a store with a review column without a role: T-1 in idea without criteria, T-2 in idea with criteria,
-// T-3 in doing without criteria.
+// ruleBox seeds three tasks for the rule tests.
 func ruleBox(t *testing.T) *box {
 	t.Helper()
 	b := newBox(t)
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "s1"}
 	b.ok("", "new", "Bare")
 	b.newTask("Crit", "idea")
-	b.ok("", "new", "Doing", "--to", "doing")
-	cfg := filepath.Join(b.home, ".tix", "config.toml")
-	if err := os.WriteFile(cfg, []byte(cliReviewConfig), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	b.ok("", "note", "T-1", "flush config") // an external edit is committed by the first operation
+	b.ok("", "new", "Doing", "--to", "in_progress")
 	return b
 }
 
@@ -293,29 +281,33 @@ func (b *box) noCommit(args ...string) {
 func TestCLI_Move_RefusalsWaitingRepeat(t *testing.T) {
 	defer guard(t)
 	b := ruleBox(t)
-	ensure(t, strings.Contains(b.rule("move", "T-1", "todo"), "criterion"), "move to ready without a criterion")
-	ensure(t, strings.Contains(b.rule("move", "T-2", "review"), "review has no role"), "move to a column without a role")
-	ensure(t, strings.Contains(b.rule("move", "T-3", "blocked"), "waiting needs a reason"), "move to waiting without a reason")
-	b.rule("move", "T-3", "todo", "-m", "text")
+	ensure(t, strings.Contains(b.rule("move", "T-1", "open"), "criterion"), "move to ready without a criterion")
+	for word, hint := range map[string]string{"review": "unknown status", "todo": "maybe open?", "waiting": "maybe blocked?",
+		"done": "maybe closed?", "doing": "maybe in_progress?", "ready": "maybe open?"} {
+		r := b.tix("", "move", "T-2", word)
+		ensure(t, r.code == 6 && r.out == "" && strings.Contains(r.err, hint), "move to %q: code %d, stderr %q, want code 6 and %q", word, r.code, r.err, hint)
+	}
+	ensure(t, strings.Contains(b.rule("move", "T-3", "blocked"), "blocked needs a reason"), "move to waiting without a reason")
+	b.rule("move", "T-3", "open", "-m", "text")
 
-	r := b.ok("", "move", "T-2", "todo")
-	ensure(t, r.out == "ok T-2 idea > todo\n", "move: %q", r.out)
-	b.noCommit("move", "T-2", "todo")
+	r := b.ok("", "move", "T-2", "open")
+	ensure(t, r.out == "ok T-2 idea > open\n", "move: %q", r.out)
+	b.noCommit("move", "T-2", "open")
 	r = b.ok("", "move", "T-3", "blocked", "-m", "need key")
-	ensure(t, r.out == "ok T-3 doing > blocked\n", "move to waiting: %q", r.out)
+	ensure(t, r.out == "ok T-3 in_progress > blocked\n", "move to waiting: %q", r.out)
 	ensure(t, strings.Contains(string(mustRead(t, b.taskFile("T-3"))), "need key"), "-m not written to the waiting field")
 	b.ok("", "take", "T-3")
 	var js struct{ Waiting, Status string }
 	_ = json.Unmarshal([]byte(b.ok("", "show", "T-3", "--json").out), &js)
-	ensure(t, js.Waiting == "" && js.Status == "doing", "take from waiting: status %q, waiting %q, want doing and empty", js.Status, js.Waiting)
-	ensure(t, b.tix("", "move", "T-99", "todo").code == 4, "move of a nonexistent task: want code 4")
+	ensure(t, js.Waiting == "" && js.Status == "in_progress", "take from waiting: status %q, waiting %q, want in_progress and empty", js.Status, js.Waiting)
+	ensure(t, b.tix("", "move", "T-99", "open").code == 4, "move of a nonexistent task: want code 4")
 }
 
 // set status= refusal; fields; repeat; the value after the first = sign.
 func TestCLI_Set_RulesRepeatFirstEquals(t *testing.T) {
 	defer guard(t)
 	b := ruleBox(t)
-	ensure(t, strings.Contains(b.rule("set", "T-3", "status=done"), "tix move"), "set status=: want the hint `tix move`")
+	ensure(t, strings.Contains(b.rule("set", "T-3", "status=closed"), "tix move"), "set status=: want the hint `tix move`")
 	b.rule("set", "T-3", "title=")
 	r := b.ok("", "set", "T-2", "summary=a=b")
 	ensure(t, r.out == "ok T-2 summary\n", "set: %q", r.out)
@@ -327,7 +319,7 @@ func TestCLI_Set_RulesRepeatFirstEquals(t *testing.T) {
 func TestCLI_CheckDone_CriteriaForceRepeat(t *testing.T) {
 	defer guard(t)
 	b := ruleBox(t)
-	b.ok("", "move", "T-2", "todo")
+	b.ok("", "move", "T-2", "open")
 	b.ok("", "take", "T-2")
 	r := b.ok("", "check", "T-2", "1")
 	ensure(t, r.out == "ok T-2 1/2\n", "check: %q", r.out)
@@ -336,7 +328,7 @@ func TestCLI_CheckDone_CriteriaForceRepeat(t *testing.T) {
 	b.rule("done", "T-2", "--force")
 	b.ok("", "check", "2", "2") // number without T-
 	r = b.ok("", "done", "T-2")
-	ensure(t, r.out == "ok T-2 doing > done\n", "done: %q", r.out)
+	ensure(t, r.out == "ok T-2 in_progress > closed\n", "done: %q", r.out)
 	b.noCommit("done", "T-2")
 
 	ensure(t, strings.Contains(b.rule("done", "T-3"), "no criteria"), "done without criteria and -m")
@@ -359,32 +351,32 @@ func TestCLI_Move_FirstAfterSameColumn(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	for _, title := range []string{"A", "B", "C"} {
-		b.ok("", "new", title, "--to", "doing")
+		b.ok("", "new", title, "--to", "in_progress")
 	}
 	b.ok("", "new", "Foreign") // T-4 in idea
 	join := func(ids []string) string { return strings.Join(ids, ",") }
-	if got := join(b.columnOrder("doing")); got != "T-1,T-2,T-3" {
+	if got := join(b.columnOrder("in_progress")); got != "T-1,T-2,T-3" {
 		t.Fatalf("initial order %s", got)
 	}
 
 	n := b.commitCount()
-	b.ok("", "move", "T-3", "doing")
-	if b.commitCount() != n || join(b.columnOrder("doing")) != "T-1,T-2,T-3" {
-		t.Errorf("move to the same column without a place: commits %d (was %d), order %v", b.commitCount(), n, b.columnOrder("doing"))
+	b.ok("", "move", "T-3", "in_progress")
+	if b.commitCount() != n || join(b.columnOrder("in_progress")) != "T-1,T-2,T-3" {
+		t.Errorf("move to the same column without a place: commits %d (was %d), order %v", b.commitCount(), n, b.columnOrder("in_progress"))
 	}
-	if r := b.ok("", "move", "T-3", "doing", "--first"); !strings.HasPrefix(r.out, "ok T-3") {
+	if r := b.ok("", "move", "T-3", "in_progress", "--first"); !strings.HasPrefix(r.out, "ok T-3") {
 		t.Errorf("--first: %q", r.out)
 	}
-	if b.commitCount() != n+1 || join(b.columnOrder("doing")) != "T-3,T-1,T-2" {
-		t.Errorf("--first in the same column: commits %d (want %d), order %v", b.commitCount(), n+1, b.columnOrder("doing"))
+	if b.commitCount() != n+1 || join(b.columnOrder("in_progress")) != "T-3,T-1,T-2" {
+		t.Errorf("--first in the same column: commits %d (want %d), order %v", b.commitCount(), n+1, b.columnOrder("in_progress"))
 	}
-	if r := b.ok("", "move", "3", "doing", "--after", "2"); !strings.HasPrefix(r.out, "ok T-3") {
+	if r := b.ok("", "move", "3", "in_progress", "--after", "2"); !strings.HasPrefix(r.out, "ok T-3") {
 		t.Errorf("--after: %q", r.out)
 	}
-	if b.commitCount() != n+2 || join(b.columnOrder("doing")) != "T-1,T-2,T-3" {
-		t.Errorf("--after 2 (number without T-): commits %d (want %d), order %v", b.commitCount(), n+2, b.columnOrder("doing"))
+	if b.commitCount() != n+2 || join(b.columnOrder("in_progress")) != "T-1,T-2,T-3" {
+		t.Errorf("--after 2 (number without T-): commits %d (want %d), order %v", b.commitCount(), n+2, b.columnOrder("in_progress"))
 	}
-	r := b.tix("", "move", "T-1", "doing", "--after", "T-4")
+	r := b.tix("", "move", "T-1", "in_progress", "--after", "T-4")
 	if r.code != 5 || !oneErrLine(r.err) {
 		t.Errorf("--after a task from another column: code %d, stderr %q, want code 5", r.code, r.err)
 	}
@@ -405,9 +397,9 @@ func seedProject(t *testing.T) (*box, string) {
 	b := newBox(t)
 	proj := projectDir(t, b, "myproj")
 	for i := 1; i <= 7; i++ {
-		b.newTaskIn(proj, fmt.Sprintf("Ready %d", i), "todo")
+		b.newTaskIn(proj, fmt.Sprintf("Ready %d", i), "open")
 	}
-	b.newTaskIn(b.cwd, "Other project", "todo", "--project", "other")
+	b.newTaskIn(b.cwd, "Other project", "open", "--project", "other")
 	b.runIn(proj, "", "new", "Idea task") // inbox is not part of ctx
 	return b, proj
 }
@@ -434,7 +426,7 @@ func TestCLI_Ctx_SevenReady_FiveRowsTwoMore(t *testing.T) {
 	first := strings.SplitN(r.out, "\n", 2)[0]
 	ensure(t, strings.HasPrefix(first, "project myproj") && strings.Contains(first, "rules:") && strings.Contains(first, "RULES.md"),
 		"first line %q, want `project myproj   rules: ...RULES.md`", first)
-	rows := regexp.MustCompile(`(?m)^todo\s+T-\d+ Ready \d`).FindAllString(r.out, -1)
+	rows := regexp.MustCompile(`(?m)^open\s+T-\d+ Ready \d`).FindAllString(r.out, -1)
 	ensure(t, len(rows) == 5 && strings.Contains(r.out, "2 more"), "want 5 ready lines and `2 more`, got %d lines:\n%s", len(rows), r.out)
 	ensure(t, !strings.Contains(r.out, "Other project") && !strings.Contains(r.out, "Idea task"), "foreign tasks in the project ctx:\n%s", r.out)
 	lines := strings.Split(strings.TrimSpace(r.out), "\n")
@@ -448,7 +440,7 @@ func TestCLI_Ctx_OutsideProjectFlagJSON(t *testing.T) {
 	b, proj := seedProject(t)
 	all := b.ok("", "ctx").out
 	ensure(t, strings.HasPrefix(all, "project all"), "ctx outside a project: want `project all`")
-	ensure(t, regexp.MustCompile(`(?m)^todo\s+8 more$`).MatchString(all) &&
+	ensure(t, regexp.MustCompile(`(?m)^open\s+8 more$`).MatchString(all) &&
 		regexp.MustCompile(`(?m)^idea\s+1 more$`).MatchString(all) &&
 		!strings.Contains(all, "Ready 1") && !strings.Contains(all, "Other project") &&
 		strings.Contains(all, "next T-1"), "ctx all should count ready and inbox tasks:\n%s", all)
@@ -468,7 +460,7 @@ func TestCLI_Ctx_OutsideProjectFlagJSON(t *testing.T) {
 	ensure(t, err == nil && js.Project == "all" && js.Next == "T-1" && len(js.Sections) == 2,
 		"ctx all --json: %v, %+v", err, js)
 	for _, s := range js.Sections {
-		want := map[string]int{"idea": 1, "todo": 8}[s.Column]
+		want := map[string]int{"idea": 1, "open": 8}[s.Column]
 		ensure(t, len(s.Rows) == 0 && s.More == want && want > 0, "ctx all JSON section: %+v", s)
 	}
 }
@@ -492,10 +484,10 @@ func TestCLI_Ctx_NoGit_LimitsAndOwnClaim(t *testing.T) {
 	b := newBox(t)
 	long := strings.Repeat("Длинное название задачи ", 10)
 	for i := 0; i < 30; i++ {
-		b.newTask(fmt.Sprintf("%d %s", i, long), []string{"todo", "doing", "blocked"}[i%3])
+		b.newTask(fmt.Sprintf("%d %s", i, long), []string{"open", "in_progress", "blocked"}[i%3])
 	}
 	b.extra = map[string]string{"CLAUDE_CODE_SESSION_ID": "me1"}
-	b.ok("", "take", "T-2") // doing: own
+	b.ok("", "take", "T-2") // in_progress: own
 	b.extra["TIX_GIT"] = "/nonexistent/git"
 	r := b.tix("", "ctx")
 	if r.code != 0 {

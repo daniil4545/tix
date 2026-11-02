@@ -37,21 +37,6 @@ const (
 func mvX(slot int) int { return slot*mvColStep + 1 }
 func mvY(row int) int  { return mvFirstRow + row*mvCardRows + 1 }
 
-const (
-	mvCfgWork = `[[column]]
-name = "work"
-role = "active"
-
-[[column]]
-name = "wait"
-role = "waiting"
-
-[[column]]
-name = "fin"
-role = "closed"
-`
-)
-
 type mvPing struct{}
 
 type mvProbe struct {
@@ -408,7 +393,7 @@ func TestMouse_Click_SelectsCardByGrid(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
 	e.create("Bravo", "idea")
-	e.create("Charlie", "todo")
+	e.create("Charlie", "open")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo", "Charlie")
 
@@ -499,7 +484,7 @@ func TestMouse_DoubleClick_ClockAndSameCard(t *testing.T) {
 			e := mvNewEnv(t, "")
 			e.create("Alpha", "idea")
 			e.create("Bravo", "idea")
-			e.create("Charlie", "todo")
+			e.create("Charlie", "open")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Bravo", "Charlie")
 			now := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
@@ -557,9 +542,9 @@ func TestMouse_Wheel_ScrolledColumn_StepsOneCard(t *testing.T) {
 func TestMouse_Wheel_OtherColumn_SelectsColumnThenSteps(t *testing.T) {
 	e := mvNewEnv(t, "")
 	e.create("Alpha", "idea")
-	e.create("Beta1", "todo")
-	e.create("Beta2", "todo")
-	e.create("Beta3", "todo")
+	e.create("Beta1", "open")
+	e.create("Beta2", "open")
+	e.create("Beta3", "open")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Beta3")
 	e.wheel(mvX(1), mvY(0), true)
@@ -661,34 +646,34 @@ func TestCard_StepUpFromBottom_KeepsWindow(t *testing.T) {
 // A drag to waiting asks for a reason; esc - the task stays; input - the task is moved.
 func TestMouse_Drag_ToWaiting_AsksReason(t *testing.T) {
 	t.Run("esc leaves the task in place", func(t *testing.T) {
-		e := mvNewEnv(t, mvCfgWork)
-		e.create("Alpha", "work")
-		e.create("Bravo", "work")
+		e := mvNewEnv(t, "")
+		e.create("Alpha", "in_progress")
+		e.create("Bravo", "in_progress")
 		e.start(140, 30)
 		e.screenHas("Alpha", "Bravo")
 		before := e.commits()
-		e.press(3, mvY(0))
-		e.release(mvX(1)+2, mvY(0))
+		e.press(mvX(2)+2, mvY(0))
+		e.release(mvX(3)+2, mvY(0))
 		e.screenHas("waiting for:")
 		e.key("esc")
 		e.until("input line closed", func() bool { return !strings.Contains(e.text(), "waiting for:") })
-		if st, _ := e.status("T-1"); st != "work" || e.commits() != before {
+		if st, _ := e.status("T-1"); st != "in_progress" || e.commits() != before {
 			t.Errorf("cancel changed the task: status %s, commits %s -> %s", st, before, e.commits())
 		}
 	})
 	t.Run("reason and enter move", func(t *testing.T) {
-		e := mvNewEnv(t, mvCfgWork)
-		e.create("Alpha", "work")
-		e.create("Bravo", "work")
+		e := mvNewEnv(t, "")
+		e.create("Alpha", "in_progress")
+		e.create("Bravo", "in_progress")
 		e.start(140, 30)
 		e.screenHas("Alpha", "Bravo")
-		e.press(3, mvY(1)) // Bravo
-		e.release(mvX(1), mvY(0))
+		e.press(mvX(2)+2, mvY(1)) // Bravo
+		e.release(mvX(3), mvY(0))
 		e.screenHas("waiting for:")
 		e.tm.Type("vendor reply")
 		e.key("enter")
-		e.until("T-2 in wait with a reason", func() bool { st, w := e.status("T-2"); return st == "wait" && w == "vendor reply" })
-		if st, _ := e.status("T-1"); st != "work" {
+		e.until("T-2 in wait with a reason", func() bool { st, w := e.status("T-2"); return st == "blocked" && w == "vendor reply" })
+		if st, _ := e.status("T-1"); st != "in_progress" {
 			t.Errorf("T-1 moved together with T-2: %s", st)
 		}
 	})
@@ -703,17 +688,17 @@ func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 		releaseX, releaseY int
 		btn                tea.MouseButton
 	}{
-		{"same column, other card", 3, mvY(0), 3, mvY(1), tea.MouseLeft},
-		{"gap between columns", 3, mvY(0), 25, mvY(0), tea.MouseLeft},
-		{"header", 3, mvY(0), mvX(1), 0, tea.MouseLeft},
-		{"status line under the columns", 3, mvY(0), mvX(1), 28, tea.MouseLeft},
-		{"right button to another column", 3, mvY(0), mvX(1), mvY(0), tea.MouseRight},
+		{"same column, other card", mvX(2) + 2, mvY(0), mvX(2) + 2, mvY(1), tea.MouseLeft},
+		{"gap between columns", mvX(2) + 2, mvY(0), 25 + 2*mvColStep, mvY(0), tea.MouseLeft},
+		{"header", mvX(2) + 2, mvY(0), mvX(3), 0, tea.MouseLeft},
+		{"status line under the columns", mvX(2) + 2, mvY(0), mvX(3), 28, tea.MouseLeft},
+		{"right button to another column", mvX(2) + 2, mvY(0), mvX(3), mvY(0), tea.MouseRight},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			e := mvNewEnv(t, mvCfgWork)
-			e.create("Alpha", "work")
-			e.create("Bravo", "work")
+			e := mvNewEnv(t, "")
+			e.create("Alpha", "in_progress")
+			e.create("Bravo", "in_progress")
 			e.start(140, 30)
 			e.screenHas("Alpha", "Bravo")
 			before := e.commits()
@@ -724,7 +709,7 @@ func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 				t.Errorf("the move input line appeared:\n%s", e.text())
 			}
 			for _, id := range []string{"T-1", "T-2"} {
-				if st, _ := e.status(id); st != "work" {
+				if st, _ := e.status(id); st != "in_progress" {
 					t.Errorf("%s moved to %s", id, st)
 				}
 			}
@@ -737,57 +722,57 @@ func TestMouse_Drag_NoTarget_NoCommit(t *testing.T) {
 
 // The task is gone by the time of release - T-N removed, no commits from us.
 func TestMouse_Drag_TaskRemovedMeanwhile_ReportsRemoved(t *testing.T) {
-	e := mvNewEnv(t, mvCfgWork)
-	e.create("Alpha", "work")
-	e.create("Bravo", "work")
-	canary := e.create("canary", "fin")
+	e := mvNewEnv(t, "")
+	e.create("Alpha", "in_progress")
+	e.create("Bravo", "in_progress")
+	canary := e.create("canary", "closed")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
 	e.awaitWatcher(canary)
-	e.press(3, mvY(0))
+	e.press(mvX(2)+2, mvY(0))
 	if _, err := e.store.Remove("T-1", "agent"); err != nil {
 		t.Fatal(err)
 	}
 	e.until("Alpha left the board", func() bool { return !strings.Contains(e.text(), "Alpha") })
 	after := e.commits()
-	e.release(mvX(1), mvY(0))
+	e.release(mvX(3), mvY(0))
 	e.screenHas("T-1 removed")
 	if e.commits() != after {
 		t.Errorf("moving a deleted task wrote a commit")
 	}
-	if st, _ := e.status("T-2"); st != "work" {
+	if st, _ := e.status("T-2"); st != "in_progress" {
 		t.Errorf("T-2 moved instead of the deleted one: %s", st)
 	}
 }
 
 // The task remembered at the press is moved, not the one that ended up in that place by the release.
 func TestMouse_Drag_BoardShiftsBetweenPressAndRelease_MovesPressedTask(t *testing.T) {
-	e := mvNewEnv(t, mvCfgWork)
-	e.create("Alpha", "work")
-	e.create("Bravo", "work")
-	canary := e.create("canary", "fin")
+	e := mvNewEnv(t, "")
+	e.create("Alpha", "in_progress")
+	e.create("Bravo", "in_progress")
+	canary := e.create("canary", "closed")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
 	e.awaitWatcher(canary)
-	e.press(3, mvY(1)) // Bravo
-	if _, err := e.store.Move("T-1", "fin", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
+	e.press(mvX(2)+2, mvY(1)) // Bravo
+	if _, err := e.store.Move("T-1", "closed", core.MoveOpts{Message: "done by agent", Force: true}, "agent"); err != nil {
 		t.Fatal(err)
 	}
 	e.until("Bravo rose to the first place", func() bool {
 		ls := e.lines()
 		return len(ls) > mvY(0) && strings.Contains(ls[mvY(0)], "Bravo")
 	})
-	e.release(mvX(1), mvY(0))
+	e.release(mvX(3), mvY(0))
 	e.screenHas("waiting for:")
 	e.tm.Type("why")
 	e.key("enter")
-	e.until("T-2 in wait", func() bool { st, _ := e.status("T-2"); return st == "wait" })
-	if st, _ := e.status("T-1"); st != "fin" {
-		t.Errorf("T-1: %s, expected fin (must not move)", st)
+	e.until("T-2 in wait", func() bool { st, _ := e.status("T-2"); return st == "blocked" })
+	if st, _ := e.status("T-1"); st != "closed" {
+		t.Errorf("T-1: %s, expected closed (must not move)", st)
 	}
 }
 
-var mvDefaultCols = []string{"idea", "todo", "doing", "blocked", "done"}
+var mvDefaultCols = []string{"idea", "open", "in_progress", "blocked", "closed"}
 
 // visibleColumns - the default column names from the header (line 2), in screen order.
 func (e *mvEnv) visibleColumns() []string {
@@ -814,9 +799,9 @@ func TestMouse_ColumnWindowShifted_ClickAndDragUseVisibleSlots(t *testing.T) {
 		}
 		e.start(80, 24)
 		e.screenHas("task-idea")
-		e.key("l", "l", "l", "l") // cursor on done
+		e.key("l", "l", "l", "l") // cursor on closed
 		e.settle()
-		e.until("column done visible", func() bool { return len(e.visibleColumns()) > 0 && strings.Contains(e.lines()[2], "done") })
+		e.until("column closed visible", func() bool { return len(e.visibleColumns()) > 0 && strings.Contains(e.lines()[2], "closed") })
 		if names := e.visibleColumns(); len(names) < 2 || names[0] == "idea" {
 			t.Fatalf("window did not shift: visible %v, header %q", names, e.lines()[2])
 		}
@@ -859,17 +844,17 @@ func TestMouse_ColumnWindowShifted_ClickAndDragUseVisibleSlots(t *testing.T) {
 
 // With an input line the mouse is ignored, input reaches the task where it was started.
 func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
-	e := mvNewEnv(t, mvCfgWork)
-	e.create("Alpha", "work")
-	e.create("Bravo", "work")
+	e := mvNewEnv(t, "")
+	e.create("Alpha", "in_progress")
+	e.create("Bravo", "in_progress")
 	e.start(140, 30)
 	e.screenHas("Alpha", "Bravo")
-	e.key(" ", "l", " ") // Alpha -> wait: reason line
+	e.key("l", "l", " ", "l", " ") // Alpha -> blocked: reason line
 	e.screenHas("waiting for:")
 	before := e.commits()
-	e.click(3, mvY(1)) // click on Bravo
-	e.press(3, mvY(1)) // and a drag of Bravo to fin
-	e.release(mvX(2), mvY(0))
+	e.click(mvX(2)+2, mvY(1)) // click on Bravo
+	e.press(mvX(2)+2, mvY(1)) // and a drag of Bravo to closed
+	e.release(mvX(4), mvY(0))
 	e.settle()
 	if !strings.Contains(e.text(), "waiting for:") {
 		t.Fatalf("mouse closed the input line:\n%s", e.text())
@@ -879,8 +864,8 @@ func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 	}
 	e.tm.Type("reason")
 	e.key("enter")
-	e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "wait" && w == "reason" })
-	if st, _ := e.status("T-2"); st != "work" {
+	e.until("T-1 in wait with a reason", func() bool { st, w := e.status("T-1"); return st == "blocked" && w == "reason" })
+	if st, _ := e.status("T-2"); st != "in_progress" {
 		t.Errorf("T-2 moved by the mouse with an input line: %s", st)
 	}
 }
@@ -892,9 +877,9 @@ func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 // a note only in the active column; without notes - summary.
 func TestPulse_NoteOnlyInActive_ElseSummary(t *testing.T) {
 	e := mvNewEnv(t, "")
-	noted := e.create("Noted", "doing")
-	plain := e.create("Plain", "doing")
-	parked := e.create("Parked", "todo")
+	noted := e.create("Noted", "in_progress")
+	plain := e.create("Plain", "in_progress")
+	parked := e.create("Parked", "open")
 	for id, s := range map[string]string{noted: "sum-noted", plain: "sum-plain", parked: "sum-parked"} {
 		e.summary(id, s)
 	}
@@ -924,7 +909,7 @@ func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.want, func(t *testing.T) {
 			e := mvNewEnv(t, "")
-			id := e.create("Noted", "doing")
+			id := e.create("Noted", "in_progress")
 			e.note(id, "old-note")
 			e.note(id, "new-note")
 			sec, err := strconv.ParseInt(e.git("log", "-1", "--format=%ct"), 10, 64)
@@ -944,7 +929,7 @@ func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 // tix note - an empty commit without a file edit; the watcher notices it by .git/logs/HEAD.
 func TestPulse_NoteWrittenWhileOpen_AppearsWithoutKeypress(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("Noted", "doing")
+	id := e.create("Noted", "in_progress")
 	e.summary(id, "sum-noted")
 	e.start(140, 30)
 	e.screenHas("sum-noted")
@@ -972,7 +957,7 @@ func TestPulse_GitCalls_DoNotGrowWithTaskCount(t *testing.T) {
 		}
 		e := mvNewEnvGit(t, "", wrapper)
 		for i := 1; i <= tasks; i++ {
-			id := e.create(fmt.Sprintf("Task%02d", i), "doing")
+			id := e.create(fmt.Sprintf("Task%02d", i), "in_progress")
 			e.note(id, fmt.Sprintf("note-of-%02d", i))
 		}
 		if err := os.WriteFile(logPath, nil, 0o600); err != nil {

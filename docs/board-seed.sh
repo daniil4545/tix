@@ -24,7 +24,7 @@ crit 3 "Orders table has the new columns" "Backfill runs in batches"
 crit 4 "Fees compared for 3 providers"
 crit 5 "Notes cover every merged change"
 crit 8 "Both runners green on main"
-for id in 1 2 3 4 5 8; do tix move "$id" todo >/dev/null; done
+for id in 1 2 3 4 5 8; do tix move "$id" open >/dev/null; done
 tix take 1 --as claude:7f3a9c21 >/dev/null
 tix note 1 "Added backoff helper" --as claude:7f3a9c21 >/dev/null
 tix check 1 1 --as claude:7f3a9c21 >/dev/null
