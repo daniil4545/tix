@@ -67,30 +67,48 @@ func (s *Store) EpicsOf(id string) []string {
 // It returns the epics whose task lines are all ticked now.
 func (s *Store) syncEpics(tx *txEnv, id string, closed bool) (ready []string) {
 	for _, e := range s.epicsOf(id) {
-		if !e.t.SetLine(id, closed) {
+		card, i := s.pendingCard(tx, e)
+		if card == nil || !card.SetLine(id, closed) {
 			continue
 		}
-		if slices.ContainsFunc(tx.pending, func(p pendingWrite) bool { return p.path == e.t.Path }) {
-			continue
+		w := pendingWrite{path: card.Path, old: e.data, new: card.Render(),
+			warn: "epic " + card.ID + ": line of " + id + " not updated"}
+		if i >= 0 {
+			w.old, tx.pending[i] = tx.pending[i].old, w
+		} else {
+			tx.pending = append(tx.pending, w)
 		}
-		tx.pending = append(tx.pending, pendingWrite{path: e.t.Path, old: e.data, new: e.t.Render(),
-			warn: "epic " + e.t.ID + ": line of " + id + " not updated"})
-		if closed && !slices.ContainsFunc(e.t.Criteria(), func(c task.Criterion) bool {
+		if closed && !slices.ContainsFunc(card.Criteria(), func(c task.Criterion) bool {
 			return !c.Done && task.LineTask(c.Text) != ""
 		}) {
-			ready = append(ready, e.t.ID)
+			ready = append(ready, card.ID)
 		}
 	}
 	return ready
 }
 
-// settleLines is the check before closing an epic: the status of the tasks is the truth. A line of a closed task
-// is ticked in the epic's own write; an open or missing task refuses the close, --force included.
+// pendingCard returns the epic card to edit and its index in tx.pending, -1 if absent. An epic already pending
+// as a renumbered rank neighbour is edited in that write, otherwise its new rank or the line is lost.
+func (s *Store) pendingCard(tx *txEnv, e epicFile) (*task.Task, int) {
+	i := slices.IndexFunc(tx.pending, func(p pendingWrite) bool { return p.path == e.t.Path })
+	if i < 0 {
+		return e.t, -1
+	}
+	t, err := task.Parse(e.t.Path, tx.pending[i].new)
+	if err != nil {
+		s.log.Warn("epic not read", "op", "epic", "id", e.t.ID, "err", err)
+		return nil, i
+	}
+	return t, i
+}
+
+// settleLines is the check before closing an epic: the status of the tasks is the truth, a ticked line included.
+// A line of a closed task is ticked in the epic's own write; an open or missing task refuses the close, --force included.
 func (s *Store) settleLines(t *task.Task) error {
 	var bad []string
 	for _, c := range t.Criteria() {
 		id := task.LineTask(c.Text)
-		if c.Done || id == "" {
+		if id == "" {
 			continue
 		}
 		path, err := s.findPath(id)
