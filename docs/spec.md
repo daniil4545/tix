@@ -27,7 +27,8 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 
 - Goal (D56): memory of agents between sessions and projects. Tasks are md files in `~/tasks` under git,
   and each edit leads to the agent session that made it. One folder for all projects and personal ideas;
-  the agent manages tasks through `tix`, the human looks at the board and the cards.
+  the agent manages tasks through `tix` and logs a short note on every movement (a decision, a commit, a PR); the human looks at the dashboard (the board and the cards), writes comments and edits through the TUI or `tix set`.
+- Restore: `~/tasks` is a git repository, `git -C ~/tasks log -- T-12.md` and `git revert` bring a task back; there is no backup command.
 - Principle (D44): a reference standard of speed, lightness and reliability. Each part passes the question "what
   breaks if it is removed"; the answer "nothing" means the part is removed. Numbers - section 7.
 
@@ -37,7 +38,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | CLI `tix`: 14 commands (2.2) | yes | | |
 | TUI `ascii`: board, card with history, `$EDITOR`, move, order, filter, live refresh, mouse and touchpad, key hint line (2.3) | yes | | |
 | Pulse on the board row: last note with its age (2.3) | yes | priority field, filters by date and priority | |
-| Work log in the task (`RULES.md`): a note for each decision, question and stage change; a note is up to 300 characters, long text goes to a file; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
+| Work log in the task (`RULES.md`): a short note for each movement: a decision with its reason, a commit (hash and gist), a PR with its link, a finding; a note is up to 300 characters, long text goes to a file; an outgrown task is closed, the remainder becomes new tasks | yes | "task outgrown" signal, folding of notes in the card | |
 | Agent model in history: the `Model:` trailer (2.4) | yes | analytics report: task time, returns, comparison of agents | |
 | Five fixed statuses; fields `waiting`, `claim`, `tags` | yes | custom fields, theme choice, theme `cards` | |
 | Board colors: green title with a live claim, grey card without a live claim, project colors (2.3) | yes | reply to the agent from the card | |
@@ -46,7 +47,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | External trackers | `external` as a link | status and result: `tix pull`, key `s` (D61, `docs/specs/integrations.md`) | sync of fields and comments |
 | Scheduled assistant, execution time on screen | | yes | |
 | Public repository v0.1.0: the whole repository in English, manifest and scenarios in the README, demo, CI, release (D47) | yes | | |
-| Column `review`, archive of `done` after 7 days, limit of tasks in progress per project, launching an agent from the board | | later (D65) | |
+| Column `review`, archive of `closed` after 7 days, limit of tasks in progress per project, launching an agent from the board | | later (D65) | |
 | Operations center: launching an agent from a card | | own spec, Galera #165 | in near versions |
 | `blocked_by`, `parent` and task links - investigation after the MVP (D65); `tix sync` for two machines (D61), opening the session of an edit, built-in editor, side panel, view in Obsidian Bases | | if needed | |
 | `estimate`, `branch`, `links`; editing comments; server, web, several machines; own LLM | | | yes |
@@ -316,7 +317,7 @@ See section 8.
   `## Details` (criteria as checkboxes, links),
   `## Comments` (append only).
 - `claim`: `actor until ISO`; only `take` checks it; the owner's writes to the file extend it by 3 h
-  (`note` does not); it is dropped by `take --release`, `done`, a move out of `active`, expiry (D36, D39).
+  (`note` does not); it is dropped by `take --release`, `done`, a move out of `in_progress`, expiry (D36, D39).
 - History event: commit `T-12: <operation> [text]`, trailers `Actor:` and `Code:` (D58).
 
 ## 6. Implementation stages

@@ -101,7 +101,7 @@ terminal.
 <details>
 <summary>How do I back it up?</summary>
 
-`~/tasks` is a git repository: add a private remote and push it with `git`.
+`~/tasks` is a git repository: add a private remote and push it with `git`. To restore a task, find the commit with `git -C ~/tasks log -- T-12.md` and `git -C ~/tasks revert` it.
 </details>
 
 ## Comparison

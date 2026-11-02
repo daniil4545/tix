@@ -6,16 +6,20 @@ Markdown tasks under git for AI coding agents, each edit linked to its session.
 [![release](https://img.shields.io/github/v/release/daniil4545/tix)](https://github.com/daniil4545/tix/releases)
 [![license](https://img.shields.io/github/license/daniil4545/tix)](LICENSE)
 
-![The tix board: tasks of two projects, two agents at work, a question waiting for you](assets/board.png)
+![The tix board: tasks of two projects, two agents at work](assets/board.png)
 
 `tix` keeps tasks as markdown files in one folder, `~/tasks`, under git. Agents
-(Claude Code, Codex) work through the `tix` command. You watch and steer the
-work on a terminal board, with keys or the mouse, or in Obsidian. Every edit is
+(Claude Code, Codex) work through the `tix` command: tix is their memory
+between sessions. The terminal board is your dashboard: you watch the work, move
+cards, comment and edit, with keys or the mouse, or read the files in Obsidian.
+An agent logs a short note on every step: a decision, a commit, a PR. A task
+that needs you goes to `blocked` with the reason, and the board marks it with
+`*`. Every edit is
 one git commit that names the agent session, and the model, that made it. A
 change always leads back to the conversation behind it. Your comments on a task
 reach the agent that holds it.
 
-Status: version 0.1, the file format may still change before 1.0.
+Status: pre-1.0, the file format may still change before 1.0.
 
 ## Features
 
@@ -29,7 +33,9 @@ Status: version 0.1, the file format may still change before 1.0.
 | Claim | `tix take` claims a task for 3 hours; another session needs `--steal` |
 | Short brief | `tix ctx` prints the in_progress, blocked and open tasks of the project in under 2000 characters; outside a project, in_progress and blocked tasks and counts of the rest |
 | Comments reach the agent | a hook hands your new comments to the agent that holds the task |
+| Five statuses | `idea`, `open`, `in_progress`, `blocked`, `closed`; an epic is a task with a todo list that `tix` ticks |
 | Board | `tix` without arguments opens a terminal board: keys, mouse, drag between columns |
+| History | the store is a git repository: `git -C ~/tasks log` and `git -C ~/tasks revert` restore any task |
 
 ## Install
 
@@ -84,10 +90,10 @@ Or take a macOS or Linux archive (amd64, arm64) from the
    ```
 
    ```text
-   ok T-1 todo > doing  @claude:demo until 17:30
+   ok T-1 open > in_progress  @claude:demo until 17:30
    ok T-1 note
    ok T-1 1/1
-   ok T-1 doing > done
+   ok T-1 in_progress > closed
    ```
 
 4. Open the board with `tix`, or list tasks with `tix list`.
@@ -109,7 +115,7 @@ and the task card with its history.
 
 ## More
 
-- [docs/commands.md](docs/commands.md): every command, exit codes, columns, board keys, settings.
+- [docs/commands.md](docs/commands.md): every command, exit codes, statuses, board keys, settings.
 - [docs/how-it-works.md](docs/how-it-works.md): connect Claude Code and Codex, what git records, design, comparison.
 - [docs/architecture.md](docs/architecture.md): map of the packages.
 

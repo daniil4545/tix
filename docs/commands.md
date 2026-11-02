@@ -61,7 +61,7 @@ The same file has a `[projects]` table to rename a project folder.
 ## Board
 
 `tix` without arguments opens the board in a terminal. Columns show cards with
-the title, the project and a one-line pulse. The board refreshes when a file in
+the title, the latest note with its age, the criteria count and the claim. The board refreshes when a file in
 `~/tasks` changes, so an agent's work appears live. Color shows who is on a
 task: the title is green while an agent holds a live claim, and the whole card
 is grey when nobody does. Each project
@@ -81,8 +81,8 @@ label has its own muted color.
 
 In a card, `j` and `k` step through the history, `enter` unfolds an entry or
 toggles a criterion, `h` and `l` open the previous or next task of the column,
-`f` edits one field (title, tags, waiting, external) and
-`esc` goes back.
+`e` and `c` work as on the board, and `esc` goes back. The title and the fields
+(tags, project, external, waiting, abstract) are changed with `tix set`.
 
 The mouse does the same. Click a card to select it and double click to open
 it. Drag a card to another column to move it. Click `+` in a column name for a
@@ -90,7 +90,7 @@ new task. The wheel scrolls. The hint line and the card actions line are
 buttons.
 
 A drop or a drag goes through the same checks as `tix move`. A refusal, for
-example moving a task without criteria to `todo`, shows in the status line.
+example moving a task without criteria to `open`, shows in the status line.
 
 
 ## Configuration
@@ -107,5 +107,5 @@ All variables are optional.
 | `VISUAL`, `EDITOR` | editor for the board, `vi` if both are empty |
 
 `tix` writes only inside the task folder. Service files live in
-`~/tasks/.tix`. Small per-user state (delivery marks, tab addresses) lives in
+`~/tasks/.tix`. Small per-user state (delivery marks) lives in
 the user cache folder under `tix/`. `tix` makes no network calls.

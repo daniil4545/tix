@@ -32,6 +32,8 @@ tix take 3 --as codex:0b5e2d44 >/dev/null
 tix note 3 "Columns added" --as codex:0b5e2d44 >/dev/null
 tix check 3 1 --as codex:0b5e2d44 >/dev/null
 tix take 4 --as claude:c19d0e85 >/dev/null
+tix note 4 "Stripe or Adyen: fees are close, need your choice" --as claude:c19d0e85 >/dev/null
+tix move 4 blocked -m "Choose a provider: Stripe or Adyen" --as claude:c19d0e85 >/dev/null
 tix take 8 --as codex:0b5e2d44 >/dev/null
 tix check 8 1 --as codex:0b5e2d44 >/dev/null
 tix "done" 8 -m "Both runners green" --as codex:0b5e2d44 >/dev/null
