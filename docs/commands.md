@@ -6,7 +6,7 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | Command | What it does |
 |---|---|
 | `tix new "title" [--to status] [--project p] [--body-file f]` | creates a task, by default in `idea`, with the body of file `f` (`-` is stdin); `--to open` needs criteria in the body, `--to blocked` and `--to closed` are refused |
-| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones, `--grep` matches the title; alias `ls` |
+| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones; `--grep` matches the title, Abstract and criteria, ignoring case, excluding notes, comments and history; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
