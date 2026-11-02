@@ -74,7 +74,9 @@ func (s *Store) syncEpics(tx *txEnv, id string, closed bool) (ready []string) {
 		w := pendingWrite{path: card.Path, old: e.data, new: card.Render(),
 			warn: "epic " + card.ID + ": line of " + id + " not updated"}
 		if i >= 0 {
-			w.old, tx.pending[i] = tx.pending[i].old, w
+			// the old bytes of the renumber read: a foreign edit since then must refuse this write
+			w.old = tx.pending[i].old
+			tx.pending[i] = w
 		} else {
 			tx.pending = append(tx.pending, w)
 		}
