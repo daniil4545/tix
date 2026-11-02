@@ -101,6 +101,24 @@ func (s *Store) nextNum(refs []taskRef) (int, error) {
 // listWorkers - the number of parse goroutines in List (stage 0 measurement: 4 goroutines 11 ms, sequential 24 ms).
 const listWorkers = 4
 
+// forEachChunked calls fn(i) for i in [0,n) on contiguous chunks, one goroutine each: a channel
+// per item eats the gain with thread wakeups. fn writes only to its own index.
+func forEachChunked(n int, fn func(i int)) {
+	workers := min(listWorkers, runtime.NumCPU(), max(n, 1))
+	chunk := (n + workers - 1) / workers
+	var wg sync.WaitGroup
+	for from := 0; from < n; from += chunk {
+		wg.Add(1)
+		go func(from, to int) {
+			defer wg.Done()
+			for i := from; i < to; i++ {
+				fn(i)
+			}
+		}(from, min(from+chunk, n))
+	}
+	wg.Wait()
+}
+
 // List reads all tasks without git. Broken files go into the error list.
 func (s *Store) List() ([]*task.Task, []error) {
 	refs, err := s.taskFiles()
@@ -109,21 +127,7 @@ func (s *Store) List() ([]*task.Task, []error) {
 	}
 	tasks := make([]*task.Task, len(refs))
 	errs := make([]error, len(refs))
-	// Files are split into contiguous chunks, one per goroutine: per-item distribution
-	// through a channel over 1000 files eats the gain with thread wakeups.
-	workers := min(listWorkers, runtime.NumCPU(), max(len(refs), 1))
-	chunk := (len(refs) + workers - 1) / workers
-	var wg sync.WaitGroup
-	for from := 0; from < len(refs); from += chunk {
-		wg.Add(1)
-		go func(from, to int) {
-			defer wg.Done()
-			for i := from; i < to; i++ {
-				tasks[i], errs[i] = readTask(refs[i].path)
-			}
-		}(from, min(from+chunk, len(refs)))
-	}
-	wg.Wait()
+	forEachChunked(len(refs), func(i int) { tasks[i], errs[i] = readTask(refs[i].path) })
 	var okTasks []*task.Task
 	var bad []error
 	for i := range refs {

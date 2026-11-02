@@ -17,33 +17,41 @@ type epicFile struct {
 }
 
 // epicsOf finds the epics (tag epic) that have a line for task id. Unreadable files are skipped.
+// The files are read in parallel chunks like List does; a byte prefilter skips the parse.
 func (s *Store) epicsOf(id string) []epicFile {
 	refs, err := s.taskFiles()
 	if err != nil {
 		return nil
 	}
+	found := make([]*epicFile, len(refs))
+	forEachChunked(len(refs), func(i int) { found[i] = s.epicFileOf(refs[i], id) })
 	var out []epicFile
-	for _, r := range refs {
-		if r.id == id {
-			continue
-		}
-		data, err := os.ReadFile(r.path) //nolint:gosec // the path is built by the core
-		if err != nil || !bytes.Contains(data, []byte(id)) {
-			continue
-		}
-		t, err := task.Parse(r.path, data)
-		if err != nil {
-			s.log.Warn("epic not read", "op", "epic", "id", r.id, "err", err)
-			continue
-		}
-		if !t.IsEpic() {
-			continue
-		}
-		if slices.ContainsFunc(t.Criteria(), func(c task.Criterion) bool { return task.LineTask(c.Text) == id }) {
-			out = append(out, epicFile{t: t, data: data})
+	for _, e := range found {
+		if e != nil {
+			out = append(out, *e)
 		}
 	}
 	return out
+}
+
+// epicFileOf returns the epic in file r if it has a line for task id, otherwise nil.
+func (s *Store) epicFileOf(r taskRef, id string) *epicFile {
+	if r.id == id {
+		return nil
+	}
+	data, err := os.ReadFile(r.path) //nolint:gosec // the path is built by the core
+	if err != nil || !bytes.Contains(data, []byte(id)) {
+		return nil
+	}
+	t, err := task.Parse(r.path, data)
+	if err != nil {
+		s.log.Warn("epic not read", "op", "epic", "id", r.id, "err", err)
+		return nil
+	}
+	if !t.IsEpic() || !slices.ContainsFunc(t.Criteria(), func(c task.Criterion) bool { return task.LineTask(c.Text) == id }) {
+		return nil
+	}
+	return &epicFile{t: t, data: data}
 }
 
 // EpicsOf returns the ids of the epics whose todo list has a line for task id.

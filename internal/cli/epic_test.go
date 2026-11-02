@@ -90,3 +90,21 @@ func TestCLI_Epic_DoneTakesTruthFromTasks(t *testing.T) {
 	body := b.ok("", "show", epic).out
 	ensure(t, strings.Contains(body, "- [x] "+c1+"\n") && strings.Contains(body, "- [x] "+c2+"\n"), "lines of closed tasks: %q", body)
 }
+
+// Epics far apart in a bigger store: the parallel scan finds both, in id order.
+func TestCLI_Epic_ShowManyFiles(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	first := b.newTask("First epic", "open")
+	task := b.newTask("Task", "open")
+	for range 20 {
+		b.newTask("Filler", "open")
+	}
+	last := b.newTask("Last epic", "open")
+	for _, e := range []string{first, last} {
+		b.ok("", "set", e, "tags=epic")
+		b.edit(e, "## Details\n- [ ] "+task+" one\n")
+	}
+	out := b.ok("", "show", task).out
+	ensure(t, strings.Contains(out, "Epic: "+first+"\nEpic: "+last+"\n"), "show: %q", out)
+}
