@@ -51,7 +51,7 @@ Accepted on 2026-10-20:
 - D44. A reference standard of speed, lightness and reliability; the numbers are in section 7.
 - D45. Cancelled on 2026-10-21 by decision D66.
 - D46. Interface and format in English: CLI and TUI replies, file sections, `RULES.md`; the Russian
-  strings of the spec and the mockup are a sample of meaning. The text of tasks is in any language.
+  strings of the spec are a sample of meaning. The text of tasks is in any language.
 - D47. A public repository for a portfolio: a snapshot of the working one per `~/.claude/templates/github/design.md`,
   task S5 after the MVP. The command stays `tk` (the conflict with wedow/ticket is accepted), the repository name is in S5.
 - D48. Short id: `12` equals `T-12` in all commands.

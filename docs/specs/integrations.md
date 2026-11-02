@@ -1,7 +1,7 @@
 # Spec: sync with external trackers (after the MVP)
 
 Status: draft
-Parent: `docs/spec.md` (decisions D14, D29-D32). Mockup: the "integrations" tab of `docs/mockup/ui.html`.
+Parent: `docs/spec.md` (decisions D14, D29-D32).
 
 ## 1. Goal and boundaries
 
