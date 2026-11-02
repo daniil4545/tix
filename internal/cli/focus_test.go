@@ -43,7 +43,7 @@ func TestFocus_AgentWriteCommands_StoreURL(t *testing.T) {
 		{"note", []string{"note", "T-1", "progress"}},
 		{"comment", []string{"comment", "T-1", "remark"}},
 		{"take", []string{"take", "T-1"}},
-		{"set", []string{"set", "T-1", "due=2026-11-01"}},
+		{"set", []string{"set", "T-1", "ask=q"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

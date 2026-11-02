@@ -154,7 +154,7 @@ func TestRenderBoard_SelectionAndErrorLookDifferent(t *testing.T) {
 func card() view.Card {
 	at := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
 	return view.Card{
-		ID: "T-12", Title: "Report on calls", Column: "doing", Fields: "alpha   due 28.10   @claude",
+		ID: "T-12", Title: "Report on calls", Column: "doing", Fields: "alpha   #a   @claude",
 		Abstract: "abstract text", Summary: "summary text", Details: "details text", Checks: "1/3",
 		History: []history.Entry{
 			{At: at, Actor: "claude", Op: "new"},

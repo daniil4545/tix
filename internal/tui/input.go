@@ -36,7 +36,7 @@ func (p *prompt) String() string {
 	return string(p.text)
 }
 
-// pickText - the line of choice pairs: `t title  d due`.
+// pickText - the line of choice pairs: `t title  g tags`.
 func pickText(opts []pickOpt) string {
 	parts := make([]string, len(opts))
 	for i, o := range opts {

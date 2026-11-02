@@ -16,10 +16,9 @@ import (
 type Row struct {
 	ID, Project, Title, Summary, Meta string
 	Ask, Note                         string
-	Live                              bool   // the task has a live claim; without it the card is grey and has no sign
-	Overdue                           string // the part of Meta drawn as overdue (the due text); empty - not overdue
-	Grabbed                           bool   // the card is grabbed: highlight and the "=" marker instead of ">"
-	ProjectColor                      int    // the project label slot in the palette, from ProjectColors
+	Live                              bool // the task has a live claim; without it the card is grey and has no sign
+	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
+	ProjectColor                      int  // the project label slot in the palette, from ProjectColors
 }
 
 // UnknownColumn - the column name for tasks with a status that is not in config.toml.
@@ -40,7 +39,6 @@ type Board struct {
 	W, H     int
 	Status   string
 	IsErr    bool
-	ByDue    bool // columns are sorted by due, not by rank
 	// FirstCol and RowTop - the previous window position (the first shown column and the top card
 	// of the selected column). Zeros give cursor windows; the window shifts only when the cursor left.
 	FirstCol, RowTop int

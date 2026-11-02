@@ -194,7 +194,7 @@ func (m *Model) wheelScroll(d int) {
 	m.card.scroll = view.CardScroll(m.cardView(), false)
 }
 
-// fields - the card fields line: project, external link, claim, wait, due, tags, modification date.
+// fields - the card fields line: project, external link, claim, wait, tags, modification date.
 func fields(t *task.Task, now time.Time, changed time.Time) string {
 	parts := []string{t.Project}
 	if t.External != "" {
@@ -205,9 +205,6 @@ func fields(t *task.Task, now time.Time, changed time.Time) string {
 	}
 	if strings.TrimSpace(t.Waiting) != "" {
 		parts = append(parts, "waiting for: "+t.Waiting)
-	}
-	if t.Due != "" {
-		parts = append(parts, "due "+dueText(t.Due))
 	}
 	if len(t.Tags) > 0 {
 		parts = append(parts, "#"+strings.Join(t.Tags, " #"))

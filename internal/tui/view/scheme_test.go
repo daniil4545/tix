@@ -173,34 +173,6 @@ func TestRenderBoard_WaitingCard_PulseHasKindColor(t *testing.T) {
 	}
 }
 
-// spec: T-85 scenario "red overdue date": the due part only, on any card
-func TestRenderBoard_Overdue_DuePartRed(t *testing.T) {
-	cases := []struct {
-		name string
-		row  view.Row
-		red  bool
-	}{
-		{"idle overdue", view.Row{Meta: "1/3 due 28.10", Overdue: "due 28.10"}, true},
-		{"working overdue", view.Row{Live: true, Meta: "due 28.10 @claude", Overdue: "due 28.10"}, true},
-		{"waiting overdue", view.Row{Live: true, Ask: "x", Meta: "due 28.10 @claude", Overdue: "due 28.10"}, true},
-		{"not overdue", view.Row{Live: true, Meta: "1/3 due 28.10"}, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			meta := cardLinesOf(t, c.row, false)[3]
-			if got := strings.Contains(meta, view.OverdueSGR()+"due 28.10"); got != c.red {
-				t.Errorf("due part red=%v, want %v: %q", got, c.red, meta)
-			}
-			if c.red && strings.Contains(meta, view.OverdueSGR()+"1/3") {
-				t.Errorf("more than the due part is red: %q", meta)
-			}
-			if !strings.Contains(plain(meta), c.row.Meta) {
-				t.Errorf("meta text changed: %q, want %q", plain(meta), c.row.Meta)
-			}
-		})
-	}
-}
-
 // spec: T-85 project color: each project on the board gets its own palette slot (FNV-1a of the
 // lower-cased name, the next free slot on a collision); the label is drawn in it, also on grey cards
 func TestProjectColors_DistinctCaseFreeStable(t *testing.T) {

@@ -311,7 +311,6 @@ type listItem struct {
 	External string   `json:"external"`
 	Waiting  string   `json:"waiting"`
 	Claim    string   `json:"claim"`
-	Due      string   `json:"due"`
 	Ask      string   `json:"ask"`
 	Rank     float64  `json:"rank"`
 	Created  string   `json:"created"`
@@ -425,7 +424,7 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 			}
 			items = append(items, listItem{
 				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status,
-				External: t.External, Waiting: t.Waiting, Claim: t.Claim, Due: t.Due,
+				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
 				Ask: t.Ask, Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
 			})
 		}

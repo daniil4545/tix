@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	acHint     = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  o order  p project  ? help  q quit"
-	acFieldRow = "t title  d due  g tags  a ask  w waiting  s summary  x external"
+	acHint     = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  p project  ? help  q quit"
+	acFieldRow = "t title  g tags  a ask  w waiting  s summary  x external"
 	acFocusURL = "warp://session/0123456789abcdef0123456789abcdef"
 	acMoving   = "moving T-1: arrows move, space drop, esc cancel"
 )
@@ -265,7 +265,6 @@ func TestHint_ClickButton_ActsAsKey(t *testing.T) {
 		{"n new", "title:"},
 		{"c comment", "comment:"},
 		{"a answer", "T-1: no question"},
-		{"o order", "order: due"},
 	}
 	for _, c := range cases {
 		t.Run(c.pair, func(t *testing.T) {
@@ -295,7 +294,7 @@ func TestHint_ClickNonButton_DoesNothing(t *testing.T) {
 	_, y := e.acFind("p project")
 	e.click(gap, y)
 	e.settle()
-	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
+	for _, bad := range []string{"title:", "comment:", "answer:", "no question"} {
 		if strings.Contains(e.text(), bad) {
 			t.Errorf("a click off a button triggered %q:\n%s", bad, e.text())
 		}
@@ -473,11 +472,11 @@ func TestGrab_OtherKeysAndMouse_Ignored(t *testing.T) {
 	before := e.acCommitCount()
 	e.key(" ")
 	e.screenHas("moving T-1")
-	e.key("n", "a", "c", "o", "p", "q")
+	e.key("n", "a", "c", "p", "q")
 	e.click(mvX(0)+3, mvY(1)) // click on Bravo
 	e.click(mvX(1)+22, 2)     // and on "+" of column todo
 	e.settle()
-	for _, bad := range []string{"title:", "comment:", "answer:", "no question", "order: due"} {
+	for _, bad := range []string{"title:", "comment:", "answer:", "no question"} {
 		if strings.Contains(e.text(), bad) {
 			t.Fatalf("%q fired during the grab:\n%s", bad, e.text())
 		}
@@ -591,28 +590,6 @@ func TestGrab_OtherChangeMeanwhile_HoldsById(t *testing.T) {
 	e.acPress("right")
 	e.key(" ")
 	e.acWaitStatus("T-1", "todo")
-}
-
-// Due order is on - the grab changes only the column, the status line says so.
-func TestGrab_OrderByDue_ColumnOnly(t *testing.T) {
-	e := mvNewEnv(t, "")
-	e.create("Alpha", "idea")
-	e.create("Bravo", "todo")
-	e.acCriterion("T-1")
-	e.start(140, 30)
-	e.screenHas("Alpha", "Bravo")
-	e.key("o")
-	e.screenHas("order: due")
-	e.key(" ")
-	e.screenHas("order by due: place off")
-	before := e.acCommitCount()
-	e.acPress("right")
-	e.key(" ")
-	e.acWaitStatus("T-1", "todo")
-	e.settle()
-	if after := e.acCommitsSettled(before + 1); after != before+1 {
-		t.Errorf("commits %d -> %d, expected one", before, after)
-	}
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -851,15 +828,12 @@ func TestAnswer_ClickNeedsYouLine_OpensAnswerLine(t *testing.T) {
 // Scenario 6: fields
 // ---------------------------------------------------------------------------------------------
 
-// acFieldCard: the Alpha card (project projx) is open; due - the initial due.
-func acFieldCard(t *testing.T, due string) *mvEnv {
+// acFieldCard: the Alpha card (project projx) is open.
+func acFieldCard(t *testing.T) *mvEnv {
 	t.Helper()
 	e := mvNewEnv(t, "")
 	if _, err := e.store.Create("Alpha", "projx", "idea", "seed"); err != nil {
 		t.Fatal(err)
-	}
-	if due != "" {
-		e.set("T-1", "due", due)
 	}
 	e.start(140, 30)
 	e.screenHas("Alpha")
@@ -867,60 +841,9 @@ func acFieldCard(t *testing.T, due string) *mvEnv {
 	return e
 }
 
-type acDueCase struct {
-	name, initial, typed, wantDue, wantStatus string
-	erase, wantCommit                         bool
-}
-
-// enterDue goes through f, d, the value edit and enter.
-func (e *mvEnv) enterDue(c acDueCase) {
-	e.t.Helper()
-	e.key("f")
-	e.screenHas(acFieldRow)
-	e.key("d")
-	e.screenHas("due:")
-	if c.erase {
-		e.acPress(strings.Split(strings.Repeat("backspace,", 30), ",")[:30]...)
-	}
-	if c.typed != "" {
-		e.tm.Type(c.typed)
-	}
-	e.key("enter")
-}
-
-// Due is written; an empty value clears; a core refusal is visible; without a change there is no write.
-func TestField_Due_SetClearRefusedUnchanged(t *testing.T) {
-	cases := []acDueCase{
-		{"write", "", "2026-11-01", "2026-11-01", "", false, true},
-		{"clear with empty", "2026-10-01", "", "", "", true, true},
-		{"core refusal", "", "not-a-date", "", "due must be", false, false},
-		{"no change", "2026-10-01", "", "2026-10-01", "", false, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			e := acFieldCard(t, c.initial)
-			before := e.acCommitCount()
-			e.enterDue(c)
-			if c.wantStatus != "" {
-				e.screenHas(c.wantStatus)
-			}
-			want := before
-			if c.wantCommit {
-				want++
-			}
-			if after := e.acCommitsSettled(want); after != want {
-				t.Errorf("commits %d -> %d, expected %d", before, after, want)
-			}
-			if tk := e.acTask("T-1"); tk.Due != c.wantDue {
-				t.Errorf("due %q, expected %q", tk.Due, c.wantDue)
-			}
-		})
-	}
-}
-
 // The field line opens with the current value (an edit appends to it).
 func TestField_Title_PrefilledWithCurrentValue(t *testing.T) {
-	e := acFieldCard(t, "")
+	e := acFieldCard(t)
 	e.key("f")
 	e.screenHas(acFieldRow)
 	e.key("t")
@@ -961,17 +884,17 @@ func TestField_Summary_MultiLineRefusedSingleLineEdits(t *testing.T) {
 
 // Field choice - by a click on a pair; a click on the card fields line opens the same choice.
 func TestField_SelectByClick_AndFieldsRowOpensSelect(t *testing.T) {
-	e := acFieldCard(t, "")
+	e := acFieldCard(t)
 	e.screenHas("projx")
 	e.settle()
 	_, y := e.acFind("projx") // fields line: project first
 	e.click(2, y)
 	e.screenHas(acFieldRow)
-	e.acClickOn("d due")
-	e.screenHas("due:")
-	e.tm.Type("2026-12-24")
+	e.acClickOn("g tags")
+	e.screenHas("tags:")
+	e.tm.Type("x")
 	e.key("enter")
-	e.until("due written", func() bool { return e.acTask("T-1").Due == "2026-12-24" })
+	e.until("tags written", func() bool { return strings.Join(e.acTask("T-1").Tags, ",") == "x" })
 }
 
 // ---------------------------------------------------------------------------------------------

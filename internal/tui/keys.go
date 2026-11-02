@@ -56,11 +56,9 @@ func (m *Model) boardKey(k string) tea.Cmd {
 	case "k", "up":
 		m.moveCursor(0, -1)
 	case "J":
-		return m.reorderKey(1)
+		return m.reorder(1)
 	case "K":
-		return m.reorderKey(-1)
-	case "o":
-		m.toggleOrder()
+		return m.reorder(-1)
 	case "p":
 		m.cycleProject()
 	case "enter":
