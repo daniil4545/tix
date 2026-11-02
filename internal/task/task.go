@@ -67,7 +67,6 @@ type source struct {
 
 const (
 	commentsHeading = "## Comments"
-	summaryHeading  = "## Summary"
 	CreatedLayout   = "2006-01-02T15:04:05"
 	commentLayout   = "2006-01-02T15:04"
 	maxSlug         = 40
@@ -536,23 +535,6 @@ func (t *Task) AddComment(at time.Time, actor, text string) {
 	}
 	t.src.heading = true
 	t.Comments = append(t.Comments, Comment{At: at, Actor: actor, Text: strings.Trim(text, "\r\n")})
-}
-
-// Summary returns the first line of the summary for list.
-func (t *Task) Summary() string {
-	in := false
-	for _, ln := range strings.Split(t.Body, "\n") {
-		ln = strings.TrimSpace(ln)
-		switch {
-		case !in:
-			in = ln == summaryHeading
-		case strings.HasPrefix(ln, "## "):
-			return ""
-		case ln != "":
-			return ln
-		}
-	}
-	return ""
 }
 
 // FileName builds the file name "T-N slug.md" from the id and the title (spec 8, mockup).

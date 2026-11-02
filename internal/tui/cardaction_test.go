@@ -84,19 +84,6 @@ func TestField_SetClearUnchanged(t *testing.T) {
 	}
 }
 
-func TestField_SummaryWithSeveralLines_RefusesToEditInline(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "open")
-	e.summary(id, "line one\nline two")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	caOpenCard(m)
-	typeKeys(m, "fs")
-	if got := caStatus(m); got != id+": summary has several lines, use e" || m.input != nil {
-		t.Errorf("status %q, input %v", got, m.input)
-	}
-}
-
 func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("job", "open")

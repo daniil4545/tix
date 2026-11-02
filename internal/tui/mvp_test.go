@@ -150,17 +150,6 @@ func (e *mvEnv) set(id, name, value string) {
 	}
 }
 
-func (e *mvEnv) summary(id, text string) {
-	e.t.Helper()
-	_, rev, err := e.store.Get(id)
-	if err == nil {
-		_, err = e.store.Edit(id, rev, "## Summary\n"+text+"\n", "seed")
-	}
-	if err != nil {
-		e.t.Fatalf("summary %s: %v", id, err)
-	}
-}
-
 func (e *mvEnv) note(id, text string) {
 	e.t.Helper()
 	if _, err := e.store.Note(id, text, "agent"); err != nil {
@@ -874,25 +863,20 @@ func TestMouse_InputLineOpen_MouseIgnored(t *testing.T) {
 // Pulse, order
 // ---------------------------------------------------------------------------------------------
 
-// a note only in the active column; without notes - summary.
-func TestPulse_NoteOnlyInActive_ElseSummary(t *testing.T) {
+// the latest note shows in any column; a task without notes has an empty third line.
+func TestPulse_LatestNoteInAnyColumn_NoNoteEmpty(t *testing.T) {
 	e := mvNewEnv(t, "")
 	noted := e.create("Noted", "in_progress")
-	plain := e.create("Plain", "in_progress")
+	e.create("Plain", "in_progress")
 	parked := e.create("Parked", "open")
-	for id, s := range map[string]string{noted: "sum-noted", plain: "sum-plain", parked: "sum-parked"} {
-		e.summary(id, s)
-	}
+	e.note(noted, "note-old")
 	e.note(noted, "note-noted")
 	e.note(parked, "note-parked")
 	e.start(140, 40)
 
-	e.screenHas("note-noted", "sum-plain", "sum-parked")
-	s := e.text()
-	for _, bad := range []string{"sum-noted", "note-parked"} {
-		if strings.Contains(s, bad) {
-			t.Errorf("extra %q on the board:\n%s", bad, s)
-		}
+	e.screenHas("note-noted", "note-parked")
+	if strings.Contains(e.text(), "note-old") {
+		t.Errorf("not the last note is shown:\n%s", e.text())
 	}
 }
 
@@ -930,9 +914,8 @@ func TestPulse_NoteAge_UsesModelClock_LatestNoteWins(t *testing.T) {
 func TestPulse_NoteWrittenWhileOpen_AppearsWithoutKeypress(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("Noted", "in_progress")
-	e.summary(id, "sum-noted")
 	e.start(140, 30)
-	e.screenHas("sum-noted")
+	e.screenHas("Noted")
 	// the watcher starts after the first frame: repeat the note until it turns on
 	deadline := time.Now().Add(5 * time.Second)
 	for i := 0; time.Now().Before(deadline) && !strings.Contains(e.text(), "fresh-news"); i++ {

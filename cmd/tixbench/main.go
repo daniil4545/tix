@@ -348,7 +348,7 @@ func seed(tixBin, home string, tasks int) error {
 
 func taskFile(id int) string { return fmt.Sprintf("T-%d bench-%d.md", id, id) }
 
-var words = strings.Fields("core write commit lock task agent column board card check merge file git frontmatter comment criterion result summary stream")
+var words = strings.Fields("core write commit lock task agent column board card check merge file git frontmatter comment criterion result stream")
 
 func para(r *rand.Rand, n int) string {
 	p := make([]string, n)
@@ -365,7 +365,7 @@ func taskContent(r *rand.Rand, id int) string {
 	fmt.Fprintf(&b, "---\nid: T-%d\ntitle: Task number %d about the core\nproject: proj%d\nstatus: %s\nrank: %d\ncreated: 2026-10-01T09:00:00\n",
 		id, id, id%12, cols[id%5], id)
 	fmt.Fprintf(&b, "external: \"\"\nwaiting: \"\"\nclaim: \"\"\ntags: [a, b]\n---\n")
-	fmt.Fprintf(&b, "## Abstract\n\n%s.\n\n## Summary\n\n%s.\n\n## Details\n\n", para(r, 30), para(r, 12))
+	fmt.Fprintf(&b, "## Abstract\n\n%s.\n\n## Details\n\n", para(r, 30))
 	for i := 0; i < 4+r.Intn(4); i++ {
 		fmt.Fprintf(&b, "- [ ] %s\n", para(r, 10))
 	}

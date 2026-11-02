@@ -59,7 +59,7 @@ type MoveOpts struct {
 type Field struct{ Name, Value string }
 
 const (
-	allowedFields = "title project waiting tags external abstract summary"
+	allowedFields = "title project waiting tags external abstract"
 )
 
 func (s *Store) claimed(id string, c task.Claim) error {
@@ -341,8 +341,6 @@ func setField(t *task.Task, f Field) error {
 		return rule("%s cannot be changed", f.Name)
 	case "abstract":
 		return t.SetSection("Abstract", f.Value)
-	case "summary":
-		return t.SetSection("Summary", f.Value)
 	case "title":
 		if strings.TrimSpace(f.Value) == "" {
 			return rule("title is empty")

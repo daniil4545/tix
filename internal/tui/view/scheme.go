@@ -20,7 +20,7 @@ const (
 	stateWorking                  // live claim
 )
 
-// cardLook - how a state is drawn. Head is the ID line, Title the title, Rest the meta, note and summary lines.
+// cardLook - how a state is drawn. Head is the ID line, Title the title, Rest the meta and note lines.
 type cardLook struct {
 	Head, Title, Rest lipgloss.Style
 }

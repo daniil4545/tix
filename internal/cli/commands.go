@@ -354,29 +354,12 @@ func (a *app) cmdList(args []string) error {
 		if hide && t.Status == config.Closed {
 			continue
 		}
-		if !strings.Contains(strings.ToLower(t.Title), needle) &&
-			!summaryContains(t.Body, needle) {
+		if !strings.Contains(strings.ToLower(t.Title), needle) {
 			continue
 		}
 		matched = append(matched, t)
 	}
 	return a.printTasks(p, a.filter(matched, proj, p.vals["status"]))
-}
-
-func summaryContains(body, needle string) bool {
-	inSummary := false
-	for _, line := range strings.Split(body, "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "## ") {
-			if inSummary {
-				return false
-			}
-			inSummary = line == "## Summary"
-		} else if inSummary && strings.Contains(strings.ToLower(line), needle) {
-			return true
-		}
-	}
-	return false
 }
 
 // filter keeps the tasks of the project and column (an empty value means no filter)
@@ -435,9 +418,6 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 		line := status + " " + t.ID + " " + t.Title
 		if t.IsEpic() {
 			line = status + " " + t.ID + " [epic] " + t.Title
-		}
-		if sum := t.Summary(); sum != "" {
-			line += " | " + sum
 		}
 		a.out("%s", line)
 	}

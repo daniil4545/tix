@@ -219,7 +219,7 @@ var commandHelp = map[string]string{
 	"rm":      "rm <id>",
 	"take":    "take <id> [--steal|--release]",
 	"move":    "move <id> <status> [--first|--after T-9] [-m text] [--force]",
-	"set":     "set <id> field=value...; fields: title project waiting tags external abstract summary",
+	"set":     "set <id> field=value...; fields: title project waiting tags external abstract",
 	"check":   "check <id> N...",
 	"done":    "done <id> [-m result] [--force]",
 }

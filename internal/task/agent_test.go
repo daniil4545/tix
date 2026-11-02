@@ -126,23 +126,36 @@ func TestSetField_AllowedNames_RenderStable(t *testing.T) {
 	}
 }
 
-func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
+// A section other than Abstract is not set; an old "## Summary" stays in the body as text.
+func TestSetSection_SummaryRefused_OldSectionKeptAsText(t *testing.T) {
 	defer guard(t)
 	tk := load(t, "valid.md")
-	if err := tk.SetSection("Summary", "Done: all good.\nSecond line."); err != nil {
+	if err := tk.SetSection("Summary", "x"); err == nil {
+		t.Error("SetSection(Summary) accepted")
+	}
+	if err := tk.SetSection("Abstract", "New abstract."); err != nil {
 		t.Fatal(err)
 	}
 	out := string(tk.Render())
-	for _, want := range []string{"Short task summary.", "Done: all good.\nSecond line.", "- [ ] criterion one", "- [x] criterion two"} {
+	if !strings.Contains(out, "## Summary\nFirst summary line.") {
+		t.Errorf("the old Summary section was lost:\n%s", out)
+	}
+}
+
+func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
+	defer guard(t)
+	tk := load(t, "valid.md")
+	if err := tk.SetSection("Abstract", "Done: all good.\nSecond line."); err != nil {
+		t.Fatal(err)
+	}
+	out := string(tk.Render())
+	for _, want := range []string{"First summary line.", "Done: all good.\nSecond line.", "- [ ] criterion one", "- [x] criterion two"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("after SetSection no %q:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "First summary line.") {
+	if strings.Contains(out, "Short task summary.") {
 		t.Errorf("old section text remained:\n%s", out)
-	}
-	if got := parseText(t, out).Summary(); got != "Done: all good." {
-		t.Errorf("Summary() = %q", got)
 	}
 
 	// A fresh task: no body, the section is created.
@@ -150,15 +163,12 @@ func TestSetSection_ReplacesOrCreates_KeepsRest(t *testing.T) {
 	if err := fresh.SetSection("Abstract", "Short."); err != nil {
 		t.Fatal(err)
 	}
-	if err := fresh.SetSection("Summary", "Result."); err != nil {
-		t.Fatal(err)
-	}
-	if got := parseText(t, string(fresh.Render())); got.Summary() != "Result." || !strings.Contains(got.Body, "Short.") {
+	if got := parseText(t, string(fresh.Render())); !strings.Contains(got.Body, "Short.") {
 		t.Errorf("sections not created in an empty task: %q", got.Body)
 	}
 
 	before := string(tk.Render())
-	if err := tk.SetSection("Summary", "text\n## Fake heading\nmore"); err == nil {
+	if err := tk.SetSection("Abstract", "text\n## Fake heading\nmore"); err == nil {
 		t.Error("`## ` in the section text accepted")
 	}
 	if after := string(tk.Render()); after != before {

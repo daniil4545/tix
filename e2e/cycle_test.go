@@ -46,7 +46,7 @@ func (b *box) trailer(key string) string {
 	return strings.TrimSpace(b.git("log", "-1", "--format=%(trailers:key="+key+",valueonly)"))
 }
 
-// Spec 3, happy path: the hook gave ctx; take, note, check, set summary=, comment, done -m.
+// Spec 3, happy path: the hook gave ctx; take, note, check, comment, done -m.
 func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 	b := newBox(t)
 	b.cwd = b.project("myproj", true)
@@ -68,7 +68,6 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 		{[]string{"take", "T-1"}, `^ok T-1 open > in_progress  @\S+ until \d\d:\d\d\n$`},
 		{[]string{"note", "T-1", "parser located"}, `^ok T-1 note\n$`},
 		{[]string{"check", "T-1", "1", "2"}, "^ok T-1 2/2\n$"},
-		{[]string{"set", "T-1", "summary=Fixed the parser"}, "^ok T-1 summary\n$"},
 		{[]string{"comment", "T-1", "done and verified"}, "^ok T-1 comment\n$"},
 		{[]string{"done", "T-1", "-m", "merged"}, "^ok T-1 in_progress > closed\n$"},
 	}
@@ -79,9 +78,9 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 		}
 	}
 
-	b.checkHistory([]string{"T-1: new", "T-1: edit", "T-1: take", "T-1: note", "T-1: check", "T-1: set", "T-1: comment", "T-1: done"})
+	b.checkHistory([]string{"T-1: new", "T-1: edit", "T-1: take", "T-1: note", "T-1: check", "T-1: comment", "T-1: done"})
 	show := b.ok("", "show", "T-1").out
-	for _, want := range []string{"status: closed", "- [x] reproduce", "- [x] fix", "Fixed the parser", "Result: merged", "done and verified"} {
+	for _, want := range []string{"status: closed", "- [x] reproduce", "- [x] fix", "Result: merged", "done and verified"} {
 		if !strings.Contains(show, want) {
 			t.Errorf("the final file lacks %q:\n%s", want, show)
 		}

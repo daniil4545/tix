@@ -28,7 +28,7 @@ func TestRenderBoard_StatusSet_HintStaysLastLine(t *testing.T) {
 	for _, status := range []string{"", "moved T-1 to in_progress"} {
 		t.Run(fmt.Sprintf("status=%q", status), func(t *testing.T) {
 			b := view.Board{Total: 1, W: 120, H: 24, Status: status,
-				Cols: []view.Col{oneCol(view.Row{ID: "T-1", Title: "Alpha", Summary: "s"})}}
+				Cols: []view.Col{oneCol(view.Row{ID: "T-1", Title: "Alpha", Note: "s"})}}
 			ls := frameLines(b)
 			if len(ls) != 24 {
 				t.Fatalf("lines in the frame %d, expected 24 (window height)", len(ls))
@@ -54,18 +54,16 @@ func TestRenderBoard_NarrowWidth_HintTruncatedNotWrapped(t *testing.T) {
 	}
 }
 
-// Scenario (view): the third line is chosen by view: note, then summary.
-func TestRenderBoard_ThirdLine_NoteThenSummary(t *testing.T) {
+// Scenario (view): the third line is the note; without a note it is empty.
+func TestRenderBoard_ThirdLine_NoteOrEmpty(t *testing.T) {
 	cases := []struct {
 		name    string
 		row     view.Row
 		want    string
 		notWant []string
 	}{
-		{"the note instead of the summary", view.Row{Note: "3h did things", Summary: "the summary"},
-			"3h did things", []string{"the summary", "?"}},
-		{"no note - the summary", view.Row{Summary: "the summary"},
-			"the summary", []string{"?"}},
+		{"the note", view.Row{Note: "3h did things"}, "3h did things", []string{"?"}},
+		{"no note - empty", view.Row{}, "", []string{"3h", "?"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

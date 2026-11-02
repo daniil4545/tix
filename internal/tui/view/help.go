@@ -22,7 +22,7 @@ var helpEntries = []helpEntry{
 	{"j k, enter", "step through the history, unfold an entry"},
 	{"h l, arrows", "previous or next task of the column"},
 	{"e c delete", "as on the board"},
-	{"f", "edit a field: title, tags, waiting, summary, external"},
+	{"f", "edit a field: title, tags, waiting, external"},
 	{"esc", "back to the board"},
 	{"", "Mouse"},
 	{"click", "select a card; double click opens it; a hint button presses its key"},

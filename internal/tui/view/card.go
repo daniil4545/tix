@@ -134,10 +134,6 @@ func cardBody(c Card, w int) (lines []string, curStart, curEnd int, crits []crit
 		section("abstract", "")
 		lines = append(lines, indentLines(c.Abstract, false, w)...)
 	}
-	if strings.TrimSpace(c.Summary) != "" {
-		section("summary", "")
-		lines = append(lines, indentLines(c.Summary, true, w)...)
-	}
 	if strings.TrimSpace(c.Details) != "" || c.Checks != "" {
 		section("details", c.Checks)
 		base := len(lines)
@@ -289,9 +285,7 @@ func entryLines(e history.Entry, selected bool, w int) []string {
 }
 
 // scrollBody keeps room body lines from offset scroll. With fit the offset shifts only when the
-// selected line (cur = start, end, start of the first selectable line) left the window: below the
-// bottom edge or above the top one. When the cursor reaches the first selectable line from above the
-// window, the preamble (abstract, summary) shows from the top while it fits.
+// cursor line (cur = start, end, first selectable) left the window; the abstract shows while it fits.
 func scrollBody(body []string, scroll int, cur [3]int, room int, fit bool) ([]string, int) {
 	curStart, curEnd, first := cur[0], cur[1], cur[2]
 	if room <= 0 {

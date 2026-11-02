@@ -10,15 +10,15 @@ import (
 	"github.com/daniil4545/tix/internal/history"
 )
 
-// Row - a board column line. The third card line (the pulse) is the first of: the Note note (a ready line "<age> <text>", empty outside in_progress), Summary.
+// Row - a board column line. The third card line (the pulse) is Note: the latest note as a ready line "<age> <text>", empty without a note.
 // The colors and the sign come from the scheme by the card state (scheme.go).
 type Row struct {
-	ID, Project, Title, Summary, Meta string
-	Note                              string
-	Live                              bool // the task has a live claim; without it the card is grey
-	Star                              bool // the task is blocked: a human looks at it, "*" before the number
-	Grabbed                           bool // the card is grabbed: highlight and the "=" marker instead of ">"
-	ProjectColor                      int  // the project label slot in the palette, from ProjectColors
+	ID, Project, Title, Meta string
+	Note                     string
+	Live                     bool // the task has a live claim; without it the card is grey
+	Star                     bool // the task is blocked: a human looks at it, "*" before the number
+	Grabbed                  bool // the card is grabbed: highlight and the "=" marker instead of ">"
+	ProjectColor             int  // the project label slot in the palette, from ProjectColors
 }
 
 // UnknownColumn - the column name for tasks with a status that is not one of the five.
@@ -48,12 +48,12 @@ type Board struct {
 // it equals the frame on the screen. The frame only clamps it; the window shifts to the Cursor line
 // (an index in History) in CardScroll with fit, when the cursor moved. W, H <= 0: the size is not limited.
 type Card struct {
-	ID, Title, Column, Fields, Abstract, Summary, Details, Checks string
-	History                                                       []history.Entry
-	Cursor, Scroll, W, H                                          int
-	CritAt                                                        []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
-	Status                                                        string
-	IsErr                                                         bool
+	ID, Title, Column, Fields, Abstract, Details, Checks string
+	History                                              []history.Entry
+	Cursor, Scroll, W, H                                 int
+	CritAt                                               []int // criterion rows in Details (indexes by "\n"); Cursor counts them before the history
+	Status                                               string
+	IsErr                                                bool
 }
 
 // Layout colors: main - the terminal color, dim, accent, yellow (action needed), orange (error). Card colors are in scheme.go.

@@ -127,7 +127,7 @@ func TestHitCard_WrappedCriterionTopCut_ContinuationIsNotBox(t *testing.T) {
 	c.W, c.H = 30, 12
 	c.Details = "- [ ] first words of a long criterion that wraps over lines"
 	c.CritAt = []int{0}
-	c.Scroll = 8 // body line 7 is the criterion head, line 8 its continuation
+	c.Scroll = 5 // body line 4 is the criterion head, line 5 its continuation
 	const firstBodyRow = 3
 	got := view.HitCard(c, 4, firstBodyRow)
 	if got.Kind != view.CardCriterion || got.Index != 0 {

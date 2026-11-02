@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-// sections - body sections in canonical order; SetSection writes the first two.
+// sections - body sections in canonical order; SetSection writes only Abstract. Summary stays
+// in the list so an old file keeps its place for the insertion order.
 var sections = []string{"Abstract", "Summary", "Details"}
 
 // SetField changes a frontmatter field: title, project, waiting, tags, external.
@@ -42,12 +43,12 @@ func splitTags(value string) []string {
 	return tags
 }
 
-// SetSection replaces the section text (Abstract, Summary). "## " inside the text is an error.
+// SetSection replaces the section text (Abstract). "## " inside the text is an error.
 // No section - it is inserted by the canonical order Abstract, Summary, Details.
 func (t *Task) SetSection(name, text string) error {
-	i := slices.IndexFunc(sections[:2], func(s string) bool { return strings.EqualFold(s, name) })
+	i := slices.IndexFunc(sections[:1], func(s string) bool { return strings.EqualFold(s, name) })
 	if i < 0 {
-		return fmt.Errorf("section %q cannot be set: allowed Abstract Summary", name)
+		return fmt.Errorf("section %q cannot be set: allowed Abstract", name)
 	}
 	heading := "## " + sections[i]
 	text = strings.TrimRight(strings.ReplaceAll(text, "\r\n", "\n"), " \t\n")
