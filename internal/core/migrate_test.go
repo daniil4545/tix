@@ -5,223 +5,119 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/daniil4545/tix/internal/assets"
 )
 
-// Migration: a store of the former version (.tracker, entries in .gitignore) gets .tix after the first Open,
-// tasks and the journal stay in place, .gitignore is updated, the next write commits the edits.
-func TestOpen_LegacyTrackerDir_MigratedToTix(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.open(0)
-	r := mustCreate(t, s, "Legacy")
-	// State of the former version: the service folder and .gitignore with the old name.
-	if err := os.Rename(filepath.Join(e.root, ".tix"), filepath.Join(e.root, ".tracker")); err != nil {
-		t.Fatal(err)
-	}
-	ign := filepath.Join(e.root, ".gitignore")
-	data, err := os.ReadFile(ign)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(ign, []byte(strings.ReplaceAll(string(data), ".tix/", ".tracker/")), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	e.git("add", "-A")
-	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "legacy layout")
-	before := e.count()
-
-	s = e.open(0)
-	if _, err := os.Stat(filepath.Join(e.root, ".tix", "config.toml")); err != nil {
-		t.Errorf("no .tix/config.toml after Open: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(e.root, ".tracker")); !os.IsNotExist(err) {
-		t.Errorf(".tracker remained after migration: %v", err)
-	}
-	got, err := os.ReadFile(ign)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(got), ".tracker") || !strings.Contains(string(got), ".tix/lock\n") {
-		t.Errorf(".gitignore after migration:\n%s", got)
-	}
-	if _, _, err := s.Get(r.ID); err != nil {
-		t.Errorf("task %s after migration: %v", r.ID, err)
-	}
-	if e.count() != before {
-		t.Errorf("Open created a commit: was %d, now %d", before, e.count())
-	}
-	if _, err := s.Comment(r.ID, "after", "tester"); err != nil {
-		t.Fatalf("Comment: %v", err)
-	}
-	if out := e.git("status", "--porcelain"); out != "" {
-		t.Errorf("migration edits not committed:\n%s", out)
-	}
-	if e.count() <= before {
-		t.Errorf("a write after migration did not create a commit")
-	}
-}
-
-// If .tix exists and .tracker remained, Open touches nothing: data is not overwritten.
-func TestOpen_BothDirs_LegacyUntouched(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.open(0)
-	mustCreate(t, s, "Both")
-	legacy := filepath.Join(e.root, ".tracker")
-	if err := os.MkdirAll(legacy, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	e.open(0)
-	if _, err := os.Stat(legacy); err != nil {
-		t.Errorf(".tracker removed while .tix exists: %v", err)
-	}
-}
-
-// legacyBase prepares a store of the former version: the service folder .tracker with a journal, .gitignore
-// with text ign (nil - no file), everything committed.
-func legacyBase(t *testing.T, e *env, ign *string) {
+// oldStore makes a store whose tasks carry the given old statuses (one task per status) and,
+// when config is not empty, the given config.toml; everything is committed. Returns the task ids.
+func oldStore(t *testing.T, e *env, config string, statuses ...string) []string {
 	t.Helper()
-	mustCreate(t, e.open(0), "Legacy")
-	if err := os.Rename(filepath.Join(e.root, ".tix"), filepath.Join(e.root, ".tracker")); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(e.root, ".tracker", "log"), []byte("old log\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(e.root, ".gitignore")
-	if ign == nil {
-		if err := os.Remove(path); err != nil {
+	s := e.openAt(newClock())
+	var ids []string
+	for i, st := range statuses {
+		r, err := s.Create("Task "+st, "proj", "idea", "tester")
+		if err != nil {
+			t.Fatalf("Create %d: %v", i, err)
+		}
+		ids = append(ids, r.ID)
+		data, err := os.ReadFile(e.file(r.ID))
+		if err != nil {
 			t.Fatal(err)
 		}
-	} else if err := os.WriteFile(path, []byte(*ign), 0o600); err != nil {
-		t.Fatal(err)
+		out := strings.Replace(string(data), "status: idea", "status: "+st, 1)
+		if err := os.WriteFile(e.file(r.ID), []byte(out), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := filepath.Join(e.root, ".tix", "config.toml")
+	if config != "" {
+		if err := os.WriteFile(cfg, []byte(config), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	e.git("add", "-A")
-	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "legacy layout")
+	e.git("commit", "-q", "-m", "old store")
+	return ids
 }
 
-// Any variant of the former-version .gitignore: after migration the .tix service files do not
-// get into git, the journal stays, a repeated Open does not change .gitignore.
-func TestOpen_LegacyGitignoreVariants_TixFilesIgnored(t *testing.T) {
-	str := func(s string) *string { return &s }
-	cases := []struct {
-		name string
-		ign  *string
-	}{
-		{"partial", str(".tracker/lock\n*.swp\n")},
-		{"rooted", str("/.tracker/\n")},
-		{"bare dir", str(".tracker\n")},
-		{"no entry", str("*.swp\n")},
-		{"no newline at end", str("*.swp")},
-		{"no file", nil},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			defer guard(t)
-			e := newEnv(t)
-			legacyBase(t, e, c.ign)
-			s := e.open(0)
-			ign := filepath.Join(e.root, ".gitignore")
-			first, _ := os.ReadFile(ign)
-			e.open(0)
-			if again, _ := os.ReadFile(ign); string(again) != string(first) {
-				t.Errorf("repeated Open changed .gitignore:\n%s\nnow:\n%s", first, again)
-			}
-			if got, err := os.ReadFile(filepath.Join(e.root, ".tix", "log")); err != nil || !strings.HasPrefix(string(got), "old log\n") {
-				t.Errorf("journal after migration: %q, %v", got, err)
-			}
-			r := mustCreate(t, s, "After")
-			if _, err := s.Comment(r.ID, "one", "tester"); err != nil {
-				t.Fatalf("Comment: %v", err)
-			}
-			if out := e.git("ls-files", ".tix/lock", ".tix/log", ".tix/tmp"); out != "" {
-				t.Errorf(".tix service files in git:\n%s\n.gitignore:\n%s", out, first)
-			}
-			if out := e.git("status", "--porcelain"); out != "" {
-				t.Errorf("dirty after the write:\n%s", out)
-			}
-		})
-	}
-}
+const oldColumns = "[[column]]\nname = \"ideas\"\nrole = \"inbox\"\n\n[[column]]\nname = \"todo\"\nrole = \"ready\"\n\n" +
+	"[[column]]\nname = \"review\"\n\n[[column]]\nname = \"wip\"\nrole = \"active\"\n\n" +
+	"[[column]]\nname = \"stuck\"\nrole = \"waiting\"\n\n[[column]]\nname = \"fin\"\nrole = \"closed\"\n\n" +
+	"[projects]\ntracker = \"tix\"\n"
 
-// Both folders (an old binary recreated .tracker): .tracker is not touched, and .gitignore
-// gets the missing .tix lines.
-func TestOpen_BothDirs_GitignoreGetsTixLines(t *testing.T) {
+// The migration goes by the role of the column, not by its name: "todo" here is ready, "wip" is active.
+// One commit; the second Open changes nothing.
+func TestOpen_MigratesStatusesByRole_OneCommit_Idempotent(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
-	mustCreate(t, e.open(0), "Both")
-	if err := os.MkdirAll(filepath.Join(e.root, ".tracker"), 0o750); err != nil {
-		t.Fatal(err)
+	ids := oldStore(t, e, oldColumns, "ideas", "todo", "wip", "stuck", "fin", "review")
+	n := e.count()
+
+	e.open(5 * 1e9)
+	if e.count() != n+1 {
+		t.Fatalf("commits %d, want %d: the migration is one commit", e.count(), n+1)
 	}
-	ign := filepath.Join(e.root, ".gitignore")
-	if err := os.WriteFile(ign, []byte(".tracker/lock\n"), 0o600); err != nil {
-		t.Fatal(err)
+	want := []string{"idea", "open", "in_progress", "blocked", "closed", "review"}
+	for i, id := range ids {
+		if got := "status: " + want[i]; !strings.Contains(e.text(id), got) {
+			t.Errorf("%s: want %q in\n%s", id, got, e.text(id))
+		}
 	}
-	e.open(0)
-	got, err := os.ReadFile(ign)
+	cfg, err := os.ReadFile(filepath.Join(e.root, ".tix", "config.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(string(got), ".tracker/lock\n") || !strings.Contains(string(got), ".tix/lock\n") {
-		t.Errorf(".gitignore with two folders:\n%s", got)
+	if strings.Contains(string(cfg), "column") || !strings.Contains(string(cfg), `tracker = "tix"`) {
+		t.Errorf("config after migration:\n%s", cfg)
+	}
+	if st := e.git("status", "--porcelain"); strings.TrimSpace(st) != "" {
+		t.Errorf("the migration left a dirty tree:\n%s", st)
+	}
+
+	e.open(5 * 1e9)
+	if e.count() != n+1 {
+		t.Errorf("the second Open added commits: %d, want %d", e.count(), n+1)
 	}
 }
 
-// writeRules puts text into the store RULES.md and commits it, as an older version left it.
-func writeRules(t *testing.T, e *env, text []byte) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(e.root, "RULES.md"), text, 0o600); err != nil {
+// No [[column]] and no config.toml: the default names idea, todo, doing, blocked, done.
+func TestOpen_MigratesDefaultNamesWithoutColumns(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	ids := oldStore(t, e, "", "idea", "todo", "doing", "blocked", "done")
+	if err := os.Remove(filepath.Join(e.root, ".tix", "config.toml")); err != nil {
 		t.Fatal(err)
 	}
 	e.git("add", "-A")
-	e.git("-c", "user.name=test", "-c", "user.email=test@localhost", "commit", "-q", "-m", "old rules")
+	e.git("commit", "-q", "-m", "no config")
+	n := e.count()
+
+	e.open(5 * 1e9)
+	want := []string{"idea", "open", "in_progress", "blocked", "closed"}
+	for i, id := range ids {
+		if got := "status: " + want[i]; !strings.Contains(e.text(id), got) {
+			t.Errorf("%s: want %q", id, got)
+		}
+	}
+	if e.count() != n+1 {
+		t.Errorf("commits %d, want %d", e.count(), n+1)
+	}
+	e.open(5 * 1e9)
+	if e.count() != n+1 {
+		t.Errorf("the second Open added commits: %d", e.count())
+	}
 }
 
-// An untouched RULES.md of an earlier version gets the current text with the next write; the
-// operation commits it. A RULES.md edited by the owner stays as it is.
-func TestPrepare_OutdatedRules_Refreshed_EditedKept(t *testing.T) {
+// A store already on the five statuses is not touched: no commit, no write.
+func TestOpen_NewStore_NoMigration(t *testing.T) {
 	defer guard(t)
-	old, err := os.ReadFile(filepath.Join("testdata", "rules-2026-10-20.md"))
-	if err != nil {
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	if _, err := s.Create("Fresh", "proj", "idea", "tester"); err != nil {
 		t.Fatal(err)
 	}
-	for _, c := range []struct {
-		name string
-		text []byte
-		want string
-	}{
-		{"untouched old", old, assets.Rules},
-		{"edited by owner", append(old[:len(old):len(old)], "\nMy own rule.\n"...), string(old) + "\nMy own rule.\n"},
-	} {
-		t.Run(c.name, func(t *testing.T) {
-			e := newEnv(t)
-			s := e.open(0)
-			r := mustCreate(t, s, "Seed")
-			writeRules(t, e, c.text)
-			before := e.count()
-			if _, err := s.Comment(r.ID, "next write", "tester"); err != nil {
-				t.Fatalf("Comment: %v", err)
-			}
-			got, err := os.ReadFile(filepath.Join(e.root, "RULES.md"))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(got) != c.want {
-				t.Errorf("RULES.md after the write:\n%.200s", got)
-			}
-			if out := e.git("status", "--porcelain"); out != "" {
-				t.Errorf("the write left changes uncommitted:\n%s", out)
-			}
-			// One commit: the refresh rides in the operation commit, not in a separate external edit.
-			if n := e.count() - before; n != 1 {
-				t.Errorf("the write made %d commits, want 1", n)
-			}
-			changed := strings.Contains(e.git("show", "--name-only", "--format=", "HEAD"), "RULES.md")
-			if refreshed := c.want == assets.Rules; changed != refreshed {
-				t.Errorf("RULES.md in the operation commit: %v, want %v", changed, refreshed)
-			}
-		})
+	n := e.count()
+	e.open(5 * 1e9)
+	if e.count() != n {
+		t.Errorf("Open of a migrated store added commits: %d, want %d", e.count(), n)
 	}
 }

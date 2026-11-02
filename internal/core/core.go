@@ -117,6 +117,9 @@ func Open(root string, o Options) (*Store, error) {
 	if s.log == nil {
 		s.log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
+	if err := s.migrateStatuses(); err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -168,19 +171,17 @@ func (s *Store) CreateWithBody(title, project, column, body, actor string) (Resu
 }
 
 func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (Result, error) {
-	cfg, err := config.Load(filepath.Join(s.root, tixDir, configFile))
-	if err != nil {
-		return Result{}, err
+	if column == "" {
+		column = config.Idea
 	}
-	column, err = pickColumn(cfg, column)
-	if err != nil {
-		return Result{}, err
+	if err := config.Check(column); err != nil {
+		return Result{}, rule("%v", err)
 	}
 	t := &task.Task{Title: title, Project: project, Status: column}
 	if err := t.SetBody(body); err != nil {
 		return Result{}, err
 	}
-	if err := s.checkNewEntry(cfg, t); err != nil {
+	if err := s.checkNewEntry(t); err != nil {
 		return Result{}, err
 	}
 	files, err := s.taskFiles()
@@ -225,18 +226,17 @@ func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (R
 }
 
 // checkNewEntry applies the destination entry check before the task is written.
-func (s *Store) checkNewEntry(cfg *config.Config, t *task.Task) error {
+func (s *Store) checkNewEntry(t *task.Task) error {
 	column := t.Status
-	role := cfg.RoleOf(column)
-	if role != roleClosed {
-		if _, err := s.enter(t, role, "", MoveOpts{}, ""); err == nil {
+	if column != config.Closed {
+		if _, err := s.enter(t, column, "", MoveOpts{}, ""); err == nil {
 			return nil
 		}
 	}
-	switch role {
-	case roleWaiting:
-		return rule("a new task has no waiting reason; create it, then run: tix move <id> %s -m <reason>", column)
-	case roleClosed:
+	switch column {
+	case config.Blocked:
+		return rule("a new task has no blocking reason; create it, then run: tix move <id> %s -m <reason>", column)
+	case config.Closed:
 		return rule("a new task cannot start closed; create it, then run: tix done <id> -m <result>")
 	}
 	return rule("a new task has no criteria; pass a body with `- [ ]` lines under ## Details: tix new <title> --to %s --body-file body.md", column)
@@ -376,27 +376,6 @@ func (s *Store) show(id string, parsed func(*task.Task)) (*task.Task, string, []
 	}
 	t.Rev, t.Path = rev, path
 	return t, rev, data, nil
-}
-
-// pickColumn checks the column; an empty name - the inbox role column, else the first.
-func pickColumn(cfg *config.Config, column string) (string, error) {
-	if column != "" {
-		for _, c := range cfg.Columns {
-			if c.Name == column {
-				return column, nil
-			}
-		}
-		return "", fmt.Errorf("unknown column %q", column)
-	}
-	for _, c := range cfg.Columns {
-		if c.Role == "inbox" {
-			return c.Name, nil
-		}
-	}
-	if len(cfg.Columns) == 0 {
-		return "", errors.New("config has no columns")
-	}
-	return cfg.Columns[0].Name, nil
 }
 
 // checkActor substitutes unknown and rejects characters that break the comment marker.

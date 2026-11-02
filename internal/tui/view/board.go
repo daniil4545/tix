@@ -223,7 +223,7 @@ func rowCells(row Row, selected bool) []string {
 		if row.Grabbed {
 			sel = grabStyle
 		}
-		head := marker + clean(row.ID+" "+row.Project)
+		head := marker + star(row) + clean(row.ID+" "+row.Project)
 		first := sel.Render(fit(head, colWidth))
 		return []string{
 			first,
@@ -237,9 +237,17 @@ func rowCells(row Row, selected bool) []string {
 	return []string{first, look.Title.Render(fit(title, colWidth)), look.Rest.Render(fit(summary, colWidth)), look.Rest.Render(fit(" "+clean(row.Meta), colWidth)), blank}
 }
 
+// star is the mark before the number of a blocked card.
+func star(row Row) string {
+	if row.Star {
+		return "*"
+	}
+	return ""
+}
+
 // headLine draws the ID line: the ID in the state style, the project in its palette color.
 func headLine(marker string, row Row, look cardLook, width int) string {
-	id := marker + clean(row.ID) + " "
+	id := marker + star(row) + clean(row.ID) + " "
 	text := fit(id+clean(row.Project), width)
 	rest, ok := strings.CutPrefix(text, id)
 	if !ok {

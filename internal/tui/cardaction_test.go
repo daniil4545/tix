@@ -57,7 +57,7 @@ func caOpenCard(m *Model) {
 
 func TestField_SetClearUnchanged(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
@@ -86,7 +86,7 @@ func TestField_SetClearUnchanged(t *testing.T) {
 
 func TestField_SummaryWithSeveralLines_RefusesToEditInline(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	e.summary(id, "line one\nline two")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
@@ -99,7 +99,7 @@ func TestField_SummaryWithSeveralLines_RefusesToEditInline(t *testing.T) {
 
 func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
@@ -139,7 +139,7 @@ func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 // A core refusal of a field edit reaches the status line and the file stays as it was.
 func TestField_CoreRefusal_ShownInStatus(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
@@ -175,7 +175,7 @@ func (e *mvEnv) caBody(id, body string) {
 
 func TestCriteria_SelectedByCursor_EnterChecksAndUnchecks(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	const body = "## Details\nplain line\n- [ ] one\n- [x] two\n"
 	e.caBody(id, body)
 	m := newMouseModel(t, e, 120, 30)
@@ -211,7 +211,7 @@ func TestCriteria_SelectedByCursor_EnterChecksAndUnchecks(t *testing.T) {
 // A click on the criterion text only selects: the mark is moved by the box.
 func TestCriteria_ClickOnText_SelectsWithoutToggle(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	e.caBody(id, "## Details\n- [ ] first\n")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
@@ -235,7 +235,7 @@ func TestCriteria_ClickOnText_SelectsWithoutToggle(t *testing.T) {
 func TestCriteria_ClickOnBox_Toggles(t *testing.T) {
 	for _, dx := range []int{0, 1, 2} { // the columns `[`, ` `/`x`, `]`
 		e := mvNewEnv(t, "")
-		id := e.create("job", "todo")
+		id := e.create("job", "open")
 		e.caBody(id, "## Details\n- [ ] first\n")
 		m := newMouseModel(t, e, 120, 30)
 		m.selectTask(id)
@@ -252,7 +252,7 @@ func TestCriteria_ClickOnBox_Toggles(t *testing.T) {
 // A click on the box of the checked criterion removes the mark.
 func TestCriteria_ClickOnBox_Unchecks(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	e.caBody(id, "## Details\n- [x] first\n")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
@@ -268,7 +268,7 @@ func TestCriteria_ClickOnBox_Unchecks(t *testing.T) {
 // A click on a history entry selects it without writing anything.
 func TestCard_ClickOnHistory_Selects(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	for i := 1; i <= 6; i++ {
 		if _, err := e.store.Comment(id, fmt.Sprintf("remark-0%d", i), "agent"); err != nil {
 			t.Fatal(err)
@@ -304,7 +304,7 @@ func TestCard_ClickOnHistory_Selects(t *testing.T) {
 // when the cursor moves again.
 func TestCard_Wheel_ScrollsByLines_SelectionStays(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	for i := 1; i <= 30; i++ {
 		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
 			t.Fatal(err)
@@ -339,7 +339,7 @@ func TestCard_Wheel_ScrollsByLines_SelectionStays(t *testing.T) {
 func remarkEnv(t *testing.T) (*mvEnv, *Model) {
 	t.Helper()
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	for i := 1; i <= 30; i++ {
 		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
 			t.Fatal(err)
@@ -377,7 +377,7 @@ func TestCard_Resize_KeepsCursorInFrame(t *testing.T) {
 // wheel-up moves the view at once.
 func TestCard_BodyShortenedExternally_WheelUpMovesAtOnce(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	long := "## Details\n" + strings.Repeat("line\n", 12)
 	e.caBody(id, long)
 	for i := 1; i <= 30; i++ {
@@ -402,7 +402,7 @@ func TestCard_BodyShortenedExternally_WheelUpMovesAtOnce(t *testing.T) {
 // the wheel has scrolled the window a little.
 func TestCard_ClickOnVisibleFirstLine_ViewStaysPut(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	e.caBody(id, "## Abstract\nabs\n\n## Summary\nsum\n\n## Details\n- [ ] first\n- [ ] second\n")
 	for i := 1; i <= 30; i++ {
 		if _, err := e.store.Comment(id, fmt.Sprintf("remark-%02d", i), "agent"); err != nil {
@@ -500,7 +500,7 @@ func sameFrame(a, b []string) bool {
 
 func TestCriteria_ChangedMeanwhile_NotToggled(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	e.caBody(id, "## Details\n- [ ] first\n")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
@@ -516,7 +516,7 @@ func TestCriteria_ChangedMeanwhile_NotToggled(t *testing.T) {
 
 func TestDelete_ConfirmByY_AnyOtherKeyCancels(t *testing.T) {
 	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
+	id := e.create("job", "open")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
@@ -541,7 +541,7 @@ func TestDelete_ConfirmByY_AnyOtherKeyCancels(t *testing.T) {
 func TestDelete_SecondDeleteOrBackspace_Cancels(t *testing.T) {
 	for _, second := range []tea.KeyPressMsg{{Code: tea.KeyDelete}, {Code: tea.KeyBackspace}} {
 		e := mvNewEnv(t, "")
-		id := e.create("job", "todo")
+		id := e.create("job", "open")
 		m := newMouseModel(t, e, 120, 30)
 		m.selectTask(id)
 		feed(m, tea.KeyPressMsg{Code: tea.KeyDelete})

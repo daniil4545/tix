@@ -8,11 +8,11 @@ import (
 
 // In a card left/right and h/l open the neighbor task of the column; at the edge nothing.
 func TestCard_LeftRight_OpensSiblingInColumn(t *testing.T) {
-	e := mvNewEnv(t, stickyCfg)
-	a := e.create("A", "c3")
-	b := e.create("B", "c3")
-	c := e.create("C", "c3")
-	e.create("Other", "c4")
+	e := mvNewEnv(t, "")
+	a := e.create("A", "open")
+	b := e.create("B", "open")
+	c := e.create("C", "open")
+	e.create("Other", "in_progress")
 	m := newMouseModel(t, e, 140, 30)
 	m.selectTask(b)
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEnter})

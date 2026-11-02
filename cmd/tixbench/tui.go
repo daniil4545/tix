@@ -13,7 +13,7 @@ func tuiBenches() []bench {
 	return []bench{{
 		name: "tui open", targetMS: 100, env: []string{tuiOneshotEnv},
 		check: func(_ int, out string) error {
-			if !strings.Contains(out, "todo") || !strings.Contains(out, "T-") {
+			if !strings.Contains(out, "in_progress") || !strings.Contains(out, "T-") {
 				return fmt.Errorf("first frame has no board: %.80q", out)
 			}
 			return nil

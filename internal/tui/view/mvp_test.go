@@ -21,11 +21,11 @@ func frameLines(b view.Board) []string {
 	return strings.Split(strings.TrimRight(plain(view.RenderBoard(b)), "\n"), "\n")
 }
 
-func oneCol(rows ...view.Row) view.Col { return view.Col{Name: "doing", Rows: rows} }
+func oneCol(rows ...view.Row) view.Col { return view.Col{Name: "in_progress", Rows: rows} }
 
 // Scenario: the hint is always the last line, the status line is above it.
 func TestRenderBoard_StatusSet_HintStaysLastLine(t *testing.T) {
-	for _, status := range []string{"", "moved T-1 to doing"} {
+	for _, status := range []string{"", "moved T-1 to in_progress"} {
 		t.Run(fmt.Sprintf("status=%q", status), func(t *testing.T) {
 			b := view.Board{Total: 1, W: 120, H: 24, Status: status,
 				Cols: []view.Col{oneCol(view.Row{ID: "T-1", Title: "Alpha", Summary: "s"})}}
@@ -149,7 +149,7 @@ func TestRenderBoard_RowWindowScrolled_CursorCardVisibleOnGrid(t *testing.T) {
 	b := bigBoard(30)
 	b.Col, b.Row, b.W, b.H = 1, 17, 120, 24
 	ls := frameLines(b)
-	want := fmt.Sprintf("T-%d", 30+17+1) // column todo: numbers 31..60
+	want := fmt.Sprintf("T-%d", 30+17+1) // column open: numbers 31..60
 	seenAt := -1
 	for y, ln := range ls {
 		if strings.Contains(ln, want) {

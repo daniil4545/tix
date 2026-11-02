@@ -21,16 +21,12 @@ func showBody(t *testing.T, b *box, id string) (body, status string) {
 
 func TestCLI_New_BodyFileStdin(t *testing.T) {
 	defer guard(t)
-	for _, to := range []string{"idea", "todo", "ready"} {
+	for _, to := range []string{"idea", "open"} {
 		t.Run(to, func(t *testing.T) {
 			b := newBox(t)
 			b.ok(newBody, "new", "Fresh", "--to", to, "--body-file", "-")
 			body, status := showBody(t, b, "T-1")
-			want := to
-			if to == "ready" {
-				want = "todo"
-			}
-			ensure(t, body == newBody && status == want, "created body %q, status %q", body, status)
+			ensure(t, body == newBody && status == to, "created body %q, status %q", body, status)
 		})
 	}
 }
@@ -41,9 +37,9 @@ func TestCLI_New_BodyFilePath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(b.cwd, "body.md"), []byte(newBody), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	b.ok("", "new", "Fresh", "--to", "ready", "--body-file", "body.md")
+	b.ok("", "new", "Fresh", "--to", "open", "--body-file", "body.md")
 	body, status := showBody(t, b, "T-1")
-	ensure(t, body == newBody && status == "todo", "created body %q, status %q", body, status)
+	ensure(t, body == newBody && status == "open", "created body %q, status %q", body, status)
 	r := b.tix("", "new", "Missing", "--body-file", "nope.md")
 	ensure(t, r.code == 6 && strings.Contains(r.err, "body file"), "missing file: %+v", r)
 }
@@ -63,7 +59,7 @@ func TestCLI_New_ReadyWithoutCriteriaLeavesStoreUnchanged(t *testing.T) {
 	b.ok("", "new", "Seed")
 	before := b.snapshot()
 	for _, body := range []string{"", "## Details\nNo checks\n", "## Details\n```\n- [ ] Example\n```\n"} {
-		r := b.tix(body, "new", "Fresh", "--to", "ready", "--body-file", "-")
+		r := b.tix(body, "new", "Fresh", "--to", "open", "--body-file", "-")
 		ensure(t, r.code == 5, "expected rule refusal: %+v", r)
 		ensure(t, b.snapshot() == before, "refusal changed the store")
 	}
@@ -72,8 +68,7 @@ func TestCLI_New_ReadyWithoutCriteriaLeavesStoreUnchanged(t *testing.T) {
 // spec: T-82 scenario 5
 func TestCLI_New_ToCheckedColumn_RefusedNothingWritten(t *testing.T) {
 	defer guard(t)
-	path := map[string]string{"todo": "--body-file", "ready": "--body-file", "blocked": "tix move <id>",
-		"waiting": "tix move <id>", "done": "tix done <id>", "closed": "tix done <id>"}
+	path := map[string]string{"open": "--body-file", "blocked": "tix move <id>", "closed": "tix done <id>"}
 	for to, want := range path {
 		t.Run(to, func(t *testing.T) {
 			b := newBox(t)
@@ -91,7 +86,7 @@ func TestCLI_New_ToCheckedColumn_RefusedNothingWritten(t *testing.T) {
 func TestCLI_New_ColumnsWithoutEntryCheck_StillCreate(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
-	for _, args := range [][]string{{"new", "A"}, {"new", "B", "--to", "idea"}, {"new", "C", "--to", "doing"}, {"new", "D", "--to", "active"}} {
+	for _, args := range [][]string{{"new", "A"}, {"new", "B", "--to", "idea"}, {"new", "C", "--to", "in_progress"}} {
 		r := b.tix("", args...)
 		ensure(t, r.code == 0, "tix %v: code %d, stderr %q", args, r.code, r.err)
 	}
@@ -102,6 +97,6 @@ func TestCLI_New_RefusalPath_CreateEditMove(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	id := b.newTask("Fresh", "idea")
-	r := b.ok("", "move", id, "todo")
-	ensure(t, strings.Contains(r.out, "todo"), "move to ready after criteria: %q", r.out)
+	r := b.ok("", "move", id, "open")
+	ensure(t, strings.Contains(r.out, "open"), "move to ready after criteria: %q", r.out)
 }

@@ -8,9 +8,9 @@ import (
 // epicBox: an epic with the lines of two tasks and one plain criterion, and the two tasks.
 func epicBox(t *testing.T) (b *box, epic, c1, c2 string) {
 	b = newBox(t)
-	epic = b.newTask("Epic", "todo")
-	c1 = b.newTask("One", "todo")
-	c2 = b.newTask("Two", "todo")
+	epic = b.newTask("Epic", "open")
+	c1 = b.newTask("One", "open")
+	c2 = b.newTask("Two", "open")
 	b.ok("", "set", epic, "tags=epic")
 	b.edit(epic, "## Details\n- [ ] "+c1+" one\n- [ ] "+c2+"\n- [ ] acceptance\n")
 	b.edit(c1, "## Details\n- [x] shipped\n")
@@ -27,10 +27,10 @@ func TestCLI_Epic_LineFollowsStatus(t *testing.T) {
 	body := b.ok("", "show", epic).out
 	ensure(t, strings.Contains(body, "- [x] "+c1+" one") && strings.Contains(body, "- [ ] "+c2), "tick: %q", body)
 	// a forced close ticks too; a move out of closed clears the mark
-	b.ok("", "move", c1, "todo")
+	b.ok("", "move", c1, "open")
 	ensure(t, strings.Contains(b.ok("", "show", epic).out, "- [ ] "+c1+" one"), "reopened task keeps its mark")
 	b.ok("", "done", c1)
-	b.ok("", "move", c2, "doing")
+	b.ok("", "move", c2, "in_progress")
 	b.ok("", "done", c2)
 	ensure(t, strings.Contains(b.ok("", "show", epic).out, "- [x] "+c2+"\n"), "bare line must tick")
 }
@@ -42,7 +42,7 @@ func TestCLI_Epic_CheckAndDone(t *testing.T) {
 	b.ok("", "check", epic, "3")
 	// an unchecked task line holds the epic even with --force
 	b.rule("done", epic, "--force", "-m", "x")
-	ensure(t, strings.Contains(b.ok("", "show", epic).out, "status: todo"), "epic must stay open")
+	ensure(t, strings.Contains(b.ok("", "show", epic).out, "status: open"), "epic must stay open")
 }
 
 func TestCLI_Epic_ShowListCtx(t *testing.T) {
@@ -69,7 +69,7 @@ func TestCLI_Epic_ForceBoundaryAndReady(t *testing.T) {
 	body := b.ok("", "show", epic).out
 	ensure(t, strings.Contains(body, "- [x] "+c1+" one") && strings.Contains(body, "- [ ] T-20 other") &&
 		strings.Contains(body, "- [ ] "+c1+"suffix"), "forced close or id boundary: %q", body)
-	b.ok("", "move", c1, "todo")
+	b.ok("", "move", c1, "open")
 	b.edit(epic, "## Details\n- [ ] "+c1+" one\n- [ ] "+c2+"\n- [ ] acceptance\n")
 	b.ok("", "check", c1, "1")
 	b.ok("", "done", c1)

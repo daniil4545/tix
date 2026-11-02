@@ -54,10 +54,10 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 
 	b.ok("", "new", "Fix parser")
 	b.ok("## Details\n- [ ] reproduce\n- [ ] fix\n", "edit", "T-1", "--base", b.showRev("T-1"))
-	b.ok("", "move", "T-1", "todo")
+	b.ok("", "move", "T-1", "open")
 
 	ctx := b.ok("", "ctx").out
-	if !strings.HasPrefix(ctx, "project myproj") || !regexp.MustCompile(`(?m)^todo\s+T-1 Fix parser`).MatchString(ctx) ||
+	if !strings.HasPrefix(ctx, "project myproj") || !regexp.MustCompile(`(?m)^open\s+T-1 Fix parser`).MatchString(ctx) ||
 		!strings.HasSuffix(strings.TrimSpace(ctx), "next T-1") {
 		t.Fatalf("ctx before work:\n%s", ctx)
 	}
@@ -65,12 +65,12 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 		args []string
 		want string
 	}{
-		{[]string{"take", "T-1"}, `^ok T-1 todo > doing  @\S+ until \d\d:\d\d\n$`},
+		{[]string{"take", "T-1"}, `^ok T-1 open > in_progress  @\S+ until \d\d:\d\d\n$`},
 		{[]string{"note", "T-1", "parser located"}, `^ok T-1 note\n$`},
 		{[]string{"check", "T-1", "1", "2"}, "^ok T-1 2/2\n$"},
 		{[]string{"set", "T-1", "summary=Fixed the parser"}, "^ok T-1 summary\n$"},
 		{[]string{"comment", "T-1", "done and verified"}, "^ok T-1 comment\n$"},
-		{[]string{"done", "T-1", "-m", "merged"}, "^ok T-1 doing > done\n$"},
+		{[]string{"done", "T-1", "-m", "merged"}, "^ok T-1 in_progress > closed\n$"},
 	}
 	for _, s := range steps {
 		r := b.tix("", s.args...)
@@ -81,7 +81,7 @@ func TestScenario_HappyPath_AgentCycle(t *testing.T) {
 
 	b.checkHistory([]string{"T-1: new", "T-1: edit", "T-1: take", "T-1: note", "T-1: check", "T-1: set", "T-1: comment", "T-1: done"})
 	show := b.ok("", "show", "T-1").out
-	for _, want := range []string{"status: done", "- [x] reproduce", "- [x] fix", "Fixed the parser", "Result: merged", "done and verified"} {
+	for _, want := range []string{"status: closed", "- [x] reproduce", "- [x] fix", "Fixed the parser", "Result: merged", "done and verified"} {
 		if !strings.Contains(show, want) {
 			t.Errorf("the final file lacks %q:\n%s", want, show)
 		}
@@ -118,7 +118,7 @@ func TestScenario_FiveTakesRace_OneWinner(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "new", "Contended")
 	b.ok("## Details\n- [ ] one\n", "edit", "T-1", "--base", b.showRev("T-1"))
-	b.ok("", "move", "T-1", "todo")
+	b.ok("", "move", "T-1", "open")
 	codes := make([]int, 5)
 	var wg sync.WaitGroup
 	for i := range codes {

@@ -78,7 +78,7 @@ func (s *Store) syncEpics(tx *txEnv, id string, closed bool) (ready []string) {
 
 // settleLines is the check before closing an epic: the status of the tasks is the truth. A line of a closed task
 // is ticked in the epic's own write; an open or missing task refuses the close, --force included.
-func (s *Store) settleLines(t *task.Task, cfg *config.Config) error {
+func (s *Store) settleLines(t *task.Task) error {
 	var bad []string
 	for _, c := range t.Criteria() {
 		id := task.LineTask(c.Text)
@@ -91,7 +91,7 @@ func (s *Store) settleLines(t *task.Task, cfg *config.Config) error {
 			continue
 		}
 		line, err := readTask(path)
-		if err != nil || cfg.RoleOf(line.Status) != roleClosed {
+		if err != nil || line.Status != config.Closed {
 			bad = append(bad, id+" (not closed)")
 			continue
 		}

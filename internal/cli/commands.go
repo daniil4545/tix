@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -104,26 +106,12 @@ func (a *app) newBody(path string) (string, error) {
 	return string(data), nil
 }
 
-// column returns the column of a new task: --to by name or role, else the inbox role column, else the first.
+// column returns the status of a new task: --to, else idea.
 func (a *app) column(p *parsed) (string, error) {
-	cols := a.store.Config().Columns
-	if len(cols) == 0 {
-		return "", errors.New("config.toml has no columns")
-	}
-	want := a.store.Config().Resolve(p.vals["to"])
-	for _, c := range cols {
-		if p.set["to"] && c.Name == want || !p.set["to"] && c.Role == "inbox" {
-			return c.Name, nil
-		}
-	}
 	if !p.set["to"] {
-		return cols[0].Name, nil
+		return config.Idea, nil
 	}
-	names := make([]string, len(cols))
-	for i, c := range cols {
-		names[i] = c.Name
-	}
-	return "", inputf("unknown column %q; available: %s", want, strings.Join(names, ", "))
+	return p.vals["to"], checkStatus(p.vals["to"])
 }
 
 func (a *app) cmdText(args []string) error {
@@ -353,13 +341,17 @@ func (a *app) cmdList(args []string) error {
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
 	}
-	// an explicit --status shows its column even when it is the closed one
-	closed, hasClosed := a.store.Config().ByRole("closed")
-	hide := hasClosed && !p.set["all"] && !p.set["status"]
+	if p.set["status"] {
+		if err := checkStatus(p.vals["status"]); err != nil {
+			return err
+		}
+	}
+	// an explicit --status shows its status even when it is closed
+	hide := !p.set["all"] && !p.set["status"]
 	needle := strings.ToLower(p.vals["grep"])
 	var matched []*task.Task
 	for _, t := range tasks {
-		if hide && t.Status == closed.Name {
+		if hide && t.Status == config.Closed {
 			continue
 		}
 		if !strings.Contains(strings.ToLower(t.Title), needle) &&
@@ -388,17 +380,13 @@ func summaryContains(body, needle string) bool {
 }
 
 // filter keeps the tasks of the project and column (an empty value means no filter)
-// and sorts: columns by config.toml, within a column by rank, then by number.
+// and sorts: statuses in board order, within a status by rank, then by number.
 func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
-	order := map[string]int{}
-	for i, c := range a.store.Config().Columns {
-		order[c.Name] = i
-	}
 	pos := func(s string) int {
-		if i, ok := order[s]; ok {
+		if i := slices.Index(config.Statuses, s); i >= 0 {
 			return i
 		}
-		return len(order)
+		return len(config.Statuses)
 	}
 	var out []*task.Task
 	for _, t := range tasks {
