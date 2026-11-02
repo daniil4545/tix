@@ -3,10 +3,8 @@ package core
 import (
 	"bytes"
 	"os"
-	"runtime"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/task"
@@ -26,19 +24,7 @@ func (s *Store) epicsOf(id string) []epicFile {
 		return nil
 	}
 	found := make([]*epicFile, len(refs))
-	workers := min(listWorkers, runtime.NumCPU(), max(len(refs), 1))
-	chunk := (len(refs) + workers - 1) / workers
-	var wg sync.WaitGroup
-	for from := 0; from < len(refs); from += chunk {
-		wg.Add(1)
-		go func(from, to int) {
-			defer wg.Done()
-			for i := from; i < to; i++ {
-				found[i] = s.epicFileOf(refs[i], id)
-			}
-		}(from, min(from+chunk, len(refs)))
-	}
-	wg.Wait()
+	forEachChunked(len(refs), func(i int) { found[i] = s.epicFileOf(refs[i], id) })
 	var out []epicFile
 	for _, e := range found {
 		if e != nil {
