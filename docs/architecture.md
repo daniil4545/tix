@@ -93,7 +93,7 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | Only `take` sets a claim; `note` does not extend it | `core.Take`, `core.extendClaim` | `core` tests (`agent_test.go`) |
 | A live claim of another actor is not taken over without `--steal` | `core.take` | `e2e` `FiveTakesRace_OneWinner` |
 | Only `gitx` starts external processes in `internal` | `gitx`; `gosec` in the linter | `make lint` |
-| `ctx` does not call git | `cli.cmdCtx`, `core.List`, `brief` | 15 ms target in `make bench` |
+| `ctx` calls git once: `gitx.Moves` over the last 14 days for the stale line, in parallel with reading the files | `cli.cmdCtx`, `core.Moves`, `brief` | 25 ms target in `make bench` |
 | `user:pass@` from a URL does not reach the reply or the log | `gitx.scrub` | `gitx/push_test.go` |
 
 ## 2. Main flow
@@ -229,7 +229,7 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Claim term, extension rule | `core.claimTTL`, `core.extendClaim` | `RULES.md`, the `take` output line |
 | Write order, lock | `internal/core/tx.go` | invariants of section 1, `e2e` |
 | A new command | `cli.dispatch`, `internal/cli/agent.go` or `commands.go`, a `Store` method | usage in `cli.go`, exit codes, `RULES.md`, `README.md` |
-| `ctx` content, text limit | `internal/brief`, `cli.ctxPerColumn`, `cli.ctxTextLimit` | 15 ms target in `cmd/tixbench`, `RULES.md` |
+| `ctx` content, text limit | `internal/brief`, `cli.ctxPerColumn`, `cli.ctxTextLimit` | 25 ms target in `cmd/tixbench`, `RULES.md` |
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |

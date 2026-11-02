@@ -337,7 +337,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Operation | Target |
 |---|---|
-| `ctx`, `list`, `show` | up to 15 ms; without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
+| `ctx`, `list`, `show` | up to 15 ms, `ctx` up to 25 ms (one git walk for the stale line); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 
