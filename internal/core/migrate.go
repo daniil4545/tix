@@ -205,12 +205,43 @@ func (s *Store) renameStatuses(names map[string]string) ([]gitx.File, error) {
 		if to == t.Status {
 			continue
 		}
-		t.Status = to
-		out := t.Render()
+		out, ok := setRawStatus(data, to)
+		if !ok {
+			s.log.Warn("migrate: status line not found", "op", "migrate", "id", ref.id)
+			continue
+		}
 		if ok, err := s.replace(ref.path, data, out); err != nil || !ok {
 			return nil, errors.Join(err, fmt.Errorf("%s changed during the migration, retry the command", ref.id))
 		}
 		files = append(files, gitx.File{Path: filepath.Base(ref.path), Data: out})
 	}
 	return files, nil
+}
+
+// setRawStatus replaces the value of the first `status:` line of the frontmatter; every other byte stays.
+func setRawStatus(data []byte, status string) ([]byte, bool) {
+	text := string(data)
+	pos := 0
+	for pos < len(text) {
+		end := strings.IndexByte(text[pos:], '\n')
+		line := text[pos:]
+		if end >= 0 {
+			line = text[pos : pos+end]
+		}
+		if strings.HasPrefix(line, "status:") {
+			eol := ""
+			if strings.HasSuffix(line, "\r") {
+				eol = "\r"
+			}
+			return []byte(text[:pos] + "status: " + status + eol + text[pos+len(line):]), true
+		}
+		if pos > 0 && strings.TrimRight(line, "\r") == "---" {
+			return nil, false // end of the frontmatter
+		}
+		if end < 0 {
+			break
+		}
+		pos += end + 1
+	}
+	return nil, false
 }

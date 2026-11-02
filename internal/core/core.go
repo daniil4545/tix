@@ -69,7 +69,7 @@ type Options struct {
 }
 
 // Result - the reply of a write operation. Warning: the commit failed, the edit is in the file.
-// Info - the tail of the ok line ("todo > doing  @claude until 20:40").
+// Info - the tail of the ok line ("open > in_progress  @claude until 20:40").
 type Result struct {
 	ID, Rev, Commit, Warning, Info string
 	Ready                          []string // epics whose task lines are all ticked after this move
@@ -94,7 +94,8 @@ type Store struct {
 }
 
 // Open opens the store at root and reads the config. Creates nothing: an empty or
-// nonexistent root is an empty store. The only edit is the migration of .tracker to .tix.
+// nonexistent root is an empty store. The only edits are the migrations: .tracker to .tix,
+// and old columns to the five statuses (one commit).
 func Open(root string, o Options) (*Store, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
