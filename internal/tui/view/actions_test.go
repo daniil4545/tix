@@ -14,7 +14,7 @@ import (
 
 const (
 	boardHintFull = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
-	cardRowFull   = "e edit  c comment  del delete  j k history  esc back"
+	cardRowFull   = "e edit  c comment  del delete  j k history  left right task  esc back"
 )
 
 func lastNonEmpty(lines []string) (int, string) {

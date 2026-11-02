@@ -23,8 +23,8 @@ type click struct {
 	at time.Time
 }
 
-// mouse handles the mouse. Mouse mode is on in the board and in the card (View). With an input line
-// a left click goes to inputClick, the rest is ignored; during a grab the mouse is ignored.
+// mouse handles the mouse. Mouse mode is on in the board and in the card (View). With an input line,
+// a grab or the help screen the mouse is ignored.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	mouse := msg.Mouse()
 	if m.input != nil || m.grab != nil || m.help {

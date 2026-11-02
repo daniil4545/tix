@@ -8,7 +8,7 @@ type actionBtn struct{ text, key string }
 
 var cardActions = []actionBtn{
 	{"e edit", "e"}, {"c comment", "c"},
-	{"del delete", "del"}, {"j k history", ""}, {"esc back", "esc"},
+	{"del delete", "del"}, {"j k history", ""}, {"left right task", ""}, {"esc back", "esc"},
 }
 
 // actionSpan - the place of a button in the actions line: cells [from, to).

@@ -726,7 +726,7 @@ func (e *mvEnv) acLastLine() int {
 // The actions line is the last card line and is visible with a non-empty status line;
 // the status line is above it. Checked on a roomy and on a low screen with a long history.
 func TestCardActions_RowVisibleWithStatusAbove(t *testing.T) {
-	const row = "e edit  c comment  del delete  j k history  esc back"
+	const row = "e edit  c comment  del delete  j k history  left right task  esc back"
 	for _, tc := range []struct {
 		name string
 		w, h int

@@ -193,6 +193,7 @@ arrows select  enter open  space grab  n new  e edit  c comment  del delete  p p
      (`noteLimit`, `gitx/history.go`); a task older than the window has an empty line;
      a status outside the five is the column `?`;
    - the hint line holds the common keys only, the rest is under `?`;
+   - the title and the fields (tags, project, external) are changed with `tix set`; `e` in the TUI edits the body;
    - the card: title and status, one fields line, abstract, details with the criteria, history:
 
 ```
