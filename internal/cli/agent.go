@@ -130,14 +130,7 @@ func (a *app) cmdCtx(args []string) error {
 	if !p.set["json"] {
 		in.Limit = ctxTextLimit
 	}
-	// A task without a move inside the window is stale: one git walk over the last staleAfter only.
-	if m := <-movesC; m.err != nil {
-		a.warn("%s", firstLine(m.err.Error()))
-	} else {
-		for _, it := range idleTasks(tasks, m.moves, now) {
-			in.Stale = append(in.Stale, it.t.ID)
-		}
-	}
+	in.Stale = a.staleIDs(<-movesC, tasks, now)
 	b := brief.Build(in)
 	if b.Project == "" {
 		b.Project = "all"
@@ -158,6 +151,20 @@ type movesResult struct {
 	err   error
 }
 
+// staleIDs returns the ids of the stale tasks by the git walk m; a failed walk is a warning and no line.
+func (a *app) staleIDs(m movesResult, tasks []*task.Task, now time.Time) []string {
+	if m.err != nil {
+		a.warn("%s", firstLine(m.err.Error()))
+		return nil
+	}
+	var ids []string
+	for _, it := range idleTasks(tasks, m.moves, now) {
+		ids = append(ids, it.t.ID)
+	}
+	return ids
+}
+
+// movesOf runs the git walk of ctx: one window of staleAfter, not the whole history.
 func movesOf(s *core.Store, since time.Time) movesResult {
 	m, err := s.Moves(since)
 	return movesResult{moves: m, err: err}
