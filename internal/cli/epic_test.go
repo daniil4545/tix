@@ -108,3 +108,13 @@ func TestCLI_Epic_ShowManyFiles(t *testing.T) {
 	out := b.ok("", "show", task).out
 	ensure(t, strings.Contains(out, "Epic: "+first+"\nEpic: "+last+"\n"), "show: %q", out)
 }
+
+// A line ticked by hand around tix does not close the epic: the task status is the truth.
+func TestCLI_Epic_DoneRefusesHandTickOfOpenTask(t *testing.T) {
+	defer guard(t)
+	b, epic, c1, c2 := epicBox(t)
+	b.ok("", "done", c2)
+	b.edit(epic, "## Details\n- [x] "+c1+" one\n- [x] "+c2+"\n")
+	msg := b.rule("done", epic, "--force", "-m", "x")
+	ensure(t, strings.Contains(msg, c1+" (not closed)") && !strings.Contains(msg, c2), "refusal text: %q", msg)
+}
