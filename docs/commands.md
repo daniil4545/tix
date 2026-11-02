@@ -15,7 +15,7 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | `tix ctx [--project p] [--json]` | brief of the project: active, waiting, ready, next task; outside a project active and waiting, the rest as counts |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to ready |
 | `tix move T-12 <column or role> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `ready`, `waiting`, `closed` |
-| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `due`, `tags`, `ask`, `external`, `abstract`, `summary` |
+| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `ask`, `external`, `abstract`, `summary` |
 | `tix check T-12 1 2` | ticks criteria by number |
 | `tix done T-12 [-m text] [--force]` | closes a task, drops the claim and clears `ask`; a task whose body starts with `Epic: T-M` ticks its line in that epic |
 | `tix backup` | commits edits made outside `tix` and pushes `HEAD` to `origin` |
@@ -66,7 +66,7 @@ is grey when nobody does. A `*` appears only when a live agent waits for you:
 its `ask` field holds a question, yellow for a decision, blue for a review
 (`ask="review: ..."`), red for access such as a key or a login
 (`ask="access: ..."`). A card without a live claim has no star: the answer stays
-in the task for the next agent. A due date in the past is red, and each project
+in the task for the next agent. Each project
 label has its own muted color.
 
 | Keys | Action |
@@ -78,14 +78,14 @@ label has its own muted color.
 | `a` | answer the agent's question |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
 | `g` | go to the agent's session (macOS and Warp only) |
-| `o`, `p` | order by due date or rank, cycle the project filter |
+| `p` | cycle the project filter |
 | `J`, `K` | move the card down or up in its column |
 | `delete` | delete the task, asks `y/n` |
 | `?`, `q` | help, quit |
 
 In a card, `j` and `k` step through the history, `enter` unfolds an entry or
 toggles a criterion, `h` and `l` open the previous or next task of the column,
-`f` edits one field (title, due, tags, ask, waiting, summary, external) and
+`f` edits one field (title, tags, ask, waiting, summary, external) and
 `esc` goes back.
 
 The mouse does the same. Click a card to select it and double click to open
