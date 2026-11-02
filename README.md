@@ -97,7 +97,7 @@ project, how to work, and the tasks that need attention:
 
 ```text
 project shop   rules: ~/tasks/RULES.md
-- take: tix take; step: tix note
+- take: tix take; step: tix note; end: tix done
 open T-1 Add retry to the sync job | 0/1
 next T-1
 ```

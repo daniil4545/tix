@@ -17,8 +17,8 @@ import (
 // maxLine - the length of a task line in the text, in runes.
 const maxLine = 160
 
-// howto - the second line of ctx: the commands of the agent cycle.
-const howto = "- take: tix take; step: tix note"
+// howto - the second line of ctx: the three commands of the agent cycle.
+const howto = "- take: tix take; step: tix note; end: tix done"
 
 // ctxStatuses - the statuses a project ctx lists, in display order.
 var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}

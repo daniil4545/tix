@@ -83,7 +83,7 @@ func TestBuild_AllProjects_CountsOtherColumns(t *testing.T) {
 	in.Project = ""
 	b := brief.Build(in)
 	want := "project all   rules: /h/RULES.md\n" +
-		"- take: tix take; step: tix note\n" +
+		"- take: tix take; step: tix note; end: tix done\n" +
 		"idea        1 more\nopen        2 more\nin_progress T-3 active\nblocked     T-4 waiting\nclosed      1 more\nnext T-2"
 	if got := b.Text(); got != want {
 		t.Fatalf("all projects:\n%s\nwant:\n%s", got, want)
