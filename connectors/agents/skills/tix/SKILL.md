@@ -20,7 +20,7 @@ Remaining or new scope is a new task: `tix new`; a task with the same result get
 ## Rules
 
 - Run `tix` as a single command. No `;`, `&&`, `|`, `cd` (Codex sandbox).
-- Find a task with `tix list --grep TEXT` (title; closed tasks need `--all`), read it with `tix show T-12`; do not grep `~/tasks`.
+- Find a task with `tix list --grep TEXT` (title, Abstract and criteria; closed tasks need `--all`), read it with `tix show T-12`; do not grep `~/tasks`.
 - Outside a project (home session in `~/tasks`), an idea is `tix new "title"`: it goes to `idea`, project `personal`.
 - Errors name the fix; follow it. Do not edit files in `~/tasks` by hand.
 - Details: `~/tasks/RULES.md`.

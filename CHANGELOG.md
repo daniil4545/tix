@@ -6,6 +6,29 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-02
+
+### Upgrade from 0.7.0
+
+- An untouched `RULES.md` in the store is replaced by the new text on the first write; one you edited yourself stays.
+- Reinstall the agent skill (`scripts/connect.sh apply --force`) or add the `stale 14d+` line to your own copy: it tells the agent to offer the review and never close or delete by itself.
+- `tix ctx` now runs one `git log` over the last 14 days: about 17 ms on the 1000-task bench (target 25 ms, was 15) and longer on a store with thousands of recent commits.
+
+### Added
+
+- `tix ctx` prints `stale 14d+: N (T-1, ...)` (up to 10 ids, most idle first) for idea and open tasks without a move for 14 days; `--json` has `stale`. A move is a `new`, `note`, `comment`, `move`, `take`, `steal`, `done`, `edit` or `check` commit; `set`, `release`, external edits and mass commits of tix do not count.
+- `tix list --stale` keeps those tasks with `| idle Nd`; `--json` has `idle_days`.
+
+### Changed
+
+- `tix list --grep` matches the title, the `## Abstract` section and the criteria, ignoring case. Notes, comments and history are not searched.
+- CI runs `make ci-check` on Linux and macOS for every PR into `main` and every push to it; `main` is the only long branch.
+
+### Fixed
+
+- Closing an epic checks the task status behind a ticked line too: a line ticked by hand for an open or missing task refuses the close, `--force` included.
+- A move that renumbers ranks no longer drops the epic line edit when the epic is one of the renumbered neighbours.
+
 ## [0.7.0] - 2026-11-02
 
 ### Upgrade from 0.6.0
@@ -207,7 +230,9 @@ First public release.
   `apply` runs. The manifest is `~/tasks/.tix/connect-state.json`.
 - Release archives for macOS and Linux on amd64 and arm64, with `SHA256SUMS.txt`.
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/daniil4545/tix/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/daniil4545/tix/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/daniil4545/tix/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/daniil4545/tix/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/daniil4545/tix/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/daniil4545/tix/compare/v0.3.0...v0.4.0

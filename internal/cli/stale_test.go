@@ -2,6 +2,7 @@ package cli_test
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -47,6 +48,15 @@ func TestCLI_Stale_CtxAndList(t *testing.T) {
 		"list --stale: %q", out)
 	ensure(t, !strings.Contains(out, noted) && !strings.Contains(out, work), "list --stale extra: %q", out)
 	ensure(t, strings.Contains(b.ok("", "list", "--stale", "--json").out, `"idle_days":30`), "json idle_days")
+
+	// a file made by hand without created has no move and an unknown age: never stale
+	hand := filepath.Join(b.home, "T-99 hand.md")
+	if err := os.WriteFile(hand, []byte("---\nid: T-99\ntitle: Hand\nproject: personal\nstatus: idea\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	b.ok("", "note", noted, "commit the hand file")
+	ensure(t, strings.Contains(b.ok("", "list").out, "T-99 Hand"), "the hand file must be listed")
+	ensure(t, !strings.Contains(b.ok("", "list", "--stale").out, "T-99"), "unknown age is not stale")
 }
 
 // A fresh store has no stale line.
