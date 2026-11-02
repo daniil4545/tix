@@ -39,7 +39,7 @@ func caXY(t *testing.T, m *Model, sub string) (x, y int) {
 	return 0, 0
 }
 
-func (e *mvEnv) caTask(id string) (ask, tags, status string, comments []string) {
+func (e *mvEnv) caTask(id string) (tags, status string, comments []string) {
 	e.t.Helper()
 	tk, _, err := e.store.Get(id)
 	if err != nil {
@@ -48,69 +48,10 @@ func (e *mvEnv) caTask(id string) (ask, tags, status string, comments []string) 
 	for _, c := range tk.Comments {
 		comments = append(comments, c.Text)
 	}
-	return tk.Ask, strings.Join(tk.Tags, ","), tk.Status, comments
+	return strings.Join(tk.Tags, ","), tk.Status, comments
 }
 
 func caStatus(m *Model) string { s, _ := m.statusText(); return s }
-
-func TestAnswer_WritesCommentThenClearsAsk(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
-	e.set(id, "ask", "which db?")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	typeKeys(m, "a")
-	if m.input == nil || m.input.label != "answer:" {
-		t.Fatalf("after a the input line is %+v, expected answer:", m.input)
-	}
-	typeKeys(m, "postgres")
-	caEnter(m)
-	ask, _, _, comments := e.caTask(id)
-	if ask != "" || len(comments) != 1 || comments[0] != "Answer: postgres" {
-		t.Errorf("ask=%q comments=%q; expected an empty ask and one comment Answer: postgres", ask, comments)
-	}
-}
-
-func TestAnswer_AskChangedMeanwhile_QuestionStays(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
-	e.set(id, "ask", "which db?")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	typeKeys(m, "a")
-	typeKeys(m, "postgres")
-	e.set(id, "ask", "which version?") // the agent managed to ask a new question
-	caEnter(m)
-	ask, _, _, comments := e.caTask(id)
-	if ask != "which version?" {
-		t.Errorf("ask = %q, expected the new question untouched", ask)
-	}
-	if len(comments) != 1 {
-		t.Errorf("comments %d, expected the answer to the old question", len(comments))
-	}
-	if got := caStatus(m); got != id+": new question" {
-		t.Errorf("status %q, expected %q", got, id+": new question")
-	}
-}
-
-func TestAnswer_NoQuestionOrEmpty_NothingWritten(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "todo")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	typeKeys(m, "a")
-	if got := caStatus(m); got != id+": no question" || m.input != nil {
-		t.Errorf("without a question: status %q, input %v", got, m.input)
-	}
-	e.set(id, "ask", "q?")
-	before := e.commits()
-	caReload(m)
-	typeKeys(m, "a")
-	caEnter(m) // empty - cancel
-	if e.commits() != before {
-		t.Error("an empty answer left a commit")
-	}
-}
 
 func caOpenCard(m *Model) {
 	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
@@ -128,7 +69,7 @@ func TestField_SetClearUnchanged(t *testing.T) {
 
 	typeKeys(m, "fga,b")
 	caEnter(m)
-	if _, tags, _, _ := e.caTask(id); tags != "a,b" {
+	if tags, _, _ := e.caTask(id); tags != "a,b" {
 		t.Fatalf("tags = %q, expected a,b", tags)
 	}
 
@@ -143,7 +84,7 @@ func TestField_SetClearUnchanged(t *testing.T) {
 	typeKeys(m, "fg")
 	feed(m, tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl})
 	caEnter(m)
-	if _, tags, _, _ := e.caTask(id); tags != "" {
+	if tags, _, _ := e.caTask(id); tags != "" {
 		t.Errorf("an empty value did not clear the tags: %q", tags)
 	}
 }
@@ -161,27 +102,19 @@ func TestField_SummaryWithSeveralLines_RefusesToEditInline(t *testing.T) {
 	}
 }
 
-func TestCardClick_AskRowFieldsRowAndButtons(t *testing.T) {
+func TestCardClick_FieldsRowAndButtons(t *testing.T) {
 	e := mvNewEnv(t, "")
 	id := e.create("job", "todo")
-	e.set(id, "ask", "which db?")
 	m := newMouseModel(t, e, 120, 30)
 	m.selectTask(id)
 	caOpenCard(m)
-
-	x, y := caXY(t, m, "* needs you:")
-	leftClick(m, x, y)
-	if m.input == nil || m.input.label != "answer:" {
-		t.Fatalf("click on the ask: input %+v", m.input)
-	}
-	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
 	leftClick(m, 0, 1) // fields line: right under the header
 	if m.input == nil || m.input.pick == nil {
 		t.Fatalf("click on the fields line: input %+v", m.input)
 	}
 	// A click on a choice pair equals its key.
-	x, y = caXY(t, m, "g tags")
+	x, y := caXY(t, m, "g tags")
 	leftClick(m, x, y)
 	if m.input == nil || m.input.label != "tags:" {
 		t.Fatalf("click on g tags: input %+v", m.input)
@@ -195,7 +128,7 @@ func TestCardClick_AskRowFieldsRowAndButtons(t *testing.T) {
 	}
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEscape})
 
-	x, y = caXY(t, m, "set ask")
+	x, y = caXY(t, m, "history")
 	leftClick(m, x, y) // card body without a button
 	if m.input != nil {
 		t.Errorf("click on an empty place opened the input line %+v", m.input)
@@ -262,6 +195,27 @@ func TestFocus_G_OpensOnlyValidURLOfLiveClaim(t *testing.T) {
 }
 
 // caReload rereads the store, as the file watcher does.
+// A core refusal of a field edit reaches the status line and the file stays as it was.
+func TestField_CoreRefusal_ShownInStatus(t *testing.T) {
+	e := mvNewEnv(t, "")
+	id := e.create("job", "todo")
+	m := newMouseModel(t, e, 120, 30)
+	m.selectTask(id)
+	caOpenCard(m)
+
+	typeKeys(m, "ft") // the title line is prefilled with "job"
+	for range "job" {
+		feed(m, tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	caEnter(m)
+	if got, want := caStatus(m), id+": title is empty"; got != want {
+		t.Errorf("status %q, expected %q", got, want)
+	}
+	if tk, _, err := e.store.Get(id); err != nil || tk.Title != "job" {
+		t.Errorf("title %q, err %v: the refused edit changed the task", tk.Title, err)
+	}
+}
+
 func caReload(m *Model) {
 	tasks, errs := m.d.Store.List()
 	m.apply(tasks, len(errs))

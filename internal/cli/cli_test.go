@@ -453,7 +453,7 @@ func TestCLI_UnknownCommand_SuggestsClosest(t *testing.T) {
 		{"two typos", "shwo", "did you mean show?"},
 		{"tie takes first in usage order", "sew", "did you mean set?"},
 		{"no close command", "banana",
-			"tix ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+			"tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm; " +
 				"flags: -v, --as, --json; text starting with a dash goes after --"},
 	}
 	for _, c := range cases {

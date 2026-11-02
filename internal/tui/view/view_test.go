@@ -89,22 +89,6 @@ func TestRenderBoard_WideScreen_ShowsColumnsAndRowParts(t *testing.T) {
 	}
 }
 
-func TestRenderBoard_StarOnlyOnRowThatNeedsYou(t *testing.T) {
-	b := view.Board{W: 120, H: 30, Total: 2, Cols: []view.Col{{Name: "todo", Rows: []view.Row{
-		{ID: "T-1", Project: "p", Title: "Quiet", Live: true},
-		{ID: "T-2", Project: "p", Title: "Needs you", Ask: "pick", Live: true},
-	}}}}
-	for _, ln := range strings.Split(plain(view.RenderBoard(b)), "\n") {
-		hasStar := strings.Contains(ln, "*")
-		if strings.Contains(ln, "T-2") && !hasStar {
-			t.Errorf("line T-2 without a star: %q", ln)
-		}
-		if strings.Contains(ln, "T-1") && hasStar {
-			t.Errorf("line T-1 with a star: %q", ln)
-		}
-	}
-}
-
 func TestRenderBoard_SelectedColumnStaysVisibleWhenWindowIsNarrow(t *testing.T) {
 	// Columns of 24 characters: two fit in 60 characters, the window follows the cursor.
 	b := bigBoard(3)
@@ -176,17 +160,6 @@ func TestRenderCard_ShowsEverySectionAndHistory(t *testing.T) {
 	}
 }
 
-func TestRenderCard_AskShownOnlyWhenSet(t *testing.T) {
-	c := card()
-	if out := plain(view.RenderCard(c)); strings.Contains(out, "needs you") {
-		t.Errorf("empty ask shown:\n%s", out)
-	}
-	c.Ask = "pick A or B"
-	if out := plain(view.RenderCard(c)); !strings.Contains(out, "* needs you: pick A or B") {
-		t.Errorf("ask not shown as the line `* needs you: <ask>`:\n%s", out)
-	}
-}
-
 func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 	long := strings.Repeat("длинная строка без переносов 日本語 ", 12)
 	for _, sz := range []struct{ w, h int }{{120, 50}, {80, 24}, {60, 16}} {
@@ -194,7 +167,7 @@ func TestRenderCard_AnySize_FitsScreen(t *testing.T) {
 			c := card()
 			c.W, c.H = sz.w, sz.h
 			c.Title, c.Abstract, c.Summary, c.Details, c.Fields = long, long, long, long+"\n"+long, long
-			c.Ask, c.Status = long, long
+			c.Status = long
 			c.History = nil
 			for i := 0; i < n; i++ {
 				c.History = append(c.History, history.Entry{Actor: "claude", Op: "comment", Text: long})
@@ -314,7 +287,7 @@ func TestGolden_BoardAndCard(t *testing.T) {
 		{Name: "idea"},
 		{Name: "todo", Rows: []view.Row{
 			{ID: "T-7", Project: "alpha", Title: "Fix login", Summary: "see notes", Meta: "1/3 28.10"},
-			{ID: "T-9", Project: "alpha", Title: "Write docs", Ask: "which db?", Live: true},
+			{ID: "T-9", Project: "alpha", Title: "Write docs", Summary: "which db?", Live: true},
 		}},
 		{Name: "doing", Rows: []view.Row{{ID: "T-12", Project: "beta", Title: "Report on calls", Meta: "@claude"}}},
 		{Name: "blocked", Rows: []view.Row{{ID: "T-15", Project: "beta", Title: "GPU access", Summary: "waiting for: invoice"}}},

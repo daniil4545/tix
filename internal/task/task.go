@@ -31,7 +31,6 @@ type Task struct {
 	External string    `json:"external"`
 	Waiting  string    `json:"waiting"`
 	Claim    string    `json:"claim"`
-	Ask      string    `json:"ask"`
 	Rank     float64   `json:"rank"`
 	Created  time.Time `json:"created"`
 	Tags     []string  `json:"tags"`
@@ -82,7 +81,7 @@ var (
 
 	// frontmatter key order of a new task
 	fieldOrder = []string{"id", "title", "project", "status", "rank", "created",
-		"external", "waiting", "claim", "tags", "ask"}
+		"external", "waiting", "claim", "tags"}
 	requiredFields = map[string]bool{"id": true, "title": true, "project": true,
 		"status": true, "rank": true, "created": true}
 )
@@ -209,7 +208,7 @@ func (t *Task) parseFields(path, fm string) error {
 // setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
-	case "id", "title", "project", "status", "external", "waiting", "claim", "ask":
+	case "id", "title", "project", "status", "external", "waiting", "claim":
 		if val.Kind != yaml.ScalarNode {
 			return errors.New("string required")
 		}
@@ -256,10 +255,8 @@ func (t *Task) stringField(key string) *string {
 		return &t.External
 	case "waiting":
 		return &t.Waiting
-	case "claim":
-		return &t.Claim
 	default:
-		return &t.Ask
+		return &t.Claim
 	}
 }
 

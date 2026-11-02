@@ -34,10 +34,6 @@ func (m *Model) startFocus() tea.Cmd {
 		return nil
 	}
 	url := m.focusURL(t)
-	if url == "" && strings.TrimSpace(t.Ask) != "" && !m.liveClaim(t) {
-		m.setStatus(t.ID+": session ended; the answer stays in the task", false)
-		return nil
-	}
 	if url == "" {
 		m.setStatus(t.ID+": no session to open", false)
 		return nil

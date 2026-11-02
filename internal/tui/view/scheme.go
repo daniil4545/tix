@@ -9,25 +9,20 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// The board color scheme. Change the scheme here: card states, signs, colors
+// The board color scheme. Change the scheme here: card states, colors
 // and the project palette. The board code only looks these values up.
 
-// cardState - what a card tells the human: an agent works, the agent waits for you, or nobody is on it.
+// cardState - what a card tells the human: an agent works or nobody is on it.
 type cardState int
 
 const (
 	stateIdle    cardState = iota // no live claim: the whole card is grey
-	stateWorking                  // live claim, no ask
-	stateWaiting                  // live claim and an ask
+	stateWorking                  // live claim
 )
 
-// cardLook - how a state is drawn. Head is the ID line, Title the title, Rest the meta, note and summary
-// lines. Sign is printed at the end of the ID line ("" - none). KindColor: the sign and the ask text
-// take the color of the ask kind.
+// cardLook - how a state is drawn. Head is the ID line, Title the title, Rest the meta, note and summary lines.
 type cardLook struct {
 	Head, Title, Rest lipgloss.Style
-	Sign              string
-	KindColor         bool
 }
 
 var (
@@ -36,11 +31,7 @@ var (
 	scheme = [...]cardLook{
 		stateIdle:    {Head: dimStyle, Title: dimStyle, Rest: dimStyle},
 		stateWorking: {Head: lipgloss.NewStyle(), Title: greenStyle, Rest: dimStyle},
-		stateWaiting: {Head: lipgloss.NewStyle(), Title: greenStyle, Rest: dimStyle, Sign: "*", KindColor: true},
 	}
-
-	// askKindColors - the sign color by ask kind: blue and red are the terminal ANSI colors.
-	askKindColors = map[string]string{"decide": "#E9CF6A", "review": "4", "access": "1"}
 
 	// projectPalette - muted colors of the project label; the name picks one by hash.
 	projectPalette = [6]lipgloss.Style{
@@ -51,34 +42,14 @@ var (
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#FF9CAC")),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("#C3A57A")),
 	}
-
-	// selKindBase - the selected line behind a colored sign.
-	selKindBase = lipgloss.NewStyle().Background(lipgloss.Color("#7FD1C3"))
 )
 
-// stateOf picks the state of a card: a live claim, then an ask.
+// stateOf picks the state of a card: a live claim.
 func stateOf(row Row) cardState {
-	switch {
-	case !row.Live:
+	if !row.Live {
 		return stateIdle
-	case strings.TrimSpace(row.Ask) != "":
-		return stateWaiting
 	}
 	return stateWorking
-}
-
-// kindStyle - the style of an ask kind; an unknown kind is decide.
-func kindStyle(kind string) lipgloss.Style {
-	color, ok := askKindColors[kind]
-	if !ok {
-		color = askKindColors["decide"]
-	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(color))
-}
-
-// selKindStyle - kindStyle on the selected line.
-func selKindStyle(kind string) lipgloss.Style {
-	return selKindBase.Foreground(kindStyle(kind).GetForeground())
 }
 
 // ProjectColors gives each project a palette slot: the FNV-1a slot of the lower-cased name, the next

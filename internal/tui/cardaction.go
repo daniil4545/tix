@@ -24,55 +24,9 @@ type fieldSpec struct {
 var cardFields = []fieldSpec{
 	{"t", "title", "title", func(t *task.Task) string { return t.Title }},
 	{"g", "tags", "tags", func(t *task.Task) string { return strings.Join(t.Tags, ",") }},
-	{"a", "ask", "ask", func(t *task.Task) string { return t.Ask }},
 	{"w", "waiting", "waiting", func(t *task.Task) string { return t.Waiting }},
 	{"s", "summary", "summary", func(t *task.Task) string { return section(t.Body, "Summary") }},
 	{"x", "external", "external", func(t *task.Task) string { return t.External }},
-}
-
-// startAnswer answers an agent ask (the ask field): comment `Answer: <text>`, then ask
-// is cleared if the agent did not manage to ask a new question.
-func (m *Model) startAnswer() tea.Cmd {
-	t := m.current()
-	if t == nil {
-		return nil
-	}
-	ask := strings.TrimSpace(t.Ask)
-	if ask == "" {
-		m.setStatus(t.ID+": no question", false)
-		return nil
-	}
-	id := t.ID
-	m.ask("answer:", func(text string) tea.Cmd {
-		return m.submit(id, "answered", nil, func() (core.Result, error) {
-			return m.answer(id, ask, text)
-		})
-	})
-	return nil
-}
-
-// answer - one task of the queue: Comment, then Set ask="" only for the same question.
-// Called from the write goroutine.
-func (m *Model) answer(id, ask, text string) (core.Result, error) {
-	res, err := m.d.Store.Comment(id, "Answer: "+text, m.d.Actor)
-	if err != nil {
-		return res, err
-	}
-	cur, _, err := m.d.Store.Get(id)
-	if err != nil {
-		res.Warning = "answer saved, ask not cleared: " + errText(err)
-		return res, nil
-	}
-	if strings.TrimSpace(cur.Ask) != ask {
-		return core.Result{Warning: "new question"}, nil
-	}
-	res, err = m.d.Store.Set(id, []core.Field{{Name: "ask", Value: ""}}, m.d.Actor)
-	if err != nil {
-		res.Warning = "answer saved, ask not cleared: " + errText(err)
-		return res, nil
-	}
-	res.Info = "answered"
-	return res, nil
 }
 
 // startField opens the field choice by one key; then a line with the field value.
@@ -116,13 +70,10 @@ func (m *Model) editField(id string, f fieldSpec) tea.Cmd {
 }
 
 // cardClick handles a click on the open card: a line selects (a criterion, a history entry), the box
-// of a criterion toggles it, the ask line, the fields line and the buttons of the actions line run.
+// of a criterion toggles it, the fields line and the buttons of the actions line run.
 func (m *Model) cardClick(x, y int) tea.Cmd {
 	hit := view.HitCard(m.cardView(), x, y)
 	switch hit.Kind {
-	case view.CardAsk:
-		m.setStatus("", false)
-		return m.startAnswer()
 	case view.CardBox:
 		m.setStatus("", false)
 		m.selectCardLine(hit.Index)
@@ -221,8 +172,6 @@ func (m *Model) toggleCriterion(idx int) tea.Cmd {
 // cardButton - a press of an actions-line button: same as the key.
 func (m *Model) cardButton(k string) tea.Cmd {
 	switch k {
-	case "a":
-		return m.startAnswer()
 	case "f":
 		return m.startField()
 	case "g":

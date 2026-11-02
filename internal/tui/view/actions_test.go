@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	boardHintFull = "arrows select  space grab  enter open  n new  a answer  e edit  c comment  p project  ? help  q quit"
-	cardRowFull   = "e edit  c comment  a answer  f field  g session  del delete  j k history  esc back"
+	boardHintFull = "arrows select  space grab  enter open  n new  e edit  c comment  p project  ? help  q quit"
+	cardRowFull   = "e edit  c comment  f field  g session  del delete  j k history  esc back"
 )
 
 func lastNonEmpty(lines []string) (int, string) {
@@ -107,23 +107,5 @@ func TestRenderCard_ActionRowNarrowCutNotWrapped(t *testing.T) {
 		if strings.Contains(plain(out), "m M move") {
 			t.Errorf("width %d: the hint m M move stayed", w)
 		}
-	}
-}
-
-// The card ask line is still "* needs you: <ask>" and stays above the body.
-func TestRenderCard_AskLineStaysAboveBody(t *testing.T) {
-	c := view.Card{ID: "T-1", Title: "Alpha", Column: "doing", W: 120, H: 24, Ask: "pick A or B", Summary: "sum"}
-	ls := strings.Split(plain(view.RenderCard(c)), "\n")
-	ask, body := -1, -1
-	for i, ln := range ls {
-		switch {
-		case strings.Contains(ln, "* needs you: pick A or B"):
-			ask = i
-		case strings.Contains(ln, "summary"):
-			body = i
-		}
-	}
-	if ask < 0 || body < 0 || ask > body {
-		t.Errorf("ask line at %d, body at %d:\n%s", ask, body, strings.Join(ls, "\n"))
 	}
 }

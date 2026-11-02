@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -24,7 +23,6 @@ const (
 	ctxTextLimit   = 2000
 	rulesFile      = "RULES.md"
 	closedRole     = "closed"
-	backupFallback = "origin"
 	hookStdinLimit = 64 << 10
 )
 
@@ -446,31 +444,4 @@ func (a *app) tickEpic(epicID, id, who string) (core.Result, bool, error) {
 	}
 	res, err := a.store.CheckAt(epicID, nums, who, rev)
 	return res, ready && err == nil, err
-}
-
-func (a *app) cmdBackup(ctx context.Context, args []string) error {
-	p, err := parseArgs(args, withCommon(nil))
-	if err != nil {
-		return err
-	}
-	if len(p.pos) > 0 {
-		return inputf("backup takes no arguments, extra: %s", p.pos[0])
-	}
-	if err := a.open(); err != nil {
-		return err
-	}
-	res, err := a.store.Backup(ctx)
-	if err != nil {
-		return err
-	}
-	remote := strings.TrimPrefix(what(res, backupFallback), "backup ")
-	line := "ok backup " + remote
-	if p.set["v"] && res.Commit != "" {
-		line += " " + res.Commit
-	}
-	a.out("%s", line)
-	if res.Warning != "" {
-		a.warn("backup: commit not recorded")
-	}
-	return nil
 }

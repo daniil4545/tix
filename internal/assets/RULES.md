@@ -18,7 +18,6 @@ When a session ends without closing, write the comment `Done / Decided / Waiting
 The human reads the task instead of your session. Keep it short and current.
 
 - Write a note on a decision (what you chose and why), a question, a finding and a stage change: spec, code, review, done. Not on every command.
-- Whoever answers a question in `ask`, you or the human, record it: `tix comment T-12 "Answer: ..."`, then `tix set T-12 ask=`. An orchestrator that answers for the human writes the same comment.
 - New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent is information.
 - A task should fit one session. It grew past that: create tasks for the rest, then `tix done T-12 --force -m "rest in T-15, T-16"`.
 
@@ -53,7 +52,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - A long text (a report, a review, a log) goes into a file; the task gets its path in a comment.
 - You may create tasks, move them from inbox to ready, close and delete them, and edit `config.toml`.
 - An idea outside a project goes to the inbox column with project `personal`.
-- A task needs the user? Keep holding it and put the question in `ask`: `tix set T-12 ask="what you need"`. The board marks it. Start `ask` with `review:` (look at it) or `access:` (you need a key or a login); no prefix means a decision. The star is yellow, blue or red by kind; it shows only while your session holds the task.
+- A task needs the user? Move it to the waiting role with the reason: `tix move T-12 blocked -m "what you need"`, and write the details in a note. The board marks it with a star. The human answers with a comment and moves it back.
 
 ## Ticket template
 

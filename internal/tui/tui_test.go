@@ -21,14 +21,11 @@ func TestBoard_NavigateOpenCardEscKeepsSelection(t *testing.T) {
 	if _, err := e.store.Comment("T-2", "hello from agent", "agent"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.store.Set("T-2", []core.Field{{Name: "ask", Value: "pick A or B"}}, "agent"); err != nil {
-		t.Fatal(err)
-	}
 	e.start("", 140, 40)
 	e.screenHas("idea", "todo", "doing", "blocked", "done", "Alpha", "Bravo", "Gamma")
 
 	e.key("j", "enter")
-	e.screenHas("Bravo", "hello from agent", "* needs you: pick A or B")
+	e.screenHas("Bravo", "hello from agent")
 	if s := e.text(); strings.Contains(s, "Alpha") || strings.Contains(s, "Gamma") {
 		t.Errorf("card shows other tasks:\n%s", s)
 	}

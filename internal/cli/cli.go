@@ -31,7 +31,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tix ctx|inbox|take|move|set|check|done|backup|new|list|show|edit|comment|note|rm; " +
+	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -167,8 +167,6 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdCheck(args)
 	case "done":
 		return a.cmdDone(args)
-	case "backup":
-		return a.cmdBackup(ctx, args)
 	case "version":
 		a.out("%s", a.env.Version)
 		return nil
@@ -181,7 +179,7 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 
 // usageCmds - the commands of the usage line in usage order.
 var usageCmds = []string{
-	"ctx", "inbox", "take", "move", "set", "check", "done", "backup",
+	"ctx", "inbox", "take", "move", "set", "check", "done",
 	"new", "list", "show", "edit", "comment", "note", "rm",
 }
 
@@ -236,10 +234,9 @@ var commandHelp = map[string]string{
 	"rm":      "rm <id>",
 	"take":    "take <id> [--steal|--release]",
 	"move":    "move <id> <column|role> [--first|--after T-9] [-m text] [--force]",
-	"set":     "set <id> field=value...; fields: title project waiting tags ask external abstract summary",
+	"set":     "set <id> field=value...; fields: title project waiting tags external abstract summary",
 	"check":   "check <id> N...",
 	"done":    "done <id> [-m result] [--force]",
-	"backup":  "backup",
 }
 
 // wantsHelp reports -h or --help among the flags; text after "--" does not count.

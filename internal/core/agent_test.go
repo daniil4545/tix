@@ -1,12 +1,10 @@
 package core_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -370,26 +368,19 @@ func TestTake_Release_ExpiredForeignClaimToHeadOfReady(t *testing.T) {
 	}
 }
 
-// Closing clears ask: a closed task does not keep the yellow star.
-func TestMove_Close_ClearsAsk(t *testing.T) {
+// The ask field is gone: Set refuses it like any unknown field and writes nothing.
+func TestSet_Ask_UnknownField(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
 	s := e.openAt(newClock())
 	id := mkIn(t, s, "A", "doing")
-	if _, err := s.Set(id, []core.Field{{Name: "ask", Value: "which port?"}}, "claude:a"); err != nil {
-		t.Fatal(err)
+	n := e.count()
+	_, err := s.Set(id, []core.Field{{Name: "ask", Value: "which port?"}}, "claude:a")
+	if !errors.Is(err, core.ErrRule) || !strings.Contains(err.Error(), "allowed: title project waiting tags external") {
+		t.Errorf("Set ask = %v, want a rule refusal listing the allowed fields", err)
 	}
-	if _, err := s.Move(id, "blocked", core.MoveOpts{Message: "need key"}, "claude:a"); err != nil {
-		t.Fatal(err)
-	}
-	if tk := get(t, s, id); tk.Ask != "which port?" {
-		t.Errorf("ask after a move to blocked %q, want it kept", tk.Ask)
-	}
-	if _, err := s.Move(id, "done", core.MoveOpts{Message: "shipped"}, "claude:a"); err != nil {
-		t.Fatal(err)
-	}
-	if tk := get(t, s, id); tk.Ask != "" {
-		t.Errorf("ask after done %q, want empty", tk.Ask)
+	if e.count() != n {
+		t.Error("a refused Set wrote a commit")
 	}
 }
 
@@ -744,102 +735,6 @@ func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	}
 	if e.count() != n || e.text(id) != before {
 		t.Error("a Check refusal changed the history or the file")
-	}
-}
-
-// Backup: bare, an edit around the core, a broken path, no origin, no store.
-func newBareDir(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	if out, err := exec.CommandContext(context.Background(), gitBin, "init", "--bare", "-q", dir).CombinedOutput(); err != nil {
-		t.Fatalf("init --bare: %v\n%s", err, out)
-	}
-	return dir
-}
-
-func (e *env) bareMatchesLocal(bare string) (local, remote string) {
-	e.t.Helper()
-	local = strings.TrimSpace(e.git("rev-parse", "HEAD"))
-	br := strings.TrimSpace(e.git("symbolic-ref", "--short", "HEAD"))
-	out, _ := exec.CommandContext(context.Background(), gitBin, "-C", bare, "rev-parse", "refs/heads/"+br).CombinedOutput()
-	return local, strings.TrimSpace(string(out))
-}
-
-func TestBackup_PushesHeadAfterCommittingOutsideEdit(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkIn(t, s, "Work", "todo")
-	bare := newBareDir(t)
-	e.git("remote", "add", "origin", bare)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if _, err := s.Backup(ctx); err != nil {
-		t.Fatalf("Backup: %v", err)
-	}
-	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Fatalf("HEAD bare %q != local %q", remote, local)
-	}
-
-	// An edit around the core: Backup commits it and pushes.
-	f := e.file(id)
-	d, _ := os.ReadFile(f)
-	if err := os.WriteFile(f, append(d, []byte("edited in Obsidian\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Backup(ctx); err != nil {
-		t.Fatalf("Backup with an external edit: %v", err)
-	}
-	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("after Backup the tree is not clean:\n%s", st)
-	}
-	if local, remote := e.bareMatchesLocal(bare); local != remote {
-		t.Errorf("HEAD bare %q != local %q after an external edit", remote, local)
-	}
-}
-
-func TestBackup_NoOriginBadPathBadCredentials_ErrorsOneKind(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkIn(t, s, "Work", "todo")
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-	if _, err := s.Backup(ctx); !errors.Is(err, core.ErrNoRemote) || !strings.Contains(err.Error(), "git remote add origin") {
-		t.Errorf("Backup without origin = %v, want ErrNoRemote with the hint `git remote add origin <url>`", err)
-	}
-
-	// A broken path: an error, but the edit around the core is still committed (the lock is released before push).
-	e.git("remote", "add", "origin", filepath.Join(e.root, "no", "such.git"))
-	f := e.file(id)
-	d, _ := os.ReadFile(f)
-	if err := os.WriteFile(f, append(d, []byte("outside\n")...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.Backup(ctx); err == nil || errors.Is(err, core.ErrNoRemote) {
-		t.Errorf("Backup to a broken path = %v, want a push error", err)
-	}
-	if st := strings.TrimSpace(e.git("status", "--porcelain")); st != "" {
-		t.Errorf("on a push failure the edit is not committed:\n%s", st)
-	}
-
-	// user:pass@ in the error text is cut out.
-	e.git("remote", "set-url", "origin", "http://user:s3cretpw@127.0.0.1:1/r.git")
-	_, err := s.Backup(ctx)
-	if err == nil {
-		t.Fatal("Backup to an unreachable address passed")
-	}
-	if strings.Contains(err.Error(), "s3cretpw") {
-		t.Errorf("remote password in the error text: %v", err)
-	}
-}
-
-func TestBackup_NoBase_Error(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	if _, err := s.Backup(context.Background()); err == nil {
-		t.Error("Backup without a store passed")
 	}
 }
 

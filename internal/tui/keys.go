@@ -67,8 +67,6 @@ func (m *Model) boardKey(k string) tea.Cmd {
 		m.startGrab()
 	case "n":
 		return m.startNew(m.board.Col)
-	case "a":
-		return m.startAnswer()
 	case "g":
 		return m.startFocus()
 	case "delete", "backspace":
@@ -97,8 +95,6 @@ func (m *Model) cardKey(k string) tea.Cmd {
 		return m.siblingCard(-1)
 	case "right", "l":
 		return m.siblingCard(1)
-	case "a":
-		return m.startAnswer()
 	case "f":
 		return m.startField()
 	case "g":
