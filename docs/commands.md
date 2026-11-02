@@ -6,16 +6,16 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | Command | What it does |
 |---|---|
 | `tix new "title" [--to status] [--project p] [--body-file f]` | creates a task, by default in `idea`, with the body of file `f` (`-` is stdin); `--to open` needs criteria in the body, `--to blocked` and `--to closed` are refused |
-| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones, `--grep` matches title and summary; alias `ls` |
+| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones, `--grep` matches the title; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
-| `tix note T-12 "text"` | logs a step in the history |
+| `tix note T-12 "text"` | logs a step in the history; up to 300 characters, longer is refused with code 5: put the text in a file and the path in the note; the board shows the latest note |
 | `tix rm T-12` | deletes a task |
 | `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, next task; outside a project in_progress and blocked, the rest as counts |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open |
 | `tix move T-12 <status> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `open`, `blocked`, `closed`; `-m` is for `blocked` and `closed` |
-| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `summary` |
+| `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract` |
 | `tix check T-12 1 2` | ticks criteria by number; a task line (`- [ ] T-N ...`) of an epic is refused, it follows the status of T-N |
 | `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; its line in every epic (tag `epic`) is ticked in the same commit, a move out of closed clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force` |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
@@ -81,7 +81,7 @@ label has its own muted color.
 
 In a card, `j` and `k` step through the history, `enter` unfolds an entry or
 toggles a criterion, `h` and `l` open the previous or next task of the column,
-`f` edits one field (title, tags, waiting, summary, external) and
+`f` edits one field (title, tags, waiting, external) and
 `esc` goes back.
 
 The mouse does the same. Click a card to select it and double click to open
