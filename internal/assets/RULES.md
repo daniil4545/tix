@@ -40,7 +40,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Into closed: all criteria checked. Otherwise `--force -m "reason"`. A task with no criteria needs `-m "result"`.
 - `tix new "title" --to open --body-file body.md` creates a task with its criteria in one call (`--body-file -` reads stdin; without the flag stdin is not read). Without criteria `--to open` is refused; `--to` blocked or closed is refused: create the task, then `tix move` or `tix done`.
 - Restore: `~/tasks` is a git repository, `git -C ~/tasks log -- T-12.md` finds the commit to revert.
-- `tix list` hides closed tasks; `--all` or `--status closed` shows them, `--grep TEXT` matches the title.
+- `tix list` hides closed tasks; `--all` or `--status closed` shows them. `--grep TEXT` matches the title, Abstract and criteria, ignoring case; notes, comments and history are excluded.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
 - `set` takes: title, project, waiting, tags, external, abstract.
 - Repeating a command that changes nothing answers `ok` and writes no commit.

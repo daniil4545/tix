@@ -263,7 +263,8 @@ func TestCLI_ListClosedAliasGrep(t *testing.T) {
 		{"all", []string{"--all"}, "idea T-1 Alpha\nidea T-2 Beta\nclosed T-3 Closed Alpha\n"},
 		{"title case", []string{"--grep", "ALPHA"}, "idea T-1 Alpha\n"},
 		{"literal", []string{"--grep", "A.*"}, "no tasks\n"},
-		{"excluded sections", []string{"--grep", "hidden"}, "no tasks\n"},
+		{"abstract", []string{"--grep", "HIDDEN PHRASE"}, "idea T-1 Alpha\n"},
+		{"excluded comments", []string{"--grep", "hidden comment"}, "no tasks\n"},
 		{"project", []string{"--grep", "beta", "--project", "other"}, "idea T-2 Beta\n"},
 		{"closed by status", []string{"--status", "closed"}, "closed T-3 Closed Alpha\n"},
 		{"closed explicit", []string{"--all", "--status", "closed", "--grep", "alpha"}, "closed T-3 Closed Alpha\n"},
@@ -291,6 +292,53 @@ func TestCLI_ListClosedAliasGrep(t *testing.T) {
 		if got := b.ok("", cmd, "--help").out; !strings.Contains(got, "--all") || !strings.Contains(got, "--grep TEXT") {
 			t.Errorf("%s help: %q", cmd, got)
 		}
+	}
+}
+
+func TestCLI_ListGrepBody(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Searchable")
+	b.edit("T-1", "## Abstract\r\n\r\nСуть задачи\r\nSecond line\r\n\r\n"+
+		"## Details\r\nIgnored prose\r\n- [ ] Pending criterion\r\n* [X] Finished criterion\r\n"+
+		"```\r\n- [ ] Fenced example\r\n```\r\n## History\r\n- [ ] Historical criterion\r\n")
+	b.ok("", "note", "T-1", "Private note", "--as", "test:list")
+	b.ok("", "comment", "T-1", "Private comment")
+	b.ok("", "new", "Archived")
+	b.ok("", "set", "T-2", "abstract=Archived description")
+	b.ok("", "done", "T-2", "-m", "done", "--as", "test:list")
+	cases := []struct {
+		query string
+		want  string
+	}{
+		{"СУТЬ ЗАДАЧИ", "idea T-1 Searchable\n"},
+		{"SECOND LINE", "idea T-1 Searchable\n"},
+		{"PENDING CRITERION", "idea T-1 Searchable\n"},
+		{"FINISHED CRITERION", "idea T-1 Searchable\n"},
+		{"ignored prose", "no tasks\n"},
+		{"fenced example", "no tasks\n"},
+		{"historical criterion", "no tasks\n"},
+		{"private note", "no tasks\n"},
+		{"private comment", "no tasks\n"},
+		{"archived description", "no tasks\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.query, func(t *testing.T) {
+			for _, cmd := range []string{"list", "ls"} {
+				if got := b.ok("", cmd, "--grep", tc.query).out; got != tc.want {
+					t.Errorf("%s --grep %q: %q, want %q", cmd, tc.query, got, tc.want)
+				}
+			}
+		})
+	}
+	if got := b.ok("", "list", "--all", "--grep", "ARCHIVED DESCRIPTION").out; got != "closed T-2 Archived\n" {
+		t.Errorf("closed abstract: %q", got)
+	}
+	var items []struct{ ID string }
+	if err := json.Unmarshal([]byte(b.ok("", "list", "--json", "--grep", "pending criterion").out), &items); err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ID != "T-1" {
+		t.Errorf("criteria JSON: %+v", items)
 	}
 }
 
