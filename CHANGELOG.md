@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-02
+
+### Upgrade from 0.6.0
+
+- The first run migrates the store (statuses and `config.toml`) in one commit; `git -C ~/tasks revert <commit>` undoes it together with the old binary.
+- Reinstall the agent skill: `scripts/connect.sh apply --force`. The old skill suggests `set summary=`, `set ask=` and `--to ready`, which now fail with codes 5 and 6.
+- A `RULES.md` you edited yourself is not replaced; update it by hand.
+- A task in a column without a role keeps its old status and shows in the `?` column; `tix ctx` does not list it. Move it to one of the five statuses.
+- `--json` no longer has the `due`, `ask`, `summary` and `columns` keys.
+- An agent no longer receives a comment on a `blocked` task: blocking releases the hold. The next `take` reads the answer with `tix show`.
+
 ### Changed
 
 - The board card shows the latest note with its age in any column. A note is limited to 300 characters; a longer one is refused with code 5.
