@@ -57,8 +57,8 @@ Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 | Subagent header | `~/.claude/templates/subagent-brief.md` |
 | Findings file | `docs/findings.jsonl` |
 
-- Branches (user decision 2026-10-26): `dev` is the working branch. A task goes in the branch `z<N>-<name>` from `origin/dev`, its PR goes into `dev` (`gh pr create --base dev`), and the agent merges it after review without waiting for CI. One small PR at a time. `main` takes only release PRs from `dev`, on the user's command.
-- Hosting and CI: `origin` is the public repository `daniil4545/tix` (D68); CI runs there: Linux only for `dev`, Linux and macOS for `main`, where both checks are required. Agents of the admitd farm send their PRs into `dev` too.
+- Branches (user decision 2026-11-02, GitHub flow): `main` is the only long branch. A task goes in the branch `T-<N>-<name>` from `origin/main`, its PR goes into `main` (`gh pr create --base main`), one review by a separate agent, green CI, squash merge by the user. One small PR at a time. A release is a tag `vX.Y.Z` on `main` with a `CHANGELOG.md` section, on the user's command.
+- Hosting and CI: `origin` is the public repository `daniil4545/tix` (D68); CI runs `make ci-check` on Linux and macOS for every PR into `main` and every push to it; both checks are required. Agents of the admitd farm send their PRs into `main` too.
 
 ## Critical invariants
 
