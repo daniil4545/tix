@@ -141,7 +141,7 @@ flowchart TD
 
 | Command | What it does |
 |---|---|
-| `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters |
+| `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters; the line `stale 14d+: N (up to 10 ids)` names idea and open tasks without a move for 14 days: a move is a commit `T-N: new|note|comment|move|take|steal|done|edit|check`, set, release, external edits and mass commits of tix do not count; `list --stale` shows them with the idle days |
 | `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, case-insensitive; alias `ls`; the whole task, with `rev` |
 | `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open` |
@@ -337,7 +337,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Operation | Target |
 |---|---|
-| `ctx`, `list`, `show` | up to 15 ms; without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
+| `ctx`, `list`, `show` | up to 15 ms, `ctx` up to 25 ms (one git walk for the stale line); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 

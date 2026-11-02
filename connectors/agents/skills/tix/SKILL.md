@@ -5,7 +5,7 @@ description: Use when the user mentions tasks, tickets, ideas, "what next" or "w
 
 # tix task tracker
 
-Run `tix ctx` first (a hook may have run it). It lists `in_progress`, `blocked`, `open` tasks and the next one. The five statuses: idea, open, in_progress, blocked, closed.
+Run `tix ctx` first (a hook may have run it). It lists `in_progress`, `blocked`, `open` tasks and the next one. A `stale 14d+` line names tasks without a move for 14 days: offer the human one review list (close as outdated, keep, or `tix rm` junk), never close or delete them yourself. The five statuses: idea, open, in_progress, blocked, closed.
 
 ## Work cycle
 

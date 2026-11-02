@@ -20,6 +20,13 @@ const noteLimit = 300
 // logIDRe - a task id for --grep: without regular expression metacharacters.
 var logIDRe = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*-[0-9]+$`)
 
+// moveOps - the operations that move a task: someone acted on it. set, release, external edits and the
+// mass commits of tix (migrations) do not count, otherwise a migration resets the idle time of every task.
+const moveOps = "new|note|comment|move|take|steal|done|edit|check"
+
+// moveSubjectRe - the subject of a commit that moves a task: "<id>: <op>[ ...]".
+var moveSubjectRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9]*-[0-9]+): (?:` + moveOps + `)(?: |$)`)
+
 // noteSubjectRe - the subject of a note commit: "<id>: note <text>".
 var noteSubjectRe = regexp.MustCompile(`^([A-Za-z][A-Za-z0-9]*-[0-9]+): note (.+)$`)
 
@@ -128,25 +135,54 @@ func (r Repo) TaskNotes(id string, since time.Time) ([]Note, error) {
 // Notes returns, by task id, the newest note among the latest noteLimit note commits.
 // One git process for all tasks; no commits - an empty result.
 func (r Repo) Notes() (map[string]Note, error) {
-	res, err := r.run(nil, true, "log", "-n", fmt.Sprint(noteLimit), "-z", "--extended-regexp",
-		"--grep=^[A-Za-z][A-Za-z0-9]*-[0-9]+: note ",
-		"--format=%aI%x1f%s")
+	out, err := r.subjects("-n", fmt.Sprint(noteLimit), "--grep=^[A-Za-z][A-Za-z0-9]*-[0-9]+: note ")
+	if err != nil || out == nil {
+		return map[string]Note{}, err
+	}
+	return parseNotes(out)
+}
+
+// Moves returns, by task id, the author time of the newest commit that moved the task, since since
+// (zero - the whole history). One git process for all tasks; no commits - an empty result.
+func (r Repo) Moves(since time.Time) (map[string]time.Time, error) {
+	args := []string{"--grep=^[A-Za-z][A-Za-z0-9]*-[0-9]+: (" + moveOps + ")( |$)"}
+	if !since.IsZero() {
+		args = append(args, "--since="+since.Format(time.RFC3339))
+	}
+	out, err := r.subjects(args...)
+	if err != nil {
+		return nil, err
+	}
+	moves := map[string]time.Time{}
+	err = eachSubject(out, func(at time.Time, subject string) {
+		if m := moveSubjectRe.FindStringSubmatch(subject); m != nil {
+			if _, seen := moves[m[1]]; !seen {
+				moves[m[1]] = at
+			}
+		}
+	})
+	return moves, err
+}
+
+// subjects runs git log with args and the -z output "author time, subject" from new to old.
+// A repository without commits gives nil.
+func (r Repo) subjects(args ...string) ([]byte, error) {
+	args = append([]string{"log", "-z", "--extended-regexp", "--format=%aI%x1f%s"}, args...)
+	res, err := r.run(nil, true, args...)
 	if err != nil {
 		return nil, err
 	}
 	if res.code != 0 {
 		if strings.Contains(string(res.errOut), "does not have any commits") {
-			return map[string]Note{}, nil
+			return nil, nil
 		}
 		return nil, &Error{Op: "log", Code: res.code, Stderr: string(res.errOut)}
 	}
-	return parseNotes(res.out)
+	return res.out, nil
 }
 
-// parseNotes parses the -z output from new to old: a task keeps the first note it meets.
-// A commit selected by another message line (an external edit) does not match by subject and is skipped.
-func parseNotes(out []byte) (map[string]Note, error) {
-	notes := map[string]Note{}
+// eachSubject calls fn for each record of the subjects output, from new to old.
+func eachSubject(out []byte, fn func(at time.Time, subject string)) error {
 	for _, rec := range strings.Split(string(out), "\x00") {
 		rec = strings.TrimLeft(rec, "\n")
 		if rec == "" {
@@ -154,21 +190,34 @@ func parseNotes(out []byte) (map[string]Note, error) {
 		}
 		stamp, subject, ok := strings.Cut(rec, "\x1f")
 		if !ok {
-			return nil, &Error{Op: "log", Stderr: "unexpected record " + fmt.Sprintf("%q", rec)}
+			return &Error{Op: "log", Stderr: "unexpected record " + fmt.Sprintf("%q", rec)}
 		}
 		at, err := time.Parse(time.RFC3339, stamp)
 		if err != nil {
-			return nil, &Error{Op: "log", Stderr: err.Error()}
+			return &Error{Op: "log", Stderr: err.Error()}
 		}
+		fn(at.Local(), subject)
+	}
+	return nil
+}
+
+// parseNotes parses the -z output from new to old: a task keeps the first note it meets.
+// A commit selected by another message line (an external edit) does not match by subject and is skipped.
+func parseNotes(out []byte) (map[string]Note, error) {
+	notes := map[string]Note{}
+	err := eachSubject(out, func(at time.Time, subject string) {
 		m := noteSubjectRe.FindStringSubmatch(subject)
 		if m == nil {
-			continue
+			return
 		}
 		text := strings.TrimSpace(m[2])
 		if _, seen := notes[m[1]]; seen || text == "" {
-			continue
+			return
 		}
-		notes[m[1]] = Note{At: at.Local(), Text: text}
+		notes[m[1]] = Note{At: at, Text: text}
+	})
+	if err != nil {
+		return nil, err
 	}
 	return notes, nil
 }

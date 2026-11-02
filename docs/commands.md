@@ -6,13 +6,13 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | Command | What it does |
 |---|---|
 | `tix new "title" [--to status] [--project p] [--body-file f]` | creates a task, by default in `idea`, with the body of file `f` (`-` is stdin); `--to open` needs criteria in the body, `--to blocked` and `--to closed` are refused |
-| `tix list [--project p] [--status s] [--grep text] [--all] [--json]` | lists tasks that are not closed; `--all` or `--status closed` adds closed ones; `--grep` matches the title, Abstract and criteria, ignoring case, excluding notes, comments and history; alias `ls` |
+| `tix list [--project p] [--status s] [--grep text] [--all] [--stale] [--json]` | lists tasks that are not closed; `--stale` keeps idea and open tasks without a move for 14 days, most idle first, with `| idle Nd`; `--all` or `--status closed` adds closed ones; `--grep` matches the title, Abstract and criteria, ignoring case, excluding notes, comments and history; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
 | `tix note T-12 "text"` | logs a step in the history; up to 300 characters, longer is refused with code 5: put the text in a file and the path in the note; the board shows the latest note |
 | `tix rm T-12` | deletes a task |
-| `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, next task; outside a project in_progress and blocked, the rest as counts |
+| `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, the line `stale 14d+: N (ids)` (up to 10 ids) for idea and open tasks without a move for 14 days, next task; outside a project in_progress and blocked, the rest as counts |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open |
 | `tix move T-12 <status> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `open`, `blocked`, `closed`; `-m` is for `blocked` and `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract` |

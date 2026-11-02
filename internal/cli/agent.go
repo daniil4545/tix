@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -95,8 +96,14 @@ func (a *app) cmdCtx(args []string) error {
 		return err
 	}
 	var tasks []*task.Task
+	now := time.Now()
+	movesC := make(chan movesResult, 1) // buffered: an early return does not block the walk
 	// Empty store: nothing to read.
-	if _, statErr := os.Stat(a.root); statErr == nil {
+	if _, statErr := os.Stat(a.root); statErr != nil {
+		movesC <- movesResult{}
+	} else {
+		// The git walk runs while the files are read; this function waits for it below.
+		go func() { movesC <- movesOf(a.store, now.Add(-staleAfter)) }()
 		var errs []error
 		tasks, errs = a.store.List()
 		for _, e := range errs {
@@ -115,7 +122,7 @@ func (a *app) cmdCtx(args []string) error {
 	in := brief.Input{
 		Tasks: tasks, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
-		Now:       time.Now(), PerColumn: ctxPerColumn,
+		Now:       now, PerColumn: ctxPerColumn,
 	}
 	if who != unknownActor {
 		in.Actor = who
@@ -123,6 +130,13 @@ func (a *app) cmdCtx(args []string) error {
 	if !p.set["json"] {
 		in.Limit = ctxTextLimit
 	}
+	var m movesResult
+	select {
+	case m = <-movesC:
+	case <-time.After(staleWait):
+		m.err = errors.New("stale line skipped: git log is slow")
+	}
+	in.Stale = a.staleIDs(m, tasks, now)
 	b := brief.Build(in)
 	if b.Project == "" {
 		b.Project = "all"
@@ -132,6 +146,63 @@ func (a *app) cmdCtx(args []string) error {
 	}
 	a.out("%s", strings.TrimRight(b.Text(), "\n"))
 	return nil
+}
+
+// staleAfter - how long an idea or open task may stay without a move before ctx names it.
+const staleAfter = 14 * 24 * time.Hour
+
+// staleWait - how long ctx waits for the git walk: the stale line is optional, the session start hook is not.
+const staleWait = 2 * time.Second
+
+// movesResult - the answer of the git walk of ctx.
+type movesResult struct {
+	moves map[string]time.Time
+	err   error
+}
+
+// staleIDs returns the ids of the stale tasks by the git walk m; a failed walk is a warning and no line.
+func (a *app) staleIDs(m movesResult, tasks []*task.Task, now time.Time) []string {
+	if m.err != nil {
+		a.warn("%s", firstLine(m.err.Error()))
+		return nil
+	}
+	var ids []string
+	for _, it := range idleTasks(tasks, m.moves, now) {
+		ids = append(ids, it.t.ID)
+	}
+	return ids
+}
+
+// movesOf runs the git walk of ctx: one window of staleAfter, not the whole history.
+func movesOf(s *core.Store, since time.Time) movesResult {
+	m, err := s.Moves(since)
+	return movesResult{moves: m, err: err}
+}
+
+// idle - a task without a move and its idle days.
+type idle struct {
+	t    *task.Task
+	days int
+}
+
+// idleTasks returns the idea and open tasks without a move for staleAfter, most idle first. The last move is
+// the newest of moves and created: a task created by hand has no commit of its own.
+func idleTasks(tasks []*task.Task, moves map[string]time.Time, now time.Time) []idle {
+	var out []idle
+	for _, t := range tasks {
+		if t.Status != config.Idea && t.Status != config.Open {
+			continue
+		}
+		last := t.Created
+		if m := moves[t.ID]; m.After(last) {
+			last = m
+		}
+		if d := now.Sub(last); d >= staleAfter {
+			out = append(out, idle{t: t, days: int(d / (24 * time.Hour))})
+		}
+	}
+	slices.SortStableFunc(out, func(x, y idle) int { return y.days - x.days })
+	return out
 }
 
 // hookReadTimeout - the shared hook stdin read timeout: the runner may not have closed the pipe.
