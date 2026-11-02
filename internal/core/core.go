@@ -70,7 +70,10 @@ type Options struct {
 
 // Result - the reply of a write operation. Warning: the commit failed, the edit is in the file.
 // Info - the tail of the ok line ("todo > doing  @claude until 20:40").
-type Result struct{ ID, Rev, Commit, Warning, Info string }
+type Result struct {
+	ID, Rev, Commit, Warning, Info string
+	Ready                          []string // epics whose task lines are all ticked after this move
+}
 
 // Store - an open task store.
 type Store struct {

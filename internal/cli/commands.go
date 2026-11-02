@@ -25,8 +25,11 @@ func (a *app) reply(p *parsed, res core.Result, id, what string) {
 		line += " " + res.Commit
 	}
 	a.out("%s", line)
+	for _, e := range res.Ready {
+		a.out("epic %s: all tasks closed, ready for acceptance", e)
+	}
 	if res.Warning != "" {
-		a.warn("%s: commit not recorded", id)
+		a.warn("%s: %s", id, res.Warning)
 	}
 }
 
@@ -244,6 +247,9 @@ func (a *app) cmdShow(args []string) error {
 		}
 		// The file as is: Obsidian may have written it in a non-canonical form.
 		a.out("rev %s", sh.Rev)
+		for _, e := range a.store.EpicsOf(id) {
+			a.out("Epic: %s", e)
+		}
 		_, _ = a.env.Stdout.Write(sh.Data)
 		a.printNotes(id, sh, p.set["v"])
 		return nil
@@ -439,6 +445,9 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 			status = "?"
 		}
 		line := status + " " + t.ID + " " + t.Title
+		if t.IsEpic() {
+			line = status + " " + t.ID + " [epic] " + t.Title
+		}
 		if sum := t.Summary(); sum != "" {
 			line += " | " + sum
 		}

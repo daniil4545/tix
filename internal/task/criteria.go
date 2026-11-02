@@ -3,10 +3,13 @@ package task
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
 const detailsHeading = "## Details"
+
+var reTaskLine = regexp.MustCompile(`^T-\d+(\s|$)`)
 
 var reCriterion = regexp.MustCompile(`^(\s*[-*] \[)( |x|X)(\] )(.*)$`)
 
@@ -142,4 +145,32 @@ func (t *Task) Check(nums ...int) (changed bool, err error) {
 		t.Body = strings.Join(lines, "\n")
 	}
 	return changed, nil
+}
+
+// IsEpic: the task carries the tag epic, so its criteria that start with T-N are task lines.
+func (t *Task) IsEpic() bool { return slices.Contains(t.Tags, "epic") }
+
+// LineTask returns the task id a criterion text starts with, or "" for a plain criterion.
+func LineTask(text string) string {
+	m := reTaskLine.FindString(text)
+	return strings.TrimSpace(m)
+}
+
+// SetLine sets the check mark of the criteria that name task id. changed=false: nothing to do.
+func (t *Task) SetLine(id string, done bool) (changed bool) {
+	var nums []int
+	for _, c := range t.Criteria() {
+		if c.Done != done && LineTask(c.Text) == id {
+			nums = append(nums, c.N)
+		}
+	}
+	if len(nums) == 0 {
+		return false
+	}
+	if done {
+		_, _ = t.Check(nums...)
+	} else {
+		_, _ = t.Uncheck(nums...)
+	}
+	return true
 }

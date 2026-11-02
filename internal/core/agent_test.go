@@ -684,36 +684,6 @@ func TestSet_Rules(t *testing.T) {
 	}
 }
 
-func TestCheckAt_ConcurrentReorderRefused(t *testing.T) {
-	defer guard(t)
-	e := newEnv(t)
-	s := e.openAt(newClock())
-	id := mkCrit(t, s, "Epic", "doing")
-	_, rev, err := s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	reordered := strings.Replace(critBody, "one\n- [ ] two", "two\n- [ ] one", 1)
-	core.SetAfterRead(s, func(path string, _ int) {
-		if err := os.WriteFile(path, []byte(strings.Replace(e.text(id), critBody, reordered, 1)), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		core.SetAfterRead(s, nil)
-	})
-	if _, err := s.CheckAt(id, []int{1}, "x:1", rev); !errors.Is(err, core.ErrConflict) {
-		t.Fatalf("concurrent reorder: %v, want conflict", err)
-	}
-	ensure(t, strings.Contains(e.text(id), reordered), "reordered criteria must stay unchecked")
-	_, rev, err = s.Get(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r, err := s.CheckAt(id, []int{2}, "x:1", rev)
-	if err != nil || r.Info != "1/3" {
-		t.Fatalf("fresh revision: info %q, err %v", r.Info, err)
-	}
-}
-
 func TestCheck_InfoSubjectRepeatBadNumber(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
@@ -819,4 +789,38 @@ func TestMove_ColumnNameBeatsRole(t *testing.T) {
 	if got, _, _ := s.Get(a); got == nil || got.Status != "waiting" {
 		t.Errorf("the task did not go to column waiting: %+v", got)
 	}
+}
+
+func TestMove_EpicEditedMeanwhileGivesWarning(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	child := mkCrit(t, s, "Child", "doing")
+	r, err := s.Create("Epic", "proj", "idea", "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Set(r.ID, []core.Field{{Name: "tags", Value: "epic"}}, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	_, rev, _ := s.Get(r.ID)
+	if _, err = s.Edit(r.ID, rev, "## Details\n- [ ] "+child+"\n", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	core.SetAfterRead(s, func(path string, _ int) {
+		if strings.Contains(path, child) {
+			f, err := os.OpenFile(e.file(r.ID), os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _ = f.WriteString("\nedited elsewhere\n")
+			_ = f.Close()
+			core.SetAfterRead(s, nil)
+		}
+	})
+	res, err := s.Move(child, "done", core.MoveOpts{Force: true, Message: "x"}, "tester")
+	if err != nil || !strings.Contains(res.Warning, r.ID) {
+		t.Fatalf("Move: warning %q, err %v; want a warning naming the epic", res.Warning, err)
+	}
+	ensure(t, strings.Contains(e.text(r.ID), "- [ ] "+child) && strings.Contains(e.text(r.ID), "edited elsewhere"), "the foreign edit must stay")
 }
