@@ -130,7 +130,13 @@ func (a *app) cmdCtx(args []string) error {
 	if !p.set["json"] {
 		in.Limit = ctxTextLimit
 	}
-	in.Stale = a.staleIDs(<-movesC, tasks, now)
+	var m movesResult
+	select {
+	case m = <-movesC:
+	case <-time.After(staleWait):
+		m.err = errors.New("stale line skipped: git log is slow")
+	}
+	in.Stale = a.staleIDs(m, tasks, now)
 	b := brief.Build(in)
 	if b.Project == "" {
 		b.Project = "all"
@@ -144,6 +150,9 @@ func (a *app) cmdCtx(args []string) error {
 
 // staleAfter - how long an idea or open task may stay without a move before ctx names it.
 const staleAfter = 14 * 24 * time.Hour
+
+// staleWait - how long ctx waits for the git walk: the stale line is optional, the session start hook is not.
+const staleWait = 2 * time.Second
 
 // movesResult - the answer of the git walk of ctx.
 type movesResult struct {

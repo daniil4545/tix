@@ -11,7 +11,7 @@ import (
 // Tasks 30 days old: a note resets the idle time, an external edit, set and a migration do not; in_progress is never stale.
 func TestCLI_Stale_CtxAndList(t *testing.T) {
 	defer guard(t)
-	old := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
+	old := time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339)
 	t.Setenv("GIT_AUTHOR_DATE", old)
 	t.Setenv("GIT_COMMITTER_DATE", old)
 	b := newBox(t)
