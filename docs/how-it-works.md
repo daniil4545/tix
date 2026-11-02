@@ -74,7 +74,6 @@ flowchart LR
   hum["You"] -->|"tix, board"| core
   core -->|"lock, write, commit"| repo[("~/tasks: md + git")]
   obs["Obsidian"] -.->|"edits outside tix"| repo
-  repo -->|"tix backup"| bak["Your private remote"]
   repo -.->|"hook: your comments"| ag
 ```
 
@@ -102,7 +101,7 @@ terminal.
 <details>
 <summary>How do I back it up?</summary>
 
-Add a private remote named `origin` in `~/tasks` and run `tix backup`.
+`~/tasks` is a git repository: add a private remote and push it with `git`.
 </details>
 
 ## Comparison

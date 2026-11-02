@@ -30,9 +30,8 @@ flowchart LR
   agent["Agent: claude, codex, opencode"] -->|"tix ... in a terminal"| tix["tix (one process per command)"]
   human["Human in Obsidian"] -->|"edits md files"| db[("~/tasks: md and git")]
   tix -->|"reads and writes files"| db
-  tix -->|"git commit, push"| git["git"]
+  tix -->|"git commit"| git["git"]
   git -->|"repository"| db
-  git -->|"push HEAD, on backup"| remote["origin"]
   tix -.->|"reads project HEAD"| proj["Project repository"]
   classDef ours fill:#dbeafe,stroke:#2c5c86,color:#000
   classDef external fill:#f3f4f6,stroke:#6b7280,color:#000
@@ -73,7 +72,7 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | Module | Responsibility | Where | Status |
 |---|---|---|---|
 | cli | parses commands, prints `ok`/`err`/`warn`, maps errors to exit codes | `internal/cli` (`cli.go` common, `agent.go` agent cycle, `commands.go` base commands) | works |
-| core | the only write path: lock, temp, rename, commit, transition rules, `backup` | `internal/core` (`tx.go` write, `agent.go` take/move/set/check/backup, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
+| core | the only write path: lock, temp, rename, commit, transition rules | `internal/core` (`tx.go` write, `agent.go` take/move/set/check, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
 | task | parses and prints the task file, claim, criteria; no IO | `internal/task` | works |
 | config | reads `.tix/config.toml`: columns and their roles, project map | `internal/config` | works |
 | brief | builds the `tix ctx` output: text and JSON; no IO | `internal/brief` | works |
@@ -95,7 +94,6 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | A live claim of another actor is not taken over without `--steal` | `core.take` | `e2e` `FiveTakesRace_OneWinner` |
 | Only `gitx` starts external processes in `internal` | `gitx`; `gosec` in the linter | `make lint` |
 | `ctx` does not call git | `cli.cmdCtx`, `core.List`, `brief` | 15 ms target in `make bench` |
-| `backup` does not hold the lock during network I/O; push has no `--force` and no password prompt | `core.Backup`, `gitx.Push` | `e2e` `Backup_BareExternalEditBrokenRemote` |
 | `user:pass@` from a URL does not reach the reply or the log | `gitx.scrub` | `gitx/push_test.go` |
 
 ## 2. Main flow
@@ -202,8 +200,6 @@ The diagram shows the main paths: `move` is allowed between any columns that hav
 | Commit failed | `core.commit` | - | none | the edit is in the file, `Warning`, `warn` on stderr, code 0; the next operation commits it as external edit |
 | Process killed (`kill -9`) | the OS releases flock; `cleanTmp` removes temp | - | - | no half-written files |
 | `edit` against an old base | `mergeBody`, `git merge-file` | base blob id | - | conflict: `ErrConflict`, code 3 |
-| `backup`: no `origin` | `core.Backup` | - | - | `no remote origin; run: git remote add origin <url>`, code 1 |
-| `backup`: push failed or hung | `gitx.Push`, `WaitDelay` | - | 30 s, once | `err`, code 1, details in `.tix/log` |
 | Background gc failed | `gcScript` | - | at the next threshold | `WARN` in `.tix/log` |
 
 Exit codes: 0 success; 2 busy (`ErrClaimed`, `ErrLocked`); 3 conflict; 4 no task; 5 rule (`ErrRule`); 6 input (`ErrNoIdentity`, `actor.ErrAmbiguous`, flag, id); 1 other (`ErrNotRecorded` of `note`).
@@ -243,4 +239,3 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 
 - `RULES.md` of a store gets the new text only while it is an untouched copy of an earlier version; an edited copy keeps the old rules.
 - `kill -9` during a column renumbering can leave it partly renumbered (a known failure, accepted in S2).
-- There is no background backup. Push to a real remote is not covered by autotests; no remote is set up for `~/tasks`.
