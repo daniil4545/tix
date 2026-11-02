@@ -10,6 +10,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
@@ -310,11 +311,12 @@ type listItem struct {
 	Tags     []string `json:"tags"`
 	Rev      string   `json:"rev"`
 	Path     string   `json:"path"`
+	IdleDays int      `json:"idle_days,omitempty"` // only with --stale
 }
 
 func (a *app) cmdList(args []string) error {
 	p, err := parseArgs(args, withCommon(flagSpec{
-		"project": true, "status": true, "json": false, "all": false, "grep": true,
+		"project": true, "status": true, "json": false, "all": false, "grep": true, "stale": false,
 	}))
 	if err != nil {
 		return err
@@ -328,7 +330,7 @@ func (a *app) cmdList(args []string) error {
 	}
 	// Empty store: nothing to read, list does not create the folder.
 	if _, statErr := os.Stat(root); errors.Is(statErr, os.ErrNotExist) {
-		return a.printTasks(p, nil)
+		return a.printTasks(p, nil, nil)
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -359,7 +361,31 @@ func (a *app) cmdList(args []string) error {
 		}
 		matched = append(matched, t)
 	}
-	return a.printTasks(p, a.filter(matched, proj, p.vals["status"]))
+	matched = a.filter(matched, proj, p.vals["status"])
+	if !p.set["stale"] {
+		return a.printTasks(p, matched, nil)
+	}
+	stale, days, err := a.stale(matched)
+	if err != nil {
+		return err
+	}
+	return a.printTasks(p, stale, days)
+}
+
+// stale keeps the tasks without a move for staleAfter, most idle first, and their idle days.
+// The whole history is read: the idle days need the last move, however old.
+func (a *app) stale(tasks []*task.Task) ([]*task.Task, map[string]int, error) {
+	moves, err := a.store.Moves(time.Time{})
+	if err != nil {
+		return nil, nil, err
+	}
+	its := idleTasks(tasks, moves, time.Now())
+	out, days := make([]*task.Task, 0, len(its)), make(map[string]int, len(its))
+	for _, it := range its {
+		out = append(out, it.t)
+		days[it.t.ID] = it.days
+	}
+	return out, days, nil
 }
 
 func listMatches(t *task.Task, needle string) bool {
@@ -412,7 +438,7 @@ func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
 	return out
 }
 
-func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
+func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int) error {
 	if p.set["json"] {
 		items := make([]listItem, 0, len(tasks))
 		for _, t := range tasks {
@@ -424,6 +450,7 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status,
 				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
 				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
+				IdleDays: days[t.ID],
 			})
 		}
 		return a.printJSON(items)
@@ -440,6 +467,9 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 		line := status + " " + t.ID + " " + t.Title
 		if t.IsEpic() {
 			line = status + " " + t.ID + " [epic] " + t.Title
+		}
+		if d, ok := days[t.ID]; ok {
+			line += fmt.Sprintf(" | idle %dd", d)
 		}
 		a.out("%s", line)
 	}

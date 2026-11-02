@@ -17,6 +17,9 @@ import (
 // maxLine - the length of a task line in the text, in runes.
 const maxLine = 160
 
+// maxStaleIDs - how many ids the stale line names.
+const maxStaleIDs = 10
+
 // howto - the second line of ctx: the three commands of the agent cycle.
 const howto = "- take: tix take; step: tix note; end: tix done"
 
@@ -30,6 +33,7 @@ type Input struct {
 	Project, RulesPath, Actor string
 	Now                       time.Time
 	PerColumn, Limit          int
+	Stale                     []string // idea and open tasks without a move for 14 days, most idle first
 }
 
 // Row - a task line. Detail: "Waiting: ...", "k/n"; own claim - "@you".
@@ -54,12 +58,16 @@ type Brief struct {
 	Rules    string    `json:"rules"`
 	Sections []Section `json:"sections"`
 	Next     string    `json:"next"`
+	Stale    []string  `json:"stale"`
 }
 
 // Build builds a Brief with compression down to Limit. The tasks in Input are already selected
 // by project. An empty Project counts tasks outside in_progress and blocked instead of listing them.
 func Build(in Input) Brief {
-	b := Brief{Project: in.Project, Rules: in.RulesPath, Sections: []Section{}}
+	b := Brief{Project: in.Project, Rules: in.RulesPath, Sections: []Section{}, Stale: in.Stale}
+	if b.Stale == nil {
+		b.Stale = []string{}
+	}
 	if b.Project == "" {
 		b.Project = "all"
 	}
@@ -209,6 +217,13 @@ func (b Brief) Text() string {
 		if s.More > 0 {
 			lines = append(lines, fmt.Sprintf("%s%d more", pad, s.More))
 		}
+	}
+	if len(b.Stale) > 0 {
+		ids := strings.Join(b.Stale[:min(len(b.Stale), maxStaleIDs)], ", ")
+		if len(b.Stale) > maxStaleIDs {
+			ids += ", ..."
+		}
+		lines = append(lines, fmt.Sprintf("stale 14d+: %d (%s)", len(b.Stale), ids))
 	}
 	if b.Next != "" {
 		lines = append(lines, "next "+b.Next)

@@ -108,6 +108,19 @@ func (s *Store) TaskNotes(id string, created time.Time) ([]gitx.Note, error) {
 	return notes, nil
 }
 
+// Moves returns, by task id, the time of the last move of the task since since (zero - the whole history).
+func (s *Store) Moves(since time.Time) (map[string]time.Time, error) {
+	repo, err := s.git()
+	if err != nil {
+		return nil, err
+	}
+	moves, err := repo.Moves(since)
+	if err != nil {
+		return nil, fmt.Errorf("moves: %w", err)
+	}
+	return moves, nil
+}
+
 // Note - a task note from the history, as gitx reads it.
 type Note = gitx.Note
 
