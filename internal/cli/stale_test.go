@@ -31,7 +31,7 @@ func TestCLI_Stale_CtxAndList(t *testing.T) {
 	b.ok("", "set", idea, "tags=x")
 	// a mass commit of tix, like the status migration, touches every file and is not a move
 	b.rewrite(open, func(s string) string { return s + "\nmigrated\n" })
-	b.git("commit", "-qam", "tix: migrate statuses to idea open in_progress blocked closed")
+	b.git("-c", "user.name=tix", "-c", "user.email=tix@localhost", "commit", "-qam", "tix: migrate statuses to idea open in_progress blocked closed")
 	b.ok("", "note", noted, "still alive")
 
 	ctx := b.ok("", "ctx", "--project", "personal").out
