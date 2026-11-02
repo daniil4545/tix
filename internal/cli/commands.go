@@ -245,6 +245,9 @@ func (a *app) cmdShow(args []string) error {
 		// The file as is: Obsidian may have written it in a non-canonical form.
 		a.out("rev %s", sh.Rev)
 		_, _ = a.env.Stdout.Write(sh.Data)
+		for _, e := range a.store.EpicsOf(id) {
+			a.out("Epic: %s", e)
+		}
 		a.printNotes(id, sh, p.set["v"])
 		return nil
 	}
@@ -439,6 +442,9 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task) error {
 			status = "?"
 		}
 		line := status + " " + t.ID + " " + t.Title
+		if t.IsEpic() {
+			line = status + " " + t.ID + " [epic] " + t.Title
+		}
 		if sum := t.Summary(); sum != "" {
 			line += " | " + sum
 		}

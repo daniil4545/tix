@@ -200,7 +200,12 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 		if err != nil {
 			return err
 		}
-		info, err = s.move(tx, t, cfg, cfg.Resolve(column), o, actor, op)
+		column = cfg.Resolve(column)
+		wasClosed := cfg.RoleOf(t.Status) == roleClosed
+		info, err = s.move(tx, t, cfg, column, o, actor, op)
+		if err == nil && wasClosed != (cfg.RoleOf(column) == roleClosed) {
+			s.syncEpics(tx, t.ID, !wasClosed)
+		}
 		return err
 	})
 	res.Info = info
@@ -315,6 +320,13 @@ func closeChecks(t *task.Task, msg string, force bool) (bool, error) {
 		return false, rule("--force needs -m result")
 	}
 	crit := t.Criteria()
+	if t.IsEpic() {
+		for _, c := range crit {
+			if id := task.LineTask(c.Text); id != "" && !c.Done {
+				return false, rule("epic has an unchecked line of %s; close or move that task first", id)
+			}
+		}
+	}
 	if len(crit) == 0 {
 		if msg == "" {
 			return false, rule("no criteria; use -m result")
@@ -400,13 +412,8 @@ func setField(t *task.Task, role string, f Field) error {
 	return t.SetField(f.Name, f.Value)
 }
 
-// Check marks criteria with numbers nums.
+// Check marks criteria with numbers nums. A task line of an epic follows the status of its task and is refused.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
-	return s.CheckAt(id, nums, actor, "")
-}
-
-// CheckAt marks criteria only if baseRev still matches; empty baseRev accepts any revision.
-func (s *Store) CheckAt(id string, nums []int, actor, baseRev string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
@@ -420,14 +427,19 @@ func (s *Store) CheckAt(id string, nums []int, actor, baseRev string) (Result, e
 	}
 	op := &opInfo{kind: "check", subject: "check " + strings.Join(parts, " ")}
 	var info string
-	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, rev string) error {
-		if baseRev != "" && baseRev != rev {
-			return ErrConflict
+	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
+		crit := t.Criteria()
+		if t.IsEpic() {
+			for _, n := range nums {
+				if n >= 1 && n <= len(crit) && task.LineTask(crit[n-1].Text) != "" {
+					return rule("line %d follows the status of %s", n, task.LineTask(crit[n-1].Text))
+				}
+			}
 		}
 		if _, err := t.Check(nums...); err != nil {
 			return err
 		}
-		crit := t.Criteria()
+		crit = t.Criteria()
 		done := 0
 		for _, c := range crit {
 			if c.Done {

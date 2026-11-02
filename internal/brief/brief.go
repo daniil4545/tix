@@ -39,6 +39,7 @@ type Row struct {
 	Title  string `json:"title"`
 	Detail string `json:"detail"`
 	Claim  string `json:"claim"`
+	Epic   bool   `json:"epic,omitempty"`
 }
 
 // Section - a column of tasks; More - how many tasks are hidden.
@@ -159,7 +160,7 @@ func nextID(ready []*task.Task, in Input) string {
 }
 
 func makeRow(t *task.Task, role string, in Input) Row {
-	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, role)}
+	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, role), Epic: t.IsEpic()}
 	if c, ok := liveClaim(t, in.Now); ok {
 		r.Claim = actor.Short(c.Actor)
 		if in.Actor != "" && c.Actor == in.Actor {
@@ -235,6 +236,9 @@ func rowLine(pad string, r Row) string {
 		tail = "  " + r.Claim
 	}
 	text := r.ID + " " + r.Title
+	if r.Epic {
+		text = r.ID + " [epic] " + r.Title
+	}
 	if r.Detail != "" {
 		text += " | " + r.Detail
 	}
