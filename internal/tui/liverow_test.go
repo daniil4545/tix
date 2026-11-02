@@ -41,14 +41,3 @@ func TestBoardRow_Live_ByClaimAndModelClock(t *testing.T) {
 		t.Errorf("expired claim (model clock): live=true, want false")
 	}
 }
-
-func TestFocus_G_NoClaim_NoSessionStatus(t *testing.T) {
-	e := mvNewEnv(t, "")
-	id := e.create("job", "doing")
-	m := newMouseModel(t, e, 120, 30)
-	m.selectTask(id)
-	typeKeys(m, "g")
-	if got := caStatus(m); got != id+": no session to open" {
-		t.Errorf("status %q, want the old no-session text", got)
-	}
-}

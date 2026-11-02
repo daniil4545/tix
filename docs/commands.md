@@ -71,7 +71,6 @@ label has its own muted color.
 | `enter` | open the card |
 | `n` | new task in the selected column (in the inbox column if that column needs criteria): asks for a title, then opens `$EDITOR` |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
-| `g` | go to the agent's session (macOS and Warp only) |
 | `p` | cycle the project filter |
 | `J`, `K` | move the card down or up in its column |
 | `delete` | delete the task, asks `y/n` |

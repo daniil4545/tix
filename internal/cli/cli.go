@@ -110,16 +110,7 @@ func Run(ctx context.Context, args []string, env Env) (code int) {
 		a.fail(err)
 		return exitCode(err)
 	}
-	if writeCmds[a.cmd] {
-		a.recordFocus()
-	}
 	return 0
-}
-
-// writeCmds - commands after whose success the agent leaves the address of its tab.
-var writeCmds = map[string]bool{
-	"new": true, "edit": true, "comment": true, "note": true, "rm": true,
-	"take": true, "move": true, "set": true, "check": true, "done": true,
 }
 
 func (a *app) dispatch(ctx context.Context, args []string) error {
