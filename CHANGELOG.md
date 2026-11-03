@@ -10,8 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Upgrade from 0.7.1
 
-- Reinstall the agent skill: `scripts/connect.sh apply --force`. It adds the SessionEnd hook and the new rules (`projects`, `list --like`, `After:`); `RULES.md` you did not edit is replaced on the first write.
-- Fill the project catalog: `tix projects add NAME PATH` for each project. Once `[paths]` in `config.toml` is not empty, `tix new --project X` and `tix set T-N project=X` refuse a name outside the catalog and not `personal` (code 5, the known projects and the add command). An empty catalog keeps the old behaviour; old tasks in unknown projects stay editable.
+- Reinstall the agent skill: `scripts/connect.sh apply --force`. It adds the SessionEnd hook and the new rules (`projects`, `list --like`); `RULES.md` you did not edit is replaced on the first write.
+- Fill the project catalog: `tix projects add NAME PATH` for each project. Once `[paths]` in `config.toml` is not empty, `tix new` (with `--project X` or the project of the current folder), `tix set T-N project=X` and `n` in the TUI refuse a name outside the catalog and not `personal` (code 5, the known projects and the add command). An empty catalog keeps the old behaviour; old tasks in unknown projects stay editable. The TUI reads the catalog at start: restart it after `tix projects add`.
 - Older binaries ignore `[paths]`.
 
 ### Added

@@ -42,7 +42,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Restore: `~/tasks` is a git repository, `git -C ~/tasks log -- T-12.md` finds the commit to revert.
 - `tix list` hides closed tasks; `--all` or `--status closed` shows them. `--grep TEXT` matches the title, Abstract and criteria, ignoring case; notes, comments and history are excluded.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
-- `tix projects` lists the known projects with paths; `tix projects add NAME PATH` registers one. Use a name from that list in `tix new --project` and `tix set project=`: an unknown name is refused with code 5 once the catalog is not empty.
+- `tix projects` lists the known projects with paths; `tix projects add NAME PATH` registers one. Use a name from that list in `tix new --project` and `tix set project=`; `tix new` without `--project` takes the project of the current folder, which must be in the list too. An unknown name is refused with code 5 once the catalog is not empty.
 - A body line `After: T-1, T-2` means the task waits for those tasks: `tix ctx` does not offer it as next until they close (`take` still works). `tix list` and `tix show` mark it.
 - `set` takes: title, project, waiting, tags, external, abstract.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
