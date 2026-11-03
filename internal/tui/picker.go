@@ -18,8 +18,15 @@ type picker struct {
 // startPicker opens the list over the board; the cursor starts on the current filter.
 func (m *Model) startPicker() {
 	items := []view.PickItem{{Name: "all", Value: ""}}
+	seen := map[string]int{} // Alpha and alpha are one project: one row, counts summed
 	for _, e := range m.d.Store.Catalog() {
-		items = append(items, view.PickItem{Name: e.Name, Value: strings.ToLower(e.Name), Tasks: e.Tasks, Count: true})
+		v := strings.ToLower(e.Name)
+		if i, ok := seen[v]; ok {
+			items[i].Tasks += e.Tasks
+			continue
+		}
+		seen[v] = len(items)
+		items = append(items, view.PickItem{Name: e.Name, Value: v, Tasks: e.Tasks, Count: true})
 	}
 	p := &picker{all: items}
 	for i, it := range items {

@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
+	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/tui/view"
 )
 
@@ -111,5 +112,22 @@ func TestRenderPicker_FitsAndScrolls(t *testing.T) {
 	out := view.RenderPicker(view.Picker{Items: items, Sel: 29, W: 80, H: 10})
 	if !strings.Contains(out, "last") {
 		t.Errorf("selected last row not scrolled in:\n%s", out)
+	}
+}
+
+// S2: the count is of open tasks; closed ones and a differently cased name do not add rows.
+func TestPicker_CountsOpenTasksAndMergesCase(t *testing.T) {
+	m := pickModel(t)
+	r, err := m.d.Store.Create("C", "Beta", "idea", "seed")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.d.Store.Move(r.ID, "closed", core.MoveOpts{Message: "gone", Force: true}, "seed"); err != nil {
+		t.Fatal(err)
+	}
+	pickKey(m, "p", "bet")
+	got := m.pick.shown()
+	if len(got) != 1 || got[0].Tasks != 1 {
+		t.Fatalf("beta rows: %+v", got)
 	}
 }
