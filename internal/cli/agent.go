@@ -377,7 +377,7 @@ func (a *app) hookEndActor() string {
 	if !ok || in.Event != eventEnd || in.AgentID != "" {
 		return ""
 	}
-	return actor.HookActor(a.env.Getenv, in.SessionID, in.TurnID != "")
+	return actor.HookActor(a.env.Getenv, in.SessionID, in.TurnID != "" || in.Model != "")
 }
 
 // projectLine prints where the task's project lives and which instruction files lie in its root.

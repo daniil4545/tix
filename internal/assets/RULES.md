@@ -10,7 +10,7 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 4. `tix comment T-12 "text"`: the human's channel. You write notes, not comments; comments are only appended.
 5. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
-When a session ends without closing, write one note `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open. `tix take --release` without a number drops all your live holds at once; the SessionEnd hook of the Claude connector runs it when the window closes (reinstall the skill with `scripts/connect.sh apply --force` to get it).
+When a session ends without closing, write one note `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open. `tix take --release` without a number drops all your live holds at once; the SessionEnd hook of the Claude Code and Codex connectors runs it when the window closes (reinstall the skill with `scripts/connect.sh apply --force` to get it).
 
 ## Progress
 

@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The Codex connector gets the `SessionEnd` hook too (`tix take --release --hook`, 3 s timeout): reinstall with `scripts/connect.sh apply --force` and confirm it in Codex `/hooks`.
+
 ## [0.8.0] - 2026-11-03
 
 ### Upgrade from 0.7.1
