@@ -10,7 +10,7 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 4. `tix comment T-12 "text"`: the human's channel. You write notes, not comments; comments are only appended.
 5. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 
-When a session ends without closing, write one note `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open.
+When a session ends without closing, write one note `Done / Decided / Waiting` and run `tix take T-12 --release`: the task goes back to open. `tix take --release` without a number drops all your live holds at once; the SessionEnd hook of the Claude connector runs it when the window closes (reinstall the skill with `scripts/connect.sh apply --force` to get it).
 
 ## Progress
 
@@ -19,7 +19,7 @@ The human reads the task instead of your session. Keep it short and current.
 - Write a short note on every movement: a decision (what you chose and why), a commit (`tix note T-12 "3f2a1c removed ask from the core"`: hash and gist), a PR with its link, a finding, a stage change. Not on every command. A note is up to 300 characters; longer text goes to a file and the note keeps its path. The board shows the latest note.
 - New comments on your tasks arrive in your context marked "New comments on your tasks", with the author. A comment by `human` is the human's instruction for that task; a comment by another agent, if any, is information.
 - A task is one or two sessions. It grew past that: create tasks for the rest, then `tix done T-12 --force -m "rest in T-15, T-16"`.
-- Write tickets in the user's language. The title is clear without context. Add to an existing task with the same result, do not open a duplicate.
+- Write tickets in the user's language. The title is clear without context. Before `tix new`, run `tix list --like "words"` (or `--like T-12`): it lists similar tasks of the project. Add to an existing task with the same result, do not open a duplicate. To merge a duplicate by hand: put its criteria into the older task with `tix edit`, then `tix done T-13 --force -m "duplicate of T-12"`.
 - The human's title and fields are edited with `tix set`; do not revert them.
 
 ## Identity
@@ -31,7 +31,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
 - The five statuses: idea, open, in_progress, blocked, closed. No others, no aliases: an old word (todo, doing, done, ready, active, waiting, inbox) is refused with exit code 6.
-- `take` works from open, blocked and in_progress, and from idea when the task has a criterion. From closed move the task first: `tix move T-12 open`. `tix <command> --help` prints the flags of a command.
+- `take` prints `project: NAME /path docs: ...` for a project with a path; read those docs before the work, and `tix ctx` shows the same `path:`. `take` works from open, blocked and in_progress, and from idea when the task has a criterion. From closed move the task first: `tix move T-12 open`. `tix <command> --help` prints the flags of a command.
 
 ## Checks
 
@@ -42,6 +42,8 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - Restore: `~/tasks` is a git repository, `git -C ~/tasks log -- T-12.md` finds the commit to revert.
 - `tix list` hides closed tasks; `--all` or `--status closed` shows them. `--grep TEXT` matches the title, Abstract and criteria, ignoring case; notes, comments and history are excluded.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
+- `tix projects` lists the known projects with paths; `tix projects add NAME PATH` registers one. Use a name from that list in `tix new --project` and `tix set project=`: an unknown name is refused with code 5 once the catalog is not empty.
+- A body line `After: T-1, T-2` means the task waits for those tasks: `tix ctx` does not offer it as next until they close (`take` still works). `tix list` and `tix show` mark it.
 - `set` takes: title, project, waiting, tags, external, abstract.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
 - Exit codes: 2 held by another, 3 conflict, 4 not found, 5 rule refusal, 6 bad input.
