@@ -233,3 +233,15 @@ func TestText_NoColumnsLine(t *testing.T) {
 		t.Errorf("ctx has a columns line:\n%s\n%s", b.Text(), raw)
 	}
 }
+
+func TestText_PathLine(t *testing.T) {
+	defer guard(t)
+	in := input(mk("T-1", "A", "open", 1))
+	if text := brief.Build(in).Text(); strings.Contains(text, "path:") {
+		t.Errorf("no Path, but a path line:\n%s", text)
+	}
+	in.Path = "/x/p"
+	if lines := strings.Split(brief.Build(in).Text(), "\n"); lines[1] != "path: /x/p" {
+		t.Errorf("second line %q, want `path: /x/p`", lines[1])
+	}
+}

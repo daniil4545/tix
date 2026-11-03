@@ -31,6 +31,7 @@ var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}
 type Input struct {
 	Tasks                     []*task.Task
 	Project, RulesPath, Actor string
+	Path                      string // the project folder; empty - no line
 	Now                       time.Time
 	PerColumn, Limit          int
 	Stale                     []string // idea and open tasks without a move for 14 days, most idle first
@@ -56,6 +57,7 @@ type Section struct {
 type Brief struct {
 	Project  string    `json:"project"`
 	Rules    string    `json:"rules"`
+	Path     string    `json:"path,omitempty"`
 	Sections []Section `json:"sections"`
 	Next     string    `json:"next"`
 	Stale    []string  `json:"stale"`
@@ -64,7 +66,7 @@ type Brief struct {
 // Build builds a Brief with compression down to Limit. The tasks in Input are already selected
 // by project. An empty Project counts tasks outside in_progress and blocked instead of listing them.
 func Build(in Input) Brief {
-	b := Brief{Project: in.Project, Rules: in.RulesPath, Sections: []Section{}, Stale: in.Stale}
+	b := Brief{Project: in.Project, Rules: in.RulesPath, Path: in.Path, Sections: []Section{}, Stale: in.Stale}
 	if b.Stale == nil {
 		b.Stale = []string{}
 	}
@@ -201,7 +203,11 @@ func (b Brief) Text() string {
 	if b.Rules != "" {
 		head += "   rules: " + b.Rules
 	}
-	lines := []string{head, howto}
+	lines := []string{head}
+	if b.Path != "" {
+		lines = append(lines, "path: "+b.Path)
+	}
+	lines = append(lines, howto)
 	if len(b.Sections) == 0 {
 		lines = append(lines, "no tasks")
 	}
