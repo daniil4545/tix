@@ -687,3 +687,32 @@ func TestCLI_CommandHelp_PrintsUsageWritesNothing(t *testing.T) {
 		t.Errorf("note after --: subject %q, want `T-1: note --help`", subj)
 	}
 }
+
+func TestCLI_ListLike(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Карточки дубли")
+	b.ok("", "new", "Дубли карточки рамки")
+	b.ok("", "new", "Другое дело")
+	b.ok("", "new", "Старые карточки дубли")
+	b.ok("", "done", "T-4", "-m", "finished", "--as", "test:like")
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"words", []string{"--like", "карточка дубли"}, "idea T-1 Карточки дубли\nidea T-2 Дубли карточки рамки\n"},
+		{"task id", []string{"--like", "T-1"}, "idea T-2 Дубли карточки рамки\n"},
+		{"all", []string{"--like", "T-1", "--all"}, "idea T-2 Дубли карточки рамки\nclosed T-4 Старые карточки дубли\n"},
+		{"one word", []string{"--like", "карточки"}, "no tasks\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := b.ok("", append([]string{"list"}, tc.args...)...).out; got != tc.want {
+				t.Errorf("list %v: %q, want %q", tc.args, got, tc.want)
+			}
+		})
+	}
+	if got := b.tix("", "list", "--like", "T-99"); got.code == 0 {
+		t.Errorf("--like T-99: %+v", got)
+	}
+}

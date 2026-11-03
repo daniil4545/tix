@@ -14,6 +14,7 @@ import (
 
 	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/search"
 	"github.com/daniil4545/tix/internal/task"
 )
 
@@ -316,7 +317,7 @@ type listItem struct {
 
 func (a *app) cmdList(args []string) error {
 	p, err := parseArgs(args, withCommon(flagSpec{
-		"project": true, "status": true, "json": false, "all": false, "grep": true, "stale": false,
+		"project": true, "status": true, "json": false, "all": false, "grep": true, "like": true, "stale": false,
 	}))
 	if err != nil {
 		return err
@@ -350,6 +351,10 @@ func (a *app) cmdList(args []string) error {
 	}
 	// an explicit --status shows its status even when it is closed
 	hide := !p.set["all"] && !p.set["status"]
+	lq, proj, err := likeQuery(p, proj, tasks)
+	if err != nil {
+		return err
+	}
 	needle := strings.ToLower(p.vals["grep"])
 	var matched []*task.Task
 	for _, t := range tasks {
@@ -362,6 +367,7 @@ func (a *app) cmdList(args []string) error {
 		matched = append(matched, t)
 	}
 	matched = a.filter(matched, proj, p.vals["status"])
+	matched = similar(p.set["like"], lq, matched)
 	if !p.set["stale"] {
 		return a.printTasks(p, matched, nil)
 	}
@@ -370,6 +376,41 @@ func (a *app) cmdList(args []string) error {
 		return err
 	}
 	return a.printTasks(p, stale, days)
+}
+
+// similar keeps the tasks resembling the query, most similar first; off - tasks as they are.
+func similar(on bool, q search.Query, tasks []*task.Task) []*task.Task {
+	if !on {
+		return tasks
+	}
+	byID := make(map[string]*task.Task, len(tasks))
+	for _, t := range tasks {
+		byID[t.ID] = t
+	}
+	var out []*task.Task
+	for _, r := range search.Similar(q, tasks) {
+		out = append(out, byID[r.ID])
+	}
+	return out
+}
+
+// likeQuery turns --like into a query (zero without the flag) and the project to list:
+// T-N takes the title and, without --project, the project of that task.
+func likeQuery(p *parsed, proj string, tasks []*task.Task) (search.Query, string, error) {
+	arg := p.vals["like"]
+	q := search.Query{Text: arg, Project: proj, All: p.set["all"]}
+	if !p.set["like"] || !strings.HasPrefix(arg, "T-") {
+		return q, proj, nil
+	}
+	i := slices.IndexFunc(tasks, func(t *task.Task) bool { return t.ID == arg })
+	if i < 0 {
+		return q, proj, fmt.Errorf("%s: %w", arg, core.ErrNotFound)
+	}
+	q.Text, q.SelfID = tasks[i].Title, arg
+	if !p.set["project"] {
+		q.Project, proj = tasks[i].Project, tasks[i].Project
+	}
+	return q, proj, nil
 }
 
 // stale keeps the tasks without a move for staleAfter, most idle first, and their idle days.
