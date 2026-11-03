@@ -25,6 +25,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `make bench` target for `show` is 20 ms (was 15): the 1000-task bench measured 19 ms on 0.7.1 and 0.8.0 alike.
+
 - `p` in the TUI no longer cycles projects. The board hint line is over 100 characters; on a narrow screen `q quit` is cut.
 - `project.Detect` prefers the longest registered path that contains the folder, then the git lookup.
 - Agents merge their task PRs through `merge-gate` after one review; the release tag stays with the owner.

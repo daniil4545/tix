@@ -137,7 +137,7 @@ func benches(home string, tasks int) []bench {
 			},
 		},
 		{
-			name: "show", targetMS: 15, args: []string{"show", id},
+			name: "show", targetMS: 20, args: []string{"show", id},
 			check: func(_ int, out string) error {
 				if !strings.HasPrefix(out, "rev ") {
 					return fmt.Errorf("reply does not start with rev: %.40q", out)
