@@ -97,7 +97,8 @@ Accepted on 2026-10-20:
   decision 2026-10-21. Cancels the name ticket from D47.
 - D68. Development moves to the public repository daniil4545/tix: it is the `origin` of the working copy, the
   whole history and the internal docs are public. The tix repository becomes the bench of the admitd agent farm:
-  agents send PRs, the owner reviews and merges. User decision 2026-10-23 ("tix is fully public, a pet project,
+  agents send PRs, the owner reviews and merges (since 2026-11-03 the owner's own agents merge their task PRs
+  through `merge-gate` after one review and green CI, see AGENTS.md; farm PRs still wait for the owner). User decision 2026-10-23 ("tix is fully public, a pet project,
   no reason to hide"). Cancels the snapshot from D47; `scripts/snapshot.sh` is removed.
 - D69. Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with
   roles (D5, D20, D24 are superseded): agents confused the two names of each column. Stores with `[[column]]` are
