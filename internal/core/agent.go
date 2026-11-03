@@ -3,12 +3,16 @@ package core
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
 	ident "github.com/daniil4545/tix/internal/actor"
 	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
 )
 
@@ -406,4 +410,69 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	})
 	res.Info = info
 	return res, err
+}
+
+// ReleaseAll drops every live claim of the actor in one commit: an in_progress task goes back to the head
+// of open, as on a single release. Foreign and expired claims stay. The result lists the released ids.
+func (s *Store) ReleaseAll(actor string) ([]string, Result, error) {
+	if actor == "" || actor == unknownActor {
+		return nil, Result{}, fmt.Errorf("%w; pass --as agent:id", ErrNoIdentity)
+	}
+	actor, err := checkActor(actor)
+	if err != nil {
+		return nil, Result{}, err
+	}
+	var ids []string
+	var res Result
+	err = s.withLock(false, func(tx *txEnv) error {
+		if err := s.syncExternal(tx); err != nil {
+			return err
+		}
+		var files []gitx.File
+		for _, e := range s.rankIndex() {
+			if e.status != config.InProgress {
+				continue // only in_progress carries a claim: no parse of the rest
+			}
+			f, ok, err := s.releaseOwn(e.path, actor)
+			if err != nil {
+				return err
+			}
+			if ok {
+				ids = append(ids, e.id)
+				files = append(files, f)
+			}
+		}
+		if len(files) == 0 {
+			return nil
+		}
+		sort.Slice(ids, func(i, j int) bool { return IDNum(ids[i]) < IDNum(ids[j]) })
+		files = append(files, tx.extra...)
+		s.commit(tx, &res, files, "release "+strings.Join(ids, " "), actor)
+		return nil
+	})
+	return ids, res, err
+}
+
+// releaseOwn releases the live claim of actor in the file path; ok=false - the task is not held by actor.
+func (s *Store) releaseOwn(path, actor string) (gitx.File, bool, error) {
+	data, err := os.ReadFile(path) //nolint:gosec // the path is built by the core
+	if err != nil {
+		return gitx.File{}, false, fmt.Errorf("read %s: %w", path, err)
+	}
+	t, err := task.Parse(path, data)
+	if err != nil {
+		return gitx.File{}, false, nil // a broken card is not ours to fix
+	}
+	if c, has := t.ClaimInfo(); !has || c.Actor != actor || !c.Until.After(s.now()) {
+		return gitx.File{}, false, nil
+	}
+	if _, err := s.release(t, actor); err != nil {
+		return gitx.File{}, false, err
+	}
+	out := t.Render()
+	ok, err := s.replace(path, data, out)
+	if err != nil || !ok {
+		return gitx.File{}, false, err
+	}
+	return gitx.File{Path: filepath.Base(path), Data: out}, true, nil
 }

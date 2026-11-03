@@ -30,7 +30,7 @@ QUIET=0
 BAKED=""
 BAKLIST=""
 CODEX_NEW=0
-HOOK_EVENTS='["SessionStart","PostToolUse","UserPromptSubmit","Stop"]'
+HOOK_EVENTS='["SessionStart","PostToolUse","UserPromptSubmit","Stop","SessionEnd"]'
 
 die() { printf 'err: %s\n' "$*" >&2; exit 1; }
 warn() { printf 'warn: %s\n' "$*" >&2; }

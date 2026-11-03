@@ -278,9 +278,15 @@ func tilde(path, home string) string {
 }
 
 func (a *app) cmdTake(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"steal": false, "release": false}))
+	p, err := parseArgs(args, withCommon(flagSpec{"steal": false, "release": false, "hook": false}))
 	if err != nil {
 		return err
+	}
+	if p.set["release"] && len(p.pos) == 0 {
+		return a.releaseAll(p)
+	}
+	if p.set["hook"] {
+		return inputf("--hook works only with take --release and no number")
 	}
 	id, err := target(p, 1, "tix take <id> [--steal|--release]")
 	if err != nil {
@@ -312,6 +318,66 @@ func (a *app) cmdTake(args []string) error {
 		a.projectLine(res.ID)
 	}
 	return nil
+}
+
+// releaseAll - `take --release` without a number: drops every live claim of the actor, one commit.
+// With --hook (SessionEnd) the actor comes from the hook input and any failure is silent: the session is ending.
+func (a *app) releaseAll(p *parsed) error {
+	if p.set["steal"] {
+		return inputf("--steal and --release exclude each other")
+	}
+	var who string
+	if p.set["hook"] {
+		who = a.hookEndActor()
+		if who == "" {
+			return nil
+		}
+	} else {
+		var err error
+		if who, err = a.actorOf(p); err != nil {
+			return err
+		}
+	}
+	if err := a.open(); err != nil {
+		return a.hookQuiet(p, err)
+	}
+	ids, res, err := a.store.ReleaseAll(who)
+	if err != nil {
+		return a.hookQuiet(p, err)
+	}
+	if len(ids) == 0 {
+		if !p.set["hook"] {
+			a.out("ok no claims")
+		}
+		return nil
+	}
+	if !p.set["hook"] {
+		a.reply(p, res, strings.Join(ids, " "), "released")
+	}
+	return nil
+}
+
+// hookQuiet - a hook never fails the session: the error goes to the log, code 0.
+func (a *app) hookQuiet(p *parsed, err error) error {
+	if !p.set["hook"] {
+		return err
+	}
+	if a.log != nil {
+		a.log.Warn("release hook failed", "op", "release_all", "err", firstLine(err.Error()))
+	}
+	return nil
+}
+
+// hookEndActor reads the SessionEnd input and returns the session actor, "" if it is not a SessionEnd of a session.
+func (a *app) hookEndActor() string {
+	if a.env.Stdin == nil {
+		return ""
+	}
+	in, ok := readHookInput(a.env.Stdin)
+	if !ok || in.Event != eventEnd || in.AgentID != "" {
+		return ""
+	}
+	return actor.HookActor(a.env.Getenv, in.SessionID, in.TurnID != "")
 }
 
 // projectLine prints where the task's project lives and which instruction files lie in its root.

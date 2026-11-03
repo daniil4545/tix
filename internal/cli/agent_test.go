@@ -607,3 +607,39 @@ func TestCLI_Ctx_PathLine(t *testing.T) {
 		t.Errorf("ctx without the path line differs:\n%q\n%q", got, before)
 	}
 }
+
+// take --release without a number: lists the released, nothing held - ok; --hook takes the actor from SessionEnd input.
+func TestCLI_Take_ReleaseAllAndHook(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	b.newTask("One", "open")
+	b.newTask("Two", "open")
+	b.newTask("Three", "open")
+	if r := b.ok("", "take", "--release", "--as", "claude:a"); r.out != "ok no claims\n" {
+		t.Errorf("nothing held: %q, want `ok no claims`", r.out)
+	}
+	b.ok("", "take", "T-2", "--as", "claude:a")
+	b.ok("", "take", "T-3", "--as", "claude:a")
+	r := b.ok("", "take", "--release", "--as", "claude:a")
+	if r.out != "ok T-2 T-3 released\n" {
+		t.Errorf("release all: %q, want `ok T-2 T-3 released`", r.out)
+	}
+	if b.claimOf("T-2") != "" || b.claimOf("T-3") != "" {
+		t.Error("claims remain after release all")
+	}
+
+	b.ok("", "take", "T-1", "--as", "claude:s1")
+	n := b.commitCount()
+	hook := func(event string) res {
+		return b.tix(unitHookStdin(event, "s1"), "take", "--release", "--hook")
+	}
+	if r := hook("Stop"); r.code != 0 || r.out != "" || b.commitCount() != n {
+		t.Errorf("foreign event: code %d out %q commits %d->%d, want silent no-op", r.code, r.out, n, b.commitCount())
+	}
+	if r := hook("SessionEnd"); r.code != 0 || r.out != "" || b.claimOf("T-1") != "" || b.commitCount() != n+1 {
+		t.Errorf("SessionEnd: code %d out %q claim %q, want a silent release in one commit", r.code, r.out, b.claimOf("T-1"))
+	}
+	if r := b.tix("", "take", "T-1", "--hook"); r.code == 0 {
+		t.Error("--hook with a number accepted")
+	}
+}

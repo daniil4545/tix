@@ -793,3 +793,50 @@ func TestMove_EpicEditedMeanwhileGivesWarning(t *testing.T) {
 	}
 	ensure(t, strings.Contains(e.text(r.ID), "- [ ] "+child) && strings.Contains(e.text(r.ID), "edited elsewhere"), "the foreign edit must stay")
 }
+
+// ReleaseAll: all live claims of the actor in one commit; foreign and expired claims stay.
+func TestReleaseAll_OwnLiveClaimsOneCommit(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	clk := newClock()
+	s := e.openAt(clk)
+	head := mkIn(t, s, "Head", "open")
+	a1 := mkIn(t, s, "A1", "open")
+	a2 := mkIn(t, s, "A2", "open")
+	foreign := mkIn(t, s, "Foreign", "open")
+	old := mkIn(t, s, "Old", "open")
+	if _, err := s.Take(old, core.Take, "claude:a"); err != nil {
+		t.Fatal(err)
+	}
+	clk.add(2 * time.Hour)
+	for id, who := range map[string]string{a1: "claude:a", a2: "claude:a", foreign: "claude:b"} {
+		if _, err := s.Take(id, core.Take, who); err != nil {
+			t.Fatal(err)
+		}
+	}
+	clk.add(time.Hour + 30*time.Minute) // old expired (3.5 h), the others live
+
+	n := e.count()
+	ids, res, err := s.ReleaseAll("claude:a")
+	if err != nil {
+		t.Fatalf("ReleaseAll: %v", err)
+	}
+	ensure(t, strings.Join(ids, " ") == a1+" "+a2, "released %v, want [%s %s]", ids, a1, a2)
+	ensure(t, e.count() == n+1 && res.Commit != "", "commits %d -> %d, want one", n, e.count())
+	for _, id := range []string{a1, a2} {
+		tk := get(t, s, id)
+		ensure(t, tk.Status == "open", "%s status %s, want open", id, tk.Status)
+		_, has := tk.ClaimInfo()
+		ensure(t, !has, "%s keeps a claim", id)
+	}
+	ensure(t, get(t, s, foreign).Status == "in_progress", "foreign claim was touched")
+	ensure(t, strings.Contains(e.text(old), "claim: claude:a"), "expired claim was touched")
+	ensure(t, get(t, s, old).Status == "in_progress", "expired task was moved")
+	// In the head of open, before the untouched task.
+	ensure(t, get(t, s, a1).Rank < get(t, s, head).Rank && get(t, s, a2).Rank < get(t, s, head).Rank,
+		"released tasks are not in the head of open")
+
+	n = e.count()
+	ids, _, err = s.ReleaseAll("claude:a")
+	ensure(t, err == nil && len(ids) == 0 && e.count() == n, "repeat: %v %v, commits %d -> %d", ids, err, n, e.count())
+}

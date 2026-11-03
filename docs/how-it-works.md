@@ -34,6 +34,7 @@ Hooks:
 | `SessionStart` | `tix ctx --hook` (Claude Code), `tix ctx` (Codex) | the brief opens the session; for Claude Code the hook also records the model |
 | `PostToolUse`, `UserPromptSubmit` | `tix inbox --hook` | add new comments on the agent's tasks to its context |
 | `Stop` | `tix inbox --hook` | if you left a comment meanwhile, return the agent to work |
+| `SessionEnd` (Claude Code only) | `tix take --release --hook` | the window is closed: drop the session's live claims, so the card does not stay grey until the 3-hour claim runs out |
 
 A comment is delivered once, only to the session that holds the task. A comment
 by `human` also wakes an idle agent. A comment by another agent waits for the
