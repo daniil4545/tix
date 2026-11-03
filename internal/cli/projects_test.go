@@ -30,7 +30,7 @@ func TestProjectsList(t *testing.T) {
 	b.newTaskIn(b.cwd, "Work", "idea", "--project", "ghost")
 	b.newTaskIn(b.cwd, "Gone", "closed", "--project", "ghost")
 	out := b.ok("", "projects").out
-	if !strings.Contains(out, "ghost  -  1  not in catalog") {
+	if !strings.Contains(strings.Join(strings.Fields(out), " "), "ghost - 1 not in catalog") {
 		t.Errorf("closed task counted:\n%s", out)
 	}
 	if !strings.Contains(out, "call-transcription  -  0") {
