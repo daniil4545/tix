@@ -316,6 +316,9 @@ func (a *app) cmdTake(args []string) error {
 // projectLine prints where the task's project lives and which instruction files lie in its root.
 // A project with no path (or an unreadable task) prints nothing.
 func (a *app) projectLine(id string) {
+	if len(a.store.Config().Paths) == 0 {
+		return // no catalog, no extra git call per take
+	}
 	t, _, err := a.store.Get(id)
 	if err != nil {
 		return
