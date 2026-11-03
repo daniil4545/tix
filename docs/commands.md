@@ -18,6 +18,8 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract` |
 | `tix check T-12 1 2` | ticks criteria by number; a task line (`- [ ] T-N ...`) of an epic is refused, it follows the status of T-N |
 | `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; its line in every epic (tag `epic`) is ticked in the same commit, a move out of closed clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force` |
+| `tix projects` | lists the catalog: project, path or `-`, number of tasks not closed; a project that only tasks mention gets `not in catalog` |
+| `tix projects add NAME [PATH]` | registers a project in `[paths]` of config.toml; PATH is an absolute existing folder, else code 6; without PATH the project has no folder; repeating the same call prints ok; no `rm`, edit config.toml by hand |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
 
 An id works with or without the prefix: `12` means `T-12`. Every command takes
