@@ -387,7 +387,10 @@ func (a *app) waitingOn(t *task.Task) []string {
 	if len(t.After()) == 0 {
 		return nil
 	}
-	all, _ := a.store.List()
+	all, errs := a.store.List()
+	for _, e := range errs {
+		a.warn("%s", firstLine(e.Error()))
+	}
 	return task.WaitingOn(t, task.NotClosed(all))
 }
 
