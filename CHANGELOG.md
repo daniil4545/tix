@@ -6,9 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-03
+
 ### Added
 
-- The Codex connector gets the `SessionEnd` hook too (`tix take --release --hook`, 3 s timeout): reinstall with `scripts/connect.sh apply --force` and confirm it in Codex `/hooks`.
+- The Codex connector gets the `SessionEnd` hook too (`tix take --release --hook`, 3 s timeout): reinstall with `scripts/connect.sh apply --force` and confirm it in Codex `/hooks`. The lock timeout (5 s) is above the Codex hook ceiling (3 s): with a busy lock the claim stays until it expires.
+
+### Fixed
+
+- The known project list of the refusal (code 5) names `personal` once.
 
 ## [0.8.0] - 2026-11-03
 
