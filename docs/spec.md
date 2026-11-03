@@ -142,15 +142,18 @@ flowchart TD
 | Command | What it does |
 |---|---|
 | `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters; the line `stale 14d+: N (up to 10 ids)` names idea and open tasks without a move for 14 days: a move is a commit `T-N: new|note|comment|move|take|steal|done|edit|check`, set, release, external edits and mass commits of tix do not count; `list --stale` shows them with the idle days |
-| `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, Abstract and criteria, case-insensitive; `--stale` keeps idea and open tasks without a move for 14 days with their idle days; alias `ls`; the whole task, with `rev` |
+| `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, Abstract and criteria, case-insensitive; `--like TEXT|T-N` lists similar tasks of the project by shared 5-letter word stems; `--stale` keeps idea and open tasks without a move for 14 days with their idle days; alias `ls`; the whole task, with `rev` |
 | `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
-| `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open` |
+| `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open`; without a number it drops every live claim of the actor in one commit (the SessionEnd hook); for a project with a path it prints `project: NAME /path docs: ...` |
+| `projects` | lists the catalog `[paths]` of config.toml with open counts; `projects add NAME [PATH]` registers a project; once the catalog is not empty `new` and `set project=` refuse an unknown project (code 5) |
 | `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`; a failed epic write is a Warning; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
 | `rm` | delete |
+
+A body line `After: T-1, T-2` keeps the task out of `next` in `ctx` until those tasks close.
 
    - `status`, `id`, `created`, `claim`, `rank` change only through their own commands (`move`, `take`,
      `done`); `set` and `edit` do not accept them;
@@ -337,7 +340,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Operation | Target |
 |---|---|
-| `ctx`, `list`, `show` | up to 15 ms, `ctx` up to 25 ms (one git walk for the stale line); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
+| `ctx`, `list`, `show` | `list` up to 15 ms, `show` up to 20 ms, `ctx` up to 25 ms (one git walk for the stale line); without Glamour and other libraries with a heavy init (the ASCII theme does not need it) |
 | write with commit | up to 50 ms; the first one after an edit that bypassed the core - up to 70 ms (measured 55) |
 | TUI open | up to 100 ms |
 
