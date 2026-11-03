@@ -30,6 +30,7 @@ var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}
 // of the text; 0 removes the limit (this is how JSON is built).
 type Input struct {
 	Tasks                     []*task.Task
+	All                       []*task.Task // every task of the store, to tell which After ids are closed; empty - Tasks
 	Project, RulesPath, Actor string
 	Path                      string // the project folder; empty - no line
 	Now                       time.Time
@@ -77,10 +78,14 @@ func Build(in Input) Brief {
 	if in.Project != "" {
 		statuses = ctxStatuses
 	}
+	known := in.All
+	if len(known) == 0 {
+		known = in.Tasks
+	}
 	for _, status := range statuses {
 		tasks := ranked(in.Tasks, status)
 		if status == config.Open {
-			b.Next = nextID(tasks, in)
+			b.Next = nextID(tasks, in, task.NotClosed(known))
 		}
 		if len(tasks) == 0 {
 			continue
@@ -150,9 +155,12 @@ func liveClaim(t *task.Task, now time.Time) (task.Claim, bool) {
 	return c, ok && now.Before(c.Until)
 }
 
-// nextID returns the first open task without a live claim of another actor.
-func nextID(ready []*task.Task, in Input) string {
+// nextID returns the first open task without a live claim of another actor and without an unclosed After task.
+func nextID(ready []*task.Task, in Input, notClosed map[string]bool) string {
 	for _, t := range ready {
+		if len(task.WaitingOn(t, notClosed)) > 0 {
+			continue
+		}
 		if c, ok := liveClaim(t, in.Now); !ok || c.Actor == in.Actor {
 			return t.ID
 		}

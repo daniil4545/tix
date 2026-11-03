@@ -29,6 +29,11 @@ When both agent variables are set (one agent started inside another), a write
 asks for `--as`.
 Text that starts with a dash goes after `--`.
 
+A body line `After: T-1, T-2` (case-insensitive, outside code blocks) names the tasks this one waits for.
+While one of them is not closed, `tix ctx` does not offer the task as `next`, `tix list` adds
+`| after T-1` and `tix show` prints a line `after T-1` before the file. A number with no task counts as
+closed. `tix take` works as usual.
+
 `tix show` ends with the notes of the task, read from the store history (`tix note`
 writes only a commit, not the file). Without notes the section is absent. Format:
 

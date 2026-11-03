@@ -240,6 +240,9 @@ func (a *app) cmdShow(args []string) error {
 		for _, e := range a.store.EpicsOf(id) {
 			a.out("Epic: %s", e)
 		}
+		if after := a.waitingOn(sh.Task); len(after) > 0 {
+			a.out("after %s", strings.Join(after, ", "))
+		}
 		_, _ = a.env.Stdout.Write(sh.Data)
 		a.printNotes(id, sh, p.set["v"])
 		return nil
@@ -331,7 +334,7 @@ func (a *app) cmdList(args []string) error {
 	}
 	// Empty store: nothing to read, list does not create the folder.
 	if _, statErr := os.Stat(root); errors.Is(statErr, os.ErrNotExist) {
-		return a.printTasks(p, nil, nil)
+		return a.printTasks(p, nil, nil, nil)
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -340,6 +343,7 @@ func (a *app) cmdList(args []string) error {
 	for _, e := range errs {
 		a.warn("%s", firstLine(e.Error()))
 	}
+	notClosed := task.NotClosed(tasks)
 	proj := p.vals["project"]
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
@@ -369,13 +373,22 @@ func (a *app) cmdList(args []string) error {
 	matched = a.filter(matched, proj, p.vals["status"])
 	matched = similar(p.set["like"], lq, matched)
 	if !p.set["stale"] {
-		return a.printTasks(p, matched, nil)
+		return a.printTasks(p, matched, nil, notClosed)
 	}
 	stale, days, err := a.stale(matched)
 	if err != nil {
 		return err
 	}
-	return a.printTasks(p, stale, days)
+	return a.printTasks(p, stale, days, notClosed)
+}
+
+// waitingOn returns the After tasks of t that are not closed; the store is read only when t has After.
+func (a *app) waitingOn(t *task.Task) []string {
+	if len(t.After()) == 0 {
+		return nil
+	}
+	all, _ := a.store.List()
+	return task.WaitingOn(t, task.NotClosed(all))
 }
 
 // similar keeps the tasks resembling the query, most similar first; off - tasks as they are.
@@ -479,7 +492,7 @@ func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
 	return out
 }
 
-func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int) error {
+func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, notClosed map[string]bool) error {
 	if p.set["json"] {
 		items := make([]listItem, 0, len(tasks))
 		for _, t := range tasks {
@@ -511,6 +524,9 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int) err
 		}
 		if d, ok := days[t.ID]; ok {
 			line += fmt.Sprintf(" | idle %dd", d)
+		}
+		if after := task.WaitingOn(t, notClosed); len(after) > 0 {
+			line += " | after " + strings.Join(after, ", ")
 		}
 		a.out("%s", line)
 	}

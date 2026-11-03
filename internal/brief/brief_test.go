@@ -245,3 +245,34 @@ func TestText_PathLine(t *testing.T) {
 		t.Errorf("second line %q, want `path: /x/p`", lines[1])
 	}
 }
+
+// A task with an unclosed After task is not offered as next; the first suitable one is.
+func TestBuild_AfterOpenTask_NextSkipsIt(t *testing.T) {
+	defer guard(t)
+	wait := mk("T-1", "waits", "open", 1)
+	wait.Body = "After: T-2"
+	b := brief.Build(input(wait, mk("T-2", "dep", "open", 2), mk("T-3", "other", "open", 3)))
+	if b.Next != "T-2" {
+		t.Errorf("next %q, want T-2", b.Next)
+	}
+	s, _ := section(b, "open")
+	if len(s.Rows) != 3 {
+		t.Errorf("the waiting task must stay listed: %+v", s)
+	}
+	// closed or unknown After ids do not hold the task
+	in := input(wait, mk("T-2", "dep", "closed", 2))
+	if b := brief.Build(in); b.Next != "T-1" {
+		t.Errorf("closed dep: next %q, want T-1", b.Next)
+	}
+	wait.Body = "After: T-99"
+	if b := brief.Build(input(wait)); b.Next != "T-1" {
+		t.Errorf("unknown dep: next %q, want T-1", b.Next)
+	}
+	// the dep lives outside the filtered project: All tells it is still open
+	wait.Body = "After: T-2"
+	in = input(wait, mk("T-3", "other", "open", 3))
+	in.All = []*task.Task{wait, mk("T-2", "dep", "open", 1), mk("T-3", "other", "open", 3)}
+	if b := brief.Build(in); b.Next != "T-3" {
+		t.Errorf("dep in another project: next %q, want T-3", b.Next)
+	}
+}
