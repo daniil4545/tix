@@ -1,6 +1,7 @@
 name: ci
 
-# GitHub flow: every PR into main and every push to main run ci-check on Linux and macOS.
+# GitHub flow: every PR into main and every push to main run ci-check on Linux and macOS. `gate` is
+# the one required check of main: red unless every job succeeded (deps runs on PRs only).
 on:
   push:
     branches: [main]
@@ -19,6 +20,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -33,3 +36,29 @@ jobs:
           version: "~> v2"
           install-only: true
       - run: make ci-check
+
+  # New or changed dependencies of a PR: known vulnerabilities and licenses outside the list.
+  deps:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          allow-licenses: MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0
+
+  gate:
+    if: always()
+    needs: [check, deps]
+    runs-on: ubuntu-latest
+    steps:
+      - name: every job passed
+        env:
+          CHECK: ${{ needs.check.result }}
+          DEPS: ${{ needs.deps.result }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "check: $CHECK, deps: $DEPS, event: $EVENT"
+          test "$CHECK" = success
+          test "$DEPS" = success || { test "$EVENT" = push && test "$DEPS" = skipped; }
