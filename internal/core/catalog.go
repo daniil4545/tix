@@ -122,7 +122,9 @@ func (s *Store) checkKnownProject(project string) error {
 	}
 	known := []string{defaultProject}
 	for n := range s.cfg.Paths {
-		known = append(known, n)
+		if n != defaultProject { // personal is always allowed: one row, not two
+			known = append(known, n)
+		}
 	}
 	sort.Strings(known)
 	return rule("unknown project %q; known: %s; register it: tix projects add %s PATH",
