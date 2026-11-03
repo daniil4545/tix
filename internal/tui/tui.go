@@ -86,6 +86,7 @@ type Model struct {
 	help    bool // the help screen is open
 	input   *prompt
 	pick    *picker // the project list; nil when closed
+	find    *search // the text search; nil when closed
 	grab    *grab   // a card grab on the board; nil outside a grab
 
 	notes map[string]gitx.Note // the latest task notes for the pulse; nil until git answers
@@ -163,6 +164,8 @@ func (m *Model) View() tea.View {
 		frame = view.RenderHelp(m.w, m.h)
 	case m.pick != nil:
 		frame = view.RenderPicker(m.pickerView())
+	case m.find != nil:
+		frame = view.RenderSearch(m.searchView())
 	case m.showing:
 		frame = view.RenderCard(m.cardView())
 	default:
