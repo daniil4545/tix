@@ -6,7 +6,7 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | Command | What it does |
 |---|---|
 | `tix new "title" [--to status] [--project p] [--body-file f]` | creates a task, by default in `idea`, with the body of file `f` (`-` is stdin); `--to open` needs criteria in the body, `--to blocked` and `--to closed` are refused |
-| `tix list [--project p] [--status s] [--grep text] [--all] [--stale] [--json]` | lists tasks that are not closed; `--stale` keeps idea and open tasks without a move for 14 days, most idle first, with `| idle Nd`; `--all` or `--status closed` adds closed ones; `--grep` matches the title, Abstract and criteria, ignoring case, excluding notes, comments and history; alias `ls` |
+| `tix list [--project p] [--status s] [--grep text] [--like text|T-N] [--all] [--stale] [--json]` | lists tasks that are not closed; `--stale` keeps idea and open tasks without a move for 14 days, most idle first, with `| idle Nd`; `--all` or `--status closed` adds closed ones; `--grep` matches the title, Abstract and criteria, ignoring case, excluding notes, comments and history; `--like` lists tasks of the project similar to the words or to the title of T-N (not T-N itself), most similar first: stems of 5 letters, epics and closed tasks excluded unless `--all`, a one-word query finds nothing; alias `ls` |
 | `tix show T-12 [-v] [--json]` | prints the whole task with its `rev`, then the notes from the history: the last 5, all with `-v` (see below) |
 | `tix edit T-12 --base <rev>` | replaces the body from stdin; comments stay untouched |
 | `tix comment T-12 "text"` | adds a comment |
