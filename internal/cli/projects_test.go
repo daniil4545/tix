@@ -28,7 +28,11 @@ func TestProjectsList(t *testing.T) {
 	b := newBox(t)
 	b.ok("", "projects", "add", "call-transcription")
 	b.newTaskIn(b.cwd, "Work", "idea", "--project", "ghost")
+	b.newTaskIn(b.cwd, "Gone", "closed", "--project", "ghost")
 	out := b.ok("", "projects").out
+	if !strings.Contains(out, "ghost  -  1  not in catalog") {
+		t.Errorf("closed task counted:\n%s", out)
+	}
 	if !strings.Contains(out, "call-transcription  -  0") {
 		t.Errorf("no row for call-transcription:\n%s", out)
 	}
