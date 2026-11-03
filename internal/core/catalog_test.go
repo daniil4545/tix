@@ -84,8 +84,11 @@ func TestStore_KnownProject(t *testing.T) {
 	if _, err := s.SetProjectPath("Tarn", "/work/tarn", "tester"); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := s.SetProjectPath("personal", "", "tester"); err != nil { // registered too: listed once
+		t.Fatal(err)
+	}
 	_, err := s.Create("New", "nope", "idea", "tester")
-	if !errors.Is(err, core.ErrRule) || !strings.Contains(err.Error(), "known: personal, tarn") ||
+	if !errors.Is(err, core.ErrRule) || !strings.Contains(err.Error(), "known: personal, tarn;") ||
 		!strings.Contains(err.Error(), "tix projects add nope PATH") {
 		t.Errorf("unknown project: %v", err)
 	}
