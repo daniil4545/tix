@@ -26,9 +26,9 @@ func TestProjectsAdd(t *testing.T) {
 
 func TestProjectsList(t *testing.T) {
 	b := newBox(t)
-	b.ok("", "projects", "add", "call-transcription")
 	b.newTaskIn(b.cwd, "Work", "idea", "--project", "ghost")
 	b.newTaskIn(b.cwd, "Gone", "closed", "--project", "ghost")
+	b.ok("", "projects", "add", "call-transcription")
 	out := b.ok("", "projects").out
 	if !strings.Contains(strings.Join(strings.Fields(out), " "), "ghost - 1 not in catalog") {
 		t.Errorf("closed task counted:\n%s", out)
@@ -42,4 +42,21 @@ func TestProjectsList(t *testing.T) {
 	if strings.Contains(strings.SplitN(out, "\n", 2)[0], "not in catalog") {
 		t.Errorf("known project marked:\n%s", out)
 	}
+}
+
+func TestKnownProject(t *testing.T) {
+	b := newBox(t)
+	b.ok("", "new", "Old", "--project", "ghost")
+	dir := t.TempDir()
+	b.ok("", "projects", "add", "tarn", dir)
+	r := b.tix("", "new", "Nope", "--project", "nope")
+	if r.code != 5 || !strings.Contains(r.err, "known: personal, tarn") || !strings.Contains(r.err, "tix projects add nope PATH") {
+		t.Errorf("new nope: code %d, %q", r.code, r.err)
+	}
+	b.ok("", "new", "A", "--project", "Tarn")
+	b.ok("", "new", "B", "--project", "personal")
+	if r := b.tix("", "set", "T-1", "project=nope"); r.code != 5 {
+		t.Errorf("set nope: code %d, %q", r.code, r.err)
+	}
+	b.ok("", "set", "T-1", "title=Renamed")
 }

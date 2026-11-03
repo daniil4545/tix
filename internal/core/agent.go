@@ -322,10 +322,14 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	list := strings.Join(names, " ")
 	op := &opInfo{kind: "set", subject: "set " + list}
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
+		old := t.Project
 		for _, f := range fields {
 			if err := setField(t, f); err != nil {
 				return err
 			}
+		}
+		if t.Project != old {
+			return s.checkKnownProject(t.Project)
 		}
 		return nil
 	})

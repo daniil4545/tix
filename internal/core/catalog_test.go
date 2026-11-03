@@ -72,3 +72,40 @@ func TestStore_SetProjectPath_KeepsForeignSections(t *testing.T) {
 		}
 	}
 }
+
+func TestStore_KnownProject(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.open(2 * time.Second)
+	// empty catalog: any project
+	if _, err := s.Create("Old", "ghost", "idea", "tester"); err != nil {
+		t.Fatalf("empty catalog: %v", err)
+	}
+	if _, err := s.SetProjectPath("Tarn", "/work/tarn", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	_, err := s.Create("New", "nope", "idea", "tester")
+	if !errors.Is(err, core.ErrRule) || !strings.Contains(err.Error(), "known: personal, tarn") ||
+		!strings.Contains(err.Error(), "tix projects add nope PATH") {
+		t.Errorf("unknown project: %v", err)
+	}
+	for _, p := range []string{"TARN", "personal", "Personal", ""} {
+		if _, err := s.Create("Ok", p, "idea", "tester"); err != nil {
+			t.Errorf("project %q: %v", p, err)
+		}
+	}
+	_, err = s.Set("T-1", []core.Field{{Name: "project", Value: "nope"}}, "tester")
+	if !errors.Is(err, core.ErrRule) {
+		t.Errorf("set unknown project: %v", err)
+	}
+	// an old task with an unknown project stays editable
+	if _, err := s.Set("T-1", []core.Field{{Name: "title", Value: "Renamed"}}, "tester"); err != nil {
+		t.Errorf("set title on old task: %v", err)
+	}
+	if _, err := s.Set("T-1", []core.Field{{Name: "project", Value: "ghost"}}, "tester"); err != nil {
+		t.Errorf("set same project: %v", err)
+	}
+	if _, err := s.Set("T-1", []core.Field{{Name: "project", Value: "Tarn"}}, "tester"); err != nil {
+		t.Errorf("set known project: %v", err)
+	}
+}
