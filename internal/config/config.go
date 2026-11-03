@@ -116,14 +116,16 @@ func (c *Config) Render() []byte {
 	var b bytes.Buffer
 	enc := toml.NewEncoder(&b)
 	enc.Indent = ""
-	if err := enc.Encode(file{Projects: c.Projects, Paths: c.Paths}); err != nil {
-		panic(fmt.Sprintf("config: render: %v", err)) // the file types are fixed
+	// one map, one Encode: a top-level scalar from a foreign section must not land under [paths]
+	all := map[string]any{"projects": c.Projects}
+	if len(c.Paths) > 0 {
+		all["paths"] = c.Paths
 	}
-	if len(c.extra) > 0 {
-		b.WriteByte('\n')
-		if err := enc.Encode(c.extra); err != nil {
-			panic(fmt.Sprintf("config: render: %v", err)) // decoded from toml, so it encodes back
-		}
+	for k, v := range c.extra {
+		all[k] = v
+	}
+	if err := enc.Encode(all); err != nil {
+		panic(fmt.Sprintf("config: render: %v", err)) // decoded from toml, so it encodes back
 	}
 	return b.Bytes()
 }

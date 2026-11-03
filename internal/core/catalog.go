@@ -74,6 +74,11 @@ func (s *Store) SetProjectPath(name, path, actor string) (Result, error) {
 func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (bool, error) {
 	cfgRel := filepath.ToSlash(filepath.Join(tixDir, configFile))
 	cfgPath := filepath.Join(s.root, tixDir, configFile)
+	// bytes first, parse second: an edit between the two is caught by replace and retried
+	old, err := os.ReadFile(cfgPath) //nolint:gosec // path inside the store, set by the owner
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("read %s: %w", cfgPath, err)
+	}
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return false, err
@@ -85,10 +90,6 @@ func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (b
 	}
 	if known && cur != "" {
 		return false, rule("project %s is already at %s, not %s", name, cur, path)
-	}
-	old, err := os.ReadFile(cfgPath) //nolint:gosec // path inside the store, set by the owner
-	if err != nil {
-		return false, fmt.Errorf("read %s: %w", cfgPath, err)
 	}
 	cfg.Paths[name] = path
 	out := cfg.Render()
