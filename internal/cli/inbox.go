@@ -33,6 +33,7 @@ type hookInput struct {
 	Event     string `json:"hook_event_name"`
 	AgentID   string `json:"agent_id"`
 	TurnID    string `json:"turn_id"`
+	Model     string `json:"model"` // Codex adds it to every hook input, Claude Code does not
 }
 
 // readHookInput reads one JSON object from stdin (up to hookStdinLimit) within hookReadTimeout.

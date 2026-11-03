@@ -28,6 +28,13 @@
           { "type": "command", "command": "tix inbox --hook", "timeout": 10 }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "tix take --release --hook", "timeout": 3 }
+        ]
+      }
     ]
   }
 }

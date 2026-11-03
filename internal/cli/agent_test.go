@@ -642,4 +642,11 @@ func TestCLI_Take_ReleaseAllAndHook(t *testing.T) {
 	if r := b.tix("", "take", "T-1", "--hook"); r.code == 0 {
 		t.Error("--hook with a number accepted")
 	}
+
+	// Codex SessionEnd: no turn_id, but a model field; the actor is codex:<session_id>
+	b.ok("", "take", "T-2", "--as", "codex:c1")
+	n = b.commitCount()
+	if r := b.tix(unitHookStdin("SessionEnd", "c1", "model", "gpt-5-codex"), "take", "--release", "--hook"); r.code != 0 || r.out != "" || b.claimOf("T-2") != "" || b.commitCount() != n+1 {
+		t.Errorf("Codex SessionEnd: code %d out %q claim %q, want a silent release", r.code, r.out, b.claimOf("T-2"))
+	}
 }

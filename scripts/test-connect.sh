@@ -238,7 +238,7 @@ t_apply_clean_writes_exact_paths() {
   done
   jq_ok "$s" '.hooks.PostToolUse[0].matcher == "*"' 'Claude: matcher PostToolUse'
   jq_ok "$s" '[.hooks.SessionEnd[] | .hooks[] | select(.command == "tix take --release --hook" and .timeout == 10)] | length == 1' 'Claude: hook SessionEnd with tix take --release --hook'
-  jq_ok "$h" 'has("hooks") and (.hooks | has("SessionEnd") | not)' 'Codex: no SessionEnd hook'
+  jq_ok "$h" '[.hooks.SessionEnd[] | .hooks[] | select(.command == "tix take --release --hook" and .timeout == 3)] | length == 1' 'Codex: hook SessionEnd with tix take --release --hook, 3 s (the Codex ceiling)'
   jq_ok "$h" '.hooks.Stop | length == 1' 'Codex: one Stop group in a clean HOME'
   grep -qF 'prefix_rule(pattern=["tix"], decision="allow")' "$HOME/.codex/rules/tix.rules" || fail "Codex: tix.rules lacks prefix_rule for tix"
   jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'manifest'
@@ -380,7 +380,7 @@ t_legacy_tk_install_migrated() {
   local f
   local want
   for f in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json"; do
-    want=4; [ "$f" = "$HOME/.claude/settings.json" ] && want=5 # Claude also has SessionEnd
+    want=5
     jq_ok "$f" '[.. | objects | select((.command? // "") | test("^tk "))] | length == 0' "hook tk left in $f"
     jq_ok "$f" "[.. | objects | select((.command? // \"\") | test(\"^tix \"))] | length == $want" "$f does not hold $want tix hooks"
   done
