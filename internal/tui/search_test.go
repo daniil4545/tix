@@ -151,8 +151,8 @@ func TestExcerpt_AroundMatch(t *testing.T) {
 
 // S3: one typed character over 1000 tasks takes under 30 ms.
 func TestSearch_OneCharOn1000Tasks(t *testing.T) {
-	if testing.Short() {
-		t.Skip("slow")
+	if testing.Short() || raceOn {
+		t.Skip("timing test: not under -short or the race detector")
 	}
 	m, _ := findModel(t)
 	var tasks []*task.Task
