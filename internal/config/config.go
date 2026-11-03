@@ -108,6 +108,12 @@ func build(f file) *Config {
 	if c.Paths == nil {
 		c.Paths = map[string]string{}
 	}
+	for k, v := range c.Paths { // a hand-edited key keeps working whatever its case
+		if l := strings.ToLower(k); l != k {
+			delete(c.Paths, k)
+			c.Paths[l] = v
+		}
+	}
 	return c
 }
 

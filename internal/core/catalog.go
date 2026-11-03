@@ -111,3 +111,20 @@ func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (b
 	s.commit(tx, res, files, "tix: project "+name+" at "+path, actor)
 	return true, nil
 }
+
+// checkKnownProject refuses a project outside [paths] and not "personal". An empty catalog: no check.
+func (s *Store) checkKnownProject(project string) error {
+	if len(s.cfg.Paths) == 0 || project == defaultProject {
+		return nil
+	}
+	if _, ok := s.cfg.Paths[strings.ToLower(project)]; ok {
+		return nil
+	}
+	known := []string{defaultProject}
+	for n := range s.cfg.Paths {
+		known = append(known, n)
+	}
+	sort.Strings(known)
+	return rule("unknown project %q; known: %s; register it: tix projects add %s PATH",
+		project, strings.Join(known, ", "), project)
+}

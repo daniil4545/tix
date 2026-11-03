@@ -160,6 +160,9 @@ func (s *Store) CreateWithBody(title, project, column, body, actor string) (Resu
 	if project == "" {
 		project = defaultProject
 	}
+	if err := s.checkKnownProject(project); err != nil {
+		return Result{}, err
+	}
 	var res Result
 	err = s.withLock(true, func(tx *txEnv) error {
 		if err := s.syncExternal(tx); err != nil {
