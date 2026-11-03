@@ -415,6 +415,9 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 // ReleaseAll drops every live claim of the actor in one commit: an in_progress task goes back to the head
 // of open, as on a single release. Foreign and expired claims stay. The result lists the released ids.
 func (s *Store) ReleaseAll(actor string) ([]string, Result, error) {
+	if actor == "" || actor == unknownActor {
+		return nil, Result{}, fmt.Errorf("%w; pass --as agent:id", ErrNoIdentity)
+	}
 	actor, err := checkActor(actor)
 	if err != nil {
 		return nil, Result{}, err
@@ -427,6 +430,9 @@ func (s *Store) ReleaseAll(actor string) ([]string, Result, error) {
 		}
 		var files []gitx.File
 		for _, e := range s.rankIndex() {
+			if e.status != config.InProgress {
+				continue // only in_progress carries a claim: no parse of the rest
+			}
 			f, ok, err := s.releaseOwn(e.path, actor)
 			if err != nil {
 				return err
