@@ -114,13 +114,14 @@ func (a *app) cmdCtx(args []string) error {
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
 	}
+	all := tasks
 	tasks = a.filter(tasks, proj, "")
 	if len(tasks) == 0 && !p.set["json"] {
 		a.out("no tasks")
 		return nil
 	}
 	in := brief.Input{
-		Tasks: tasks, Project: proj,
+		Tasks: tasks, All: all, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
 		Now:       now, PerColumn: ctxPerColumn,
 		Path: a.store.Config().Paths[strings.ToLower(proj)],
