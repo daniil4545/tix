@@ -31,7 +31,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm; " +
+	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm|projects; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
