@@ -12,12 +12,14 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | `tix comment T-12 "text"` | adds a comment |
 | `tix note T-12 "text"` | logs a step in the history; up to 300 characters, longer is refused with code 5: put the text in a file and the path in the note; the board shows the latest note |
 | `tix rm T-12` | deletes a task |
-| `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, the line `stale 14d+: N (ids)` (up to 10 ids) for idea and open tasks without a move for 14 days, next task; outside a project in_progress and blocked, the rest as counts |
-| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open |
+| `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, the line `stale 14d+: N (ids)` (up to 10 ids) for idea and open tasks without a move for 14 days, next task; the line `path: /abs/path` when the project has a path in `[paths]`; outside a project in_progress and blocked, the rest as counts |
+| `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open; take and steal for a project with a path also print `project: NAME /abs/path docs: AGENTS.md CLAUDE.md` (docs: the files that exist in the path root) |
 | `tix move T-12 <status> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `open`, `blocked`, `closed`; `-m` is for `blocked` and `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract` |
 | `tix check T-12 1 2` | ticks criteria by number; a task line (`- [ ] T-N ...`) of an epic is refused, it follows the status of T-N |
 | `tix done T-12 [-m text] [--force]` | closes a task and drops the claim; its line in every epic (tag `epic`) is ticked in the same commit, a move out of closed clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force` |
+| `tix projects` | lists the catalog: project, path or `-`, number of tasks not closed; a project that only tasks mention gets `not in catalog` |
+| `tix projects add NAME [PATH]` | registers a project in `[paths]` of config.toml; PATH is an absolute existing folder, else code 6; without PATH the project has no folder; repeating the same call prints ok; no `rm`, edit config.toml by hand |
 | `tix inbox --hook` | delivers new comments to an agent; runs from a hook, not by hand |
 
 An id works with or without the prefix: `12` means `T-12`. Every command takes

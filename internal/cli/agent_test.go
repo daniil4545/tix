@@ -545,3 +545,65 @@ func TestCLI_Note_TooLongRefused(t *testing.T) {
 	b.ok("", "note", "T-3", strings.Repeat("ж", 300))
 	b.ok("", "comment", "T-3", strings.Repeat("ж", 301))
 }
+
+// setPaths writes a [paths] table into the config of the box.
+func (b *box) setPaths(name, dir string) {
+	b.t.Helper()
+	cfg := filepath.Join(b.home, ".tix", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(cfg), 0o755); err != nil {
+		b.t.Fatal(err)
+	}
+	if err := os.WriteFile(cfg, []byte("[paths]\n"+name+" = \""+dir+"\"\n"), 0o644); err != nil {
+		b.t.Fatal(err)
+	}
+}
+
+func TestCLI_Take_ProjectPathLine(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	proj := projectDir(t, b, "myproj")
+	id := b.newTaskIn(proj, "Work", "open")
+	other := b.newTaskIn(projectDir(t, b, "plain"), "Other", "open")
+	if r := b.ok("", "take", other, "--as", "claude:a"); strings.Contains(r.out, "project:") {
+		t.Errorf("take with no path: %q, want no project line", r.out)
+	}
+	b.setPaths("myproj", proj)
+	if err := os.WriteFile(filepath.Join(proj, "AGENTS.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := b.ok("", "take", id, "--as", "claude:a")
+	want := "project: myproj " + proj + " docs: AGENTS.md\n"
+	if !strings.HasSuffix(r.out, "\n"+want) {
+		t.Errorf("take: %q, want last line %q", r.out, want)
+	}
+	if err := os.WriteFile(filepath.Join(proj, "CLAUDE.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r = b.ok("", "take", id, "--as", "claude:a")
+	if want = "project: myproj " + proj + " docs: AGENTS.md CLAUDE.md\n"; !strings.HasSuffix(r.out, "\n"+want) {
+		t.Errorf("take: %q, want last line %q", r.out, want)
+	}
+	if r = b.ok("", "take", id, "--release", "--as", "claude:a"); strings.Contains(r.out, "project:") {
+		t.Errorf("release: %q, want no project line", r.out)
+	}
+}
+
+func TestCLI_Ctx_PathLine(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	proj := projectDir(t, b, "myproj")
+	b.newTaskIn(proj, "Work", "open")
+	before := b.runIn(proj, "", "ctx").out
+	if strings.Contains(before, "path:") {
+		t.Fatalf("ctx with no path: %q", before)
+	}
+	b.setPaths("myproj", proj)
+	after := b.runIn(proj, "", "ctx").out
+	lines := strings.Split(after, "\n")
+	if lines[1] != "path: "+proj {
+		t.Errorf("ctx line 2 %q, want path line", lines[1])
+	}
+	if got := strings.Join(append(lines[:1:1], lines[2:]...), "\n"); got != before {
+		t.Errorf("ctx without the path line differs:\n%q\n%q", got, before)
+	}
+}

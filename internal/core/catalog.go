@@ -25,8 +25,13 @@ func (s *Store) Catalog() []CatalogEntry {
 	count := map[string]int{}
 	tasks, _ := s.List()
 	for _, t := range tasks {
-		if t.Project != "" {
+		if t.Project == "" {
+			continue
+		}
+		if t.Status != config.Closed {
 			count[t.Project]++
+		} else {
+			count[t.Project] += 0
 		}
 	}
 	for n := range s.cfg.Paths {
