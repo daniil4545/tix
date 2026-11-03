@@ -123,6 +123,7 @@ func (a *app) cmdCtx(args []string) error {
 		Tasks: tasks, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
 		Now:       now, PerColumn: ctxPerColumn,
+		Path: a.store.Config().Paths[strings.ToLower(proj)],
 	}
 	if who != unknownActor {
 		in.Actor = who
@@ -306,7 +307,34 @@ func (a *app) cmdTake(args []string) error {
 		return wrap(id, err)
 	}
 	a.reply(p, res, id, what(res, "take"))
+	if mode != core.Release {
+		a.projectLine(res.ID)
+	}
 	return nil
+}
+
+// projectLine prints where the task's project lives and which instruction files lie in its root.
+// A project with no path (or an unreadable task) prints nothing.
+func (a *app) projectLine(id string) {
+	t, _, err := a.store.Get(id)
+	if err != nil {
+		return
+	}
+	dir := a.store.Config().Paths[strings.ToLower(t.Project)]
+	if dir == "" {
+		return
+	}
+	line := "project: " + t.Project + " " + dir
+	var docs []string
+	for _, f := range []string{"AGENTS.md", "CLAUDE.md"} {
+		if st, err := os.Stat(filepath.Join(dir, f)); err == nil && st.Mode().IsRegular() {
+			docs = append(docs, f)
+		}
+	}
+	if len(docs) > 0 {
+		line += " docs: " + strings.Join(docs, " ")
+	}
+	a.out("%s", line)
 }
 
 func (a *app) cmdMove(args []string) error {
