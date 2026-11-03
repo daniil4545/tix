@@ -13,6 +13,7 @@ See also: [how it works](how-it-works.md), [README](../README.md).
 | `tix note T-12 "text"` | logs a step in the history; up to 300 characters, longer is refused with code 5: put the text in a file and the path in the note; the board shows the latest note |
 | `tix rm T-12` | deletes a task |
 | `tix ctx [--project p] [--json]` | brief of the project: in_progress, blocked, open, the line `stale 14d+: N (ids)` (up to 10 ids) for idea and open tasks without a move for 14 days, next task; the line `path: /abs/path` when the project has a path in `[paths]`; outside a project in_progress and blocked, the rest as counts |
+| `tix take --release` | without a number: releases every live claim of the actor in one commit (in_progress goes to the head of open), prints `ok T-2 T-3 released` or `ok no claims`; foreign and expired claims stay; `--hook` is the SessionEnd form: actor from the hook input, silent |
 | `tix take T-12 [--steal\|--release]` | claims a task for 3 hours, takes it over, or releases it back to open; take and steal for a project with a path also print `project: NAME /abs/path docs: AGENTS.md CLAUDE.md` (docs: the files that exist in the path root) |
 | `tix move T-12 <status> [--first\|--after T-9] [-m text] [--force]` | moves a task; checks on entering `open`, `blocked`, `closed`; `-m` is for `blocked` and `closed` |
 | `tix set T-12 field=value...` | sets `title`, `project`, `waiting`, `tags`, `external`, `abstract` |

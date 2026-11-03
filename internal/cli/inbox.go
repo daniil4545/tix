@@ -24,6 +24,7 @@ const (
 	eventPostTool = "PostToolUse"
 	eventPrompt   = "UserPromptSubmit"
 	eventStop     = "Stop"
+	eventEnd      = "SessionEnd"
 )
 
 // hookInput - the hook input fields that delivery needs.

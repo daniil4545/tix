@@ -156,7 +156,7 @@ must_exist() { [ -e "$1" ] || [ -L "$1" ] || fail "missing $1"; }
 must_absent() { [ ! -e "$1" ] && [ ! -L "$1" ] || fail "left over: $1"; }
 baks() { find "$HOME" -name '*.tix-bak-*' | LC_ALL=C sort; }
 # Our hook groups in all events; event arrays left empty after removal go too.
-DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tix ctx" or .command == "tix ctx --hook" or .command == "tix inbox --hook") | not))) | with_entries(select(.value | length > 0)))'
+DROP_OURS='.hooks |= (with_entries(.value |= map(select(any(.hooks[]?; .command == "tix ctx" or .command == "tix ctx --hook" or .command == "tix inbox --hook" or .command == "tix take --release --hook") | not))) | with_entries(select(.value | length > 0)))'
 MANIFEST() { echo "$HOME/tasks/.tix/connect-state.json"; }
 files_in_home() { (cd "$HOME" && find . -mindepth 1 \( -type f -o -type l \) | LC_ALL=C sort); }
 
@@ -237,6 +237,8 @@ t_apply_clean_writes_exact_paths() {
     jq_ok "$h" "[.hooks.${ev}[] | .hooks[] | select(.command == \"tix inbox --hook\" and .timeout == 10)] | length == 1" "Codex: hook $ev with tix inbox --hook"
   done
   jq_ok "$s" '.hooks.PostToolUse[0].matcher == "*"' 'Claude: matcher PostToolUse'
+  jq_ok "$s" '[.hooks.SessionEnd[] | .hooks[] | select(.command == "tix take --release --hook" and .timeout == 10)] | length == 1' 'Claude: hook SessionEnd with tix take --release --hook'
+  jq_ok "$h" 'has("hooks") and (.hooks | has("SessionEnd") | not)' 'Codex: no SessionEnd hook'
   jq_ok "$h" '.hooks.Stop | length == 1' 'Codex: one Stop group in a clean HOME'
   grep -qF 'prefix_rule(pattern=["tix"], decision="allow")' "$HOME/.codex/rules/tix.rules" || fail "Codex: tix.rules lacks prefix_rule for tix"
   jq_ok "$(MANIFEST)" '.version == 1 and (.entries | length) > 0' 'manifest'
@@ -376,9 +378,11 @@ t_legacy_tk_install_migrated() {
   grep -q '^\.tix/lock$' "$HOME/tasks/.gitignore" || fail ".gitignore of the store not moved to .tix: $(cat "$HOME/tasks/.gitignore")"
   grep -q 'tracker' "$HOME/tasks/.gitignore" && fail ".gitignore of the store keeps .tracker"
   local f
+  local want
   for f in "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json"; do
+    want=4; [ "$f" = "$HOME/.claude/settings.json" ] && want=5 # Claude also has SessionEnd
     jq_ok "$f" '[.. | objects | select((.command? // "") | test("^tk "))] | length == 0' "hook tk left in $f"
-    jq_ok "$f" '[.. | objects | select((.command? // "") | test("^tix "))] | length == 4' "$f does not hold four tix hooks"
+    jq_ok "$f" "[.. | objects | select((.command? // \"\") | test(\"^tix \"))] | length == $want" "$f does not hold $want tix hooks"
   done
   jq_ok "$HOME/.claude/settings.json" '.permissions.allow | index("Bash(tix *)") != null and index("Bash(tk *)") == null' 'allow not moved to Bash(tix *)'
   must_exist "$HOME/.claude/skills/tix/SKILL.md"; must_absent "$HOME/.claude/skills/tk"
@@ -403,7 +407,7 @@ t_legacy_base_migrated_by_tix_first() {
   must_exist "$(MANIFEST)"; must_absent "$HOME/tasks/.tracker"
   apply
   grep -q 'tracker' "$(MANIFEST)" && fail "manifest keeps .tracker paths"
-  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | test("^tix "))] | length == 4' 'hooks not moved to tix'
+  jq_ok "$HOME/.claude/settings.json" '[.. | objects | select((.command? // "") | test("^tix "))] | length == 5' 'hooks not moved to tix'
   undo
   [ -z "$(find "$HOME" -mindepth 1 \( -type f -o -type l \) ! -name .gitignore)" ] || fail "files left after undo: $(find "$HOME" -type f | head -5)"
 }
