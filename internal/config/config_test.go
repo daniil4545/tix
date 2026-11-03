@@ -179,3 +179,17 @@ func TestRenderKeepsTopLevelScalarOutOfPaths(t *testing.T) {
 		t.Fatalf("paths after render: %v\n%s", c2.Paths, c.Render())
 	}
 }
+
+func TestLoadLowersPathKeys(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(p, []byte("[paths]\nTarn = \"/abs/tarn\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Paths["tarn"] != "/abs/tarn" || len(c.Paths) != 1 {
+		t.Fatalf("paths: %v", c.Paths)
+	}
+}
