@@ -107,7 +107,7 @@ func Similar(q Query, tasks []*task.Task) []Result {
 		if t.ID == q.SelfID || t.IsEpic() || (t.Status == config.Closed && !q.All) {
 			continue
 		}
-		if q.Project != "" && t.Project != q.Project {
+		if q.Project != "" && !strings.EqualFold(t.Project, q.Project) {
 			continue
 		}
 		if r, ok := match(t, qs, q.Project); ok {
