@@ -74,3 +74,41 @@ func TestDetect(t *testing.T) {
 		})
 	}
 }
+
+func TestDetect_Catalog(t *testing.T) {
+	defer guard(t)
+	base := t.TempDir()
+	root := filepath.Join(base, "tasks")
+	outer := filepath.Join(base, "work", "outer")
+	inner := filepath.Join(outer, "inner")
+	link := filepath.Join(base, "link")
+	mk(t, root, filepath.Join(inner, "pkg"), filepath.Join(outer, ".worktrees", "wt", "src"),
+		filepath.Join(base, "work", "other"), filepath.Join(outer, ".git"))
+	if err := os.Symlink(outer, link); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.Paths = map[string]string{"outer": outer, "inner": inner, "linked": filepath.Join(base, "work", "other"), "nopath": ""}
+	cases := []struct {
+		name, cwd, want string
+		ok              bool
+	}{
+		{"subfolder", filepath.Join(outer, ".worktrees", "wt", "src"), "outer", true},
+		{"longest path wins", filepath.Join(inner, "pkg"), "inner", true},
+		{"the path itself", outer, "outer", true},
+		{"through a symlink", filepath.Join(link, "x"), "outer", true},
+		{"git fallback with no match", filepath.Join(base, "work"), "", false},
+	}
+	mk(t, filepath.Join(link, "x"))
+	for _, c := range cases {
+		got, ok := project.Detect(c.cwd, root, cfg)
+		if got != c.want || ok != c.ok {
+			t.Errorf("%s: Detect(%s) = %q, %v; want %q, %v", c.name, c.cwd, got, ok, c.want, c.ok)
+		}
+	}
+	// a registered path given through a symlink matches the real cwd
+	cfg.Paths = map[string]string{"viaLink": link}
+	if got, _ := project.Detect(filepath.Join(outer, "x"), root, cfg); got != "viaLink" {
+		t.Errorf("symlinked registration: %q", got)
+	}
+}
