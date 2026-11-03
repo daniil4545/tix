@@ -12,10 +12,12 @@ import (
 	"github.com/daniil4545/tix/internal/gitx"
 )
 
-// CatalogEntry - one project of the catalog. Path is empty for a project with no folder.
+// CatalogEntry - one project of the catalog. Path is empty for a project with no folder;
+// Known is false for a project that only tasks mention, not [paths].
 type CatalogEntry struct {
 	Name, Path string
 	Tasks      int
+	Known      bool
 }
 
 // Catalog lists the projects: the names registered in [paths] and the projects of the tasks, by name.
@@ -32,7 +34,8 @@ func (s *Store) Catalog() []CatalogEntry {
 	}
 	out := make([]CatalogEntry, 0, len(count))
 	for n, c := range count {
-		out = append(out, CatalogEntry{Name: n, Path: s.cfg.Paths[n], Tasks: c})
+		p, known := s.cfg.Paths[n]
+		out = append(out, CatalogEntry{Name: n, Path: p, Tasks: c, Known: known})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
