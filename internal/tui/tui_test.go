@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/daniil4545/tix/internal/core"
 )
 
@@ -217,7 +219,7 @@ func TestReorder_JK_MovesWithinColumn_EdgesDoNothing(t *testing.T) {
 	}
 }
 
-func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
+func TestFilterProject_PickerAndInitialFilter(t *testing.T) {
 	e := newEnv(t, "")
 	e.create("Alpha task", "alpha", "idea")
 	e.create("Beta task", "beta", "idea")
@@ -237,9 +239,16 @@ func TestFilterProject_CyclesAndInitialFilter(t *testing.T) {
 		}
 		return ""
 	}
-	for _, want := range []string{"alpha", "beta", "all", "alpha"} {
+	for _, c := range []struct{ query, want string }{{"alp", "alpha"}, {"bet", "beta"}, {"", "alpha"}} {
 		e.key("p")
-		e.until("filter "+want+" after p", func() bool { return state() == want })
+		e.screenHas("find:")
+		if c.query == "" { // no query: the cursor starts on beta, one row up is alpha
+			e.tm.Send(tea.KeyPressMsg{Code: tea.KeyUp})
+		} else {
+			e.key(c.query)
+		}
+		e.key("enter")
+		e.until("filter "+c.want+" after p", func() bool { return state() == c.want })
 	}
 
 	f := newEnv(t, "")

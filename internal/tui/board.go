@@ -233,23 +233,6 @@ func checks(crit []task.Criterion) string {
 	return fmt.Sprintf("%d/%d", done, len(crit))
 }
 
-// cycleProject switches the filter in a circle: all, then projects alphabetically.
-func (m *Model) cycleProject() {
-	seen := map[string]bool{}
-	var list []string
-	for _, t := range m.tasks {
-		if p := strings.ToLower(t.Project); p != "" && !seen[p] {
-			seen[p] = true
-			list = append(list, p)
-		}
-	}
-	sort.Strings(list)
-	list = append([]string{""}, list...)
-	i := slices.Index(list, strings.ToLower(m.project))
-	m.project = list[(i+1)%len(list)]
-	m.rebuild()
-}
-
 // moveCursor moves the board cursor: dc columns, dr rows.
 func (m *Model) moveCursor(dc, dr int) {
 	if len(m.colTasks) == 0 {
