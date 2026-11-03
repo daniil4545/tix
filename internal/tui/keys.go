@@ -27,6 +27,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.pick != nil {
 		return m.pickerKey(msg)
 	}
+	if m.find != nil {
+		return m.searchKey(msg)
+	}
 	return m.dispatch(msg.String())
 }
 
@@ -64,6 +67,8 @@ func (m *Model) boardKey(k string) tea.Cmd {
 		return m.reorder(-1)
 	case "p":
 		m.startPicker()
+	case "f":
+		m.startSearch()
 	case "enter":
 		return m.openCard()
 	case "space":

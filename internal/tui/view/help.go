@@ -15,6 +15,7 @@ var helpEntries = []helpEntry{
 	{"c", "comment"},
 	{"J K", "move the card down or up in its column"},
 	{"p", "project list: type to narrow, up and down choose, enter sets, esc keeps"},
+	{"f", "find: type to search the title, Abstract and criteria; tab project or all, ctrl+t closed, enter opens, esc keeps"},
 	{"delete", "delete the task, asks y/n"},
 	{"?", "this help"},
 	{"q", "quit"},

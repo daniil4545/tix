@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	boardHintFull = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit"
+	boardHintFull = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  f find  p project  ? help  q quit"
 	cardRowFull   = "e edit  c comment  del delete  j k history  left right task  esc back"
 )
 

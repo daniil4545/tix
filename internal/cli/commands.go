@@ -365,7 +365,7 @@ func (a *app) cmdList(args []string) error {
 		if hide && t.Status == config.Closed {
 			continue
 		}
-		if !listMatches(t, needle) {
+		if !t.Matches(needle) {
 			continue
 		}
 		matched = append(matched, t)
@@ -443,28 +443,6 @@ func (a *app) stale(tasks []*task.Task) ([]*task.Task, map[string]int, error) {
 		days[it.t.ID] = it.days
 	}
 	return out, days, nil
-}
-
-func listMatches(t *task.Task, needle string) bool {
-	if strings.Contains(strings.ToLower(t.Title), needle) {
-		return true
-	}
-	inAbstract := false
-	for _, line := range strings.Split(t.Body, "\n") {
-		if strings.HasPrefix(line, "## ") {
-			inAbstract = strings.TrimRight(line, " \t\r") == "## Abstract"
-			continue
-		}
-		if inAbstract && strings.Contains(strings.ToLower(line), needle) {
-			return true
-		}
-	}
-	for _, c := range t.Criteria() {
-		if strings.Contains(strings.ToLower(c.Text), needle) {
-			return true
-		}
-	}
-	return false
 }
 
 // filter keeps the tasks of the project and column (an empty value means no filter)
