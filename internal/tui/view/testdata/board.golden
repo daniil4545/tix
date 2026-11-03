@@ -11,4 +11,4 @@ idea 0                 +  open 2                 +  in_progress 1          +  bl
                                                                                                                                 
 --------------------------------------------------------------------------------------------------------------------------------
 ok T-7 open > in_progress
-arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  f find  ? help  q quit
+arrows select  enter open  space grab  n new  e edit  c comment  del delete  f find  p project  ? help  q quit

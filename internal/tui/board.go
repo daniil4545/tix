@@ -22,6 +22,9 @@ func (m *Model) apply(tasks []*task.Task, skipped int) {
 	m.tasks, m.skipped = tasks, skipped
 	m.dropGone()
 	m.rebuild()
+	if m.find != nil {
+		m.refind()
+	}
 }
 
 // dropGone cancels the grab if the grabbed task is not on the board or was moved since the grab began.

@@ -173,3 +173,39 @@ func TestSearch_OneCharOn1000Tasks(t *testing.T) {
 		t.Errorf("found %d", len(m.find.found))
 	}
 }
+
+// The mouse does nothing while the search is open: no clicks on the hidden board or its hint buttons.
+func TestSearch_MouseIgnored(t *testing.T) {
+	m, _ := findModel(t)
+	findKey(m, "f", "needle")
+	row, col := m.board.Row, m.board.Col
+	for _, y := range []int{3, 4, m.h - 1} {
+		m.Update(tea.MouseClickMsg{X: 5, Y: y, Button: tea.MouseLeft})
+		m.Update(tea.MouseReleaseMsg{X: 5, Y: y, Button: tea.MouseLeft})
+	}
+	m.Update(tea.MouseWheelMsg{X: 5, Y: 5, Button: tea.MouseWheelDown})
+	if m.find == nil || m.showing || m.input != nil || m.board.Row != row || m.board.Col != col {
+		t.Fatalf("mouse reached the board: find %v showing %v", m.find, m.showing)
+	}
+}
+
+// With no board project the scope is all: tab changes nothing and results stay.
+func TestSearch_TabWithoutProject(t *testing.T) {
+	m, _ := findModel(t)
+	m.project = ""
+	m.rebuild()
+	findKey(m, "f", "needle", "tab")
+	if len(m.find.found) != 2 || !m.searchView().All {
+		t.Fatalf("found %d all %v", len(m.find.found), m.searchView().All)
+	}
+}
+
+// A reload while the search is open refreshes the results.
+func TestSearch_ReloadRefreshes(t *testing.T) {
+	m, _ := findModel(t)
+	findKey(m, "f", "needle")
+	m.apply(nil, 0)
+	if len(m.find.found) != 0 {
+		t.Fatalf("stale results: %d", len(m.find.found))
+	}
+}

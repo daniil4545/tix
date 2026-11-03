@@ -20,7 +20,7 @@ type hintItem struct{ key, word string }
 
 var boardHints = []hintItem{
 	{"arrows", "select"}, {"enter", "open"}, {"space", "grab"}, {"n", "new"}, {"e", "edit"},
-	{"c", "comment"}, {"del", "delete"}, {"p", "project"}, {"f", "find"}, {"?", "help"}, {"q", "quit"},
+	{"c", "comment"}, {"del", "delete"}, {"f", "find"}, {"p", "project"}, {"?", "help"}, {"q", "quit"},
 }
 
 // hintSpan - the place of a pair in the hint line: characters [x0, x1).

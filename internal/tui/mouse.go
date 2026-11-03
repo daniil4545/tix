@@ -27,7 +27,7 @@ type click struct {
 // a grab or the help screen the mouse is ignored.
 func (m *Model) mouse(msg tea.MouseMsg) tea.Cmd {
 	mouse := msg.Mouse()
-	if m.input != nil || m.grab != nil || m.help || m.pick != nil {
+	if m.input != nil || m.grab != nil || m.help || m.pick != nil || m.find != nil {
 		m.press = nil
 		return nil
 	}

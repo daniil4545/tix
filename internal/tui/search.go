@@ -40,7 +40,7 @@ func (m *Model) refind() {
 		return
 	}
 	for _, t := range m.tasks {
-		if !s.all && !strings.EqualFold(t.Project, m.project) || !s.closed && t.Status == config.Closed {
+		if m.project != "" && !s.all && !strings.EqualFold(t.Project, m.project) || !s.closed && t.Status == config.Closed {
 			continue
 		}
 		if line, ok := t.MatchLine(needle); ok {
@@ -84,7 +84,7 @@ func excerpt(text, needle string) string {
 func (m *Model) searchView() view.Search {
 	s := m.find
 	needle := strings.ToLower(strings.TrimSpace(string(s.query)))
-	v := view.Search{Query: string(s.query), Sel: s.sel, All: s.all, Closed: s.closed, Project: m.project, W: m.w, H: m.h}
+	v := view.Search{Query: string(s.query), Sel: s.sel, All: s.all || m.project == "", Closed: s.closed, Project: m.project, W: m.w, H: m.h}
 	for i, t := range s.found {
 		v.Rows = append(v.Rows, view.SearchRow{ID: t.ID, Title: t.Title, Excerpt: excerpt(s.lines[i], needle)})
 	}
@@ -114,8 +114,10 @@ func (m *Model) searchKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "down", "ctrl+n":
 		s.sel = min(s.sel+1, max(len(s.found)-1, 0))
 	case "tab":
-		s.all = !s.all
-		m.refind()
+		if m.project != "" { // with no board project the scope is always all
+			s.all = !s.all
+			m.refind()
+		}
 	case "ctrl+t":
 		s.closed = !s.closed
 		m.refind()

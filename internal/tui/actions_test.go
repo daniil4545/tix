@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	acHint   = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  f find  ? help  q quit"
+	acHint   = "arrows select  enter open  space grab  n new  e edit  c comment  del delete  f find  p project  ? help  q quit"
 	acMoving = "moving T-1: arrows move, space drop, esc cancel"
 )
 
