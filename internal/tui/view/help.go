@@ -14,7 +14,7 @@ var helpEntries = []helpEntry{
 	{"e", "edit the text in $EDITOR"},
 	{"c", "comment"},
 	{"J K", "move the card down or up in its column"},
-	{"p", "switch the project filter"},
+	{"p", "project list: type to narrow, up and down choose, enter sets, esc keeps"},
 	{"delete", "delete the task, asks y/n"},
 	{"?", "this help"},
 	{"q", "quit"},

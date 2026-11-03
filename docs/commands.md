@@ -77,7 +77,7 @@ label has its own muted color.
 | `enter` | open the card |
 | `n` | new task in the selected column (in `idea` if that status needs criteria): asks for a title, then opens `$EDITOR` |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
-| `p` | cycle the project filter |
+| `p` | project list: letters narrow it (substring, any case), arrows select, `enter` sets the filter, `esc` keeps the old one; `all` is first, projects of tasks and of the catalog follow with their open counts |
 | `J`, `K` | move the card down or up in its column |
 | `delete` | delete the task, asks `y/n` |
 | `?`, `q` | help, quit |

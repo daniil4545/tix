@@ -85,7 +85,8 @@ type Model struct {
 	showing bool // the card is open
 	help    bool // the help screen is open
 	input   *prompt
-	grab    *grab // a card grab on the board; nil outside a grab
+	pick    *picker // the project list; nil when closed
+	grab    *grab   // a card grab on the board; nil outside a grab
 
 	notes map[string]gitx.Note // the latest task notes for the pulse; nil until git answers
 	now   func() time.Time     // the model clock: meta, pulse, double click
@@ -160,6 +161,8 @@ func (m *Model) View() tea.View {
 	switch {
 	case m.help:
 		frame = view.RenderHelp(m.w, m.h)
+	case m.pick != nil:
+		frame = view.RenderPicker(m.pickerView())
 	case m.showing:
 		frame = view.RenderCard(m.cardView())
 	default:
