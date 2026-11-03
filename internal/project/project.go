@@ -10,11 +10,14 @@ import (
 )
 
 // Detect returns the project name for cwd: the name of the folder above .git (for a worktree - above
-// the main one), renamed by the c.Projects map. false: cwd in root or outside git.
+// the main one), renamed by the c.Projects map. A path registered in c.Paths wins: the longest one holding cwd. false: cwd in root or outside git.
 func Detect(cwd, root string, c *config.Config) (string, bool) {
 	cwd, root = resolve(cwd), resolve(root)
 	if root != "" && within(cwd, root) {
 		return "", false
+	}
+	if name, ok := catalogMatch(cwd, c); ok {
+		return name, true
 	}
 	dir := findGitDir(cwd)
 	if dir == "" {
@@ -30,6 +33,24 @@ func Detect(cwd, root string, c *config.Config) (string, bool) {
 		}
 	}
 	return name, true
+}
+
+// catalogMatch returns the project whose registered path is the longest one holding cwd.
+func catalogMatch(cwd string, c *config.Config) (string, bool) {
+	if c == nil {
+		return "", false
+	}
+	best, bestLen := "", -1
+	for name, p := range c.Paths {
+		if p == "" {
+			continue
+		}
+		p = resolve(p)
+		if within(cwd, p) && len(p) > bestLen {
+			best, bestLen = name, len(p)
+		}
+	}
+	return best, bestLen >= 0
 }
 
 // resolve expands symlinks (macOS: /var and /private/var); if that fails - the path as is.

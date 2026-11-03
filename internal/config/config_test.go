@@ -130,3 +130,52 @@ func TestLegacyMap_NoColumns_DefaultNames(t *testing.T) {
 		t.Errorf("map %v, want %v", m, want)
 	}
 }
+
+func TestRender_KeepsProjectsPathsForeign(t *testing.T) {
+	defer guard(t)
+	p := filepath.Join(t.TempDir(), "config.toml")
+	src := "[projects]\ndir = \"имя\"\n\n[paths]\nalpha = \"/a/b\"\nnone = \"\"\n\n[adapter]\nkind = \"x\"\n"
+	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, c.Render(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, err := config.Load(p)
+	if err != nil {
+		t.Fatalf("%v\n%s", err, c.Render())
+	}
+	if out.Projects["dir"] != "имя" || out.Paths["alpha"] != "/a/b" || len(out.Paths) != 2 {
+		t.Errorf("lost: %+v", out)
+	}
+	if got := string(out.Render()); !strings.Contains(got, "[adapter]") || !strings.Contains(got, `kind = "x"`) {
+		t.Errorf("foreign section lost:\n%s", got)
+	}
+}
+
+func TestRenderKeepsTopLevelScalarOutOfPaths(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "config.toml")
+	src := "version = \"1\"\n\n[projects]\ntarn = \"main\"\n\n[paths]\ntarn = \"/abs/tarn\"\n"
+	if err := os.WriteFile(p, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, c.Render(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c2, err := config.Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, bad := c2.Paths["version"]; bad || len(c2.Paths) != 1 || c2.Paths["tarn"] != "/abs/tarn" {
+		t.Fatalf("paths after render: %v\n%s", c2.Paths, c.Render())
+	}
+}
