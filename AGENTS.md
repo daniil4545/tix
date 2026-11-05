@@ -51,8 +51,8 @@ Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 
 | Parameter | Value |
 |---|---|
-| Autonomy | the agent decides technical questions within the spec; it approves the task plan itself if `spec-reviewer` raised no questions about functionality; a question about behavior, anything irreversible and spending subscription limits go to the user |
-| Subagents | every task runs through the `orchestrate` skill: plan, `spec-reviewer`, up to 5 concurrent agents (workers and tester), thorough `code-reviewer`, `skeptic` by `regress` |
+| Autonomy | the agent decides technical questions within the spec; it approves the task plan itself if `reviewer` in spec mode raised no questions about functionality; a question about behavior, anything irreversible and spending subscription limits go to the user |
+| Subagents | every task runs through the `orchestrate` skill: plan, `reviewer` on the spec, up to 5 concurrent agents (workers and tester), `reviewer` in thorough mode, `skeptic` by `regress` |
 | Tracker | tix, project `tracker`; the plan of a heavy task is `docs/plans/<task>.md` |
 | Subagent header | `~/.claude/templates/subagent-brief.md` |
 | Findings file | `docs/findings.jsonl` |
