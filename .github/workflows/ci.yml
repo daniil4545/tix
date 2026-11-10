@@ -1,7 +1,8 @@
 name: ci
 
-# GitHub flow: every PR into main and every push to main run ci-check on Linux and macOS. `gate` is
-# the one required check of main: red unless every job succeeded (deps runs on PRs only).
+# GitHub flow: every PR into main and every push to main run ci-check on Linux and macOS and six
+# linters. `gate` is the one CI check required by main: red unless every job succeeded (deps runs
+# on PRs only).
 on:
   push:
     branches: [main]
@@ -48,17 +49,85 @@ jobs:
           fail-on-severity: high
           allow-licenses: MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0
 
+  # The linters below: a checkout and one action pinned by hash, after zerocracy/judges-action.
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: reviewdog/action-actionlint@619a81ec64ff8c0211cd6146eb2b21e8f1d7f440 # v1.81.1
+        with:
+          # The action's default is none: findings are reported and the job stays green.
+          fail_level: error
+
+  typos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: crate-ci/typos@4c8b7f51ca60df14e3c5ca82770dfbbe6c3dae85 # v1.52.0
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca # master
+
+  yamllint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
+        with:
+          config_file: .yamllint.yml
+
+  # Checks the markdown files of the repository root only, the default of the action.
+  markdown-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
+
+  checkmake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: Uno-Takashi/checkmake-action@bc11ee86274ceaf5710dbcd80871d7cd7ecc78ce # v2
+        with:
+          config: checkmake.ini
+
   gate:
     if: always()
-    needs: [check, deps]
+    needs: [check, deps, actionlint, typos, shellcheck, yamllint, markdown-lint, checkmake]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed
         env:
           CHECK: ${{ needs.check.result }}
           DEPS: ${{ needs.deps.result }}
+          LINT: >-
+            ${{ needs.actionlint.result }} ${{ needs.typos.result }}
+            ${{ needs.shellcheck.result }} ${{ needs.yamllint.result }}
+            ${{ needs.markdown-lint.result }} ${{ needs.checkmake.result }}
           EVENT: ${{ github.event_name }}
         run: |
-          echo "check: $CHECK, deps: $DEPS, event: $EVENT"
+          echo "check: $CHECK, deps: $DEPS, linters: $LINT, event: $EVENT"
           test "$CHECK" = success
           test "$DEPS" = success || { test "$EVENT" = push && test "$DEPS" = skipped; }
+          for r in $LINT; do test "$r" = success; done
