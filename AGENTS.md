@@ -9,7 +9,8 @@ canon is `docs/spec.md`, tasks are in tix (project `tracker`), task plans in `do
 ## Principles
 
 - The reference for speed, lightness and reliability (D44): a part that nothing breaks without is removed.
-- The agent writes the code, acceptance is automatic (D33): done only with a green `make check`. `make bench` runs before a release and for the README, it does not block a task (D64).
+- The agent writes the code, acceptance is automatic (D33): done only with a green `make check`.
+  `make bench` runs before a release and for the README, it does not block a task (D64).
 
 ## Stack
 
@@ -17,10 +18,12 @@ Go, one `tix` binary; Bubble Tea from S4. Versions are in `go.mod`.
 
 ## Structure
 
-Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `gitx`, `config`, `assets`, `project`, `actor`; `brief` - `task`, `config`, `actor`. The map and flows are in `docs/architecture.md`.
+Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `gitx`, `config`,
+`assets`, `project`, `actor`; `brief` - `task`, `config`, `actor`. The map and flows are in
+`docs/architecture.md`.
 
 | Path | Role |
-|---|---|
+| --- | --- |
 | `cmd/tix` | CLI entry point |
 | `cmd/tixbench` | speed benchmark of `tix` for `make bench` |
 | `internal/cli` | command parsing and reply printing |
@@ -37,7 +40,7 @@ Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `git
 ## Commands
 
 | Command | What it does |
-|---|---|
+| --- | --- |
 | `make check` | format, vet, linter, tests, build; acceptance |
 | `make test-fast` | fast tier (`-short`); `RUN=Name` - one test |
 | `make bench` | builds `bin/tix`, speed benchmark on 1000 tasks, including `ctx`, `take`, `move` |
@@ -50,15 +53,22 @@ Dependencies: `cli` - `core`, `brief`, `project`, `actor`; `core` - `task`, `git
 Project profile for the pipeline `~/.claude/docs/pipeline.md`:
 
 | Parameter | Value |
-|---|---|
+| --- | --- |
 | Autonomy | the agent decides technical questions within the spec; it approves the task plan itself if `reviewer` in spec mode raised no questions about functionality; a question about behavior, anything irreversible and spending subscription limits go to the user |
 | Subagents | every task runs through the `orchestrate` skill: plan, `reviewer` on the spec, up to 5 concurrent agents (workers and tester), `reviewer` in thorough mode, `skeptic` by `regress` |
 | Tracker | tix, project `tracker`; the plan of a heavy task is `docs/plans/<task>.md` |
 | Subagent header | `~/.claude/templates/subagent-brief.md` |
 | Findings file | `docs/findings.jsonl` |
 
-- Branches (user decision 2026-11-02, GitHub flow): `main` is the only long branch. A task goes in the branch `T-<N>-<name>` from `origin/main`, its PR goes into `main` (`gh pr create --base main`), one review by a separate agent, green CI, then the agent squash-merges it itself through `merge-gate` (`~/.claude/scripts/merge-gate.py`, decision 2026-11-03). Dependent tasks go in waves: a branch waits for the PR it builds on. A release is a tag `vX.Y.Z` on `main` with a `CHANGELOG.md` section; the tag is set by the user.
-- Hosting and CI: `origin` is the public repository `daniil4545/tix` (D68); CI runs `make ci-check` on Linux and macOS for every PR into `main` and every push to it; both checks are required. Agents of the admitd farm send their PRs into `main` too.
+- Branches (user decision 2026-11-02, GitHub flow): `main` is the only long branch. A task goes in
+  the branch `T-<N>-<name>` from `origin/main`, its PR goes into `main`
+  (`gh pr create --base main`), one review by a separate agent, green CI, then the agent
+  squash-merges it itself through `merge-gate` (`~/.claude/scripts/merge-gate.py`, decision
+  2026-11-03). Dependent tasks go in waves: a branch waits for the PR it builds on. A release is a
+  tag `vX.Y.Z` on `main` with a `CHANGELOG.md` section; the tag is set by the user.
+- Hosting and CI: `origin` is the public repository `daniil4545/tix` (D68); CI runs `make ci-check`
+  on Linux and macOS for every PR into `main` and every push to it; both checks are required. Agents
+  of the admitd farm send their PRs into `main` too.
 
 ## Critical invariants
 

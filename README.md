@@ -24,7 +24,7 @@ Status: pre-1.0, the file format may still change before 1.0.
 ## Features
 
 | What | In one line |
-|---|---|
+| --- | --- |
 | One store for all projects | a single `~/tasks` folder, the project is the folder name above `.git` |
 | Plain files | one `.md` file per task, readable by agents, Obsidian and `grep` |
 | Session in every commit | each edit is a commit with `Actor:` holding the full session id, plus `Model:` and `Code:` trailers |

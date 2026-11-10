@@ -1,0 +1,28 @@
+---
+# yamllint disable rule:line-length
+name: actionlint
+'on':
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/**'
+permissions:
+  contents: read
+jobs:
+  actionlint:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: reviewdog/action-actionlint@619a81ec64ff8c0211cd6146eb2b21e8f1d7f440 # v1.81.1
+        with:
+          # The action's default is none: findings are reported and the job stays green.
+          fail_level: error
