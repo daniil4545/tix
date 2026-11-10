@@ -1,0 +1,9 @@
+# Ratatui is a library name, Nd is the "N days" age format, ba is a sed branch command, the rest are
+# typed-wrong commands in tests.
+[default.extend-words]
+Ratatui = "Ratatui"
+Nd = "Nd"
+ba = "ba"
+gam = "gam"
+lsit = "lsit"
+shwo = "shwo"

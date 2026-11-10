@@ -48,7 +48,8 @@ jobs:
             on && /^\[[^]]+\]: / { next }
             on { print }
           ' CHANGELOG.md | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' > "${RUNNER_TEMP}/release-notes.md"
-          test -s "${RUNNER_TEMP}/release-notes.md" || { echo "release notes are empty" >&2; exit 1; }
+          test -s "${RUNNER_TEMP}/release-notes.md" || {
+            echo "release notes are empty" >&2; exit 1; }
           cat "${RUNNER_TEMP}/release-notes.md"
 
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
