@@ -11,16 +11,21 @@ build:
 	go build ./...
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/tix ./cmd/tix
 
+# Tests run as on a CI runner: no machine git config and no author guessed from the host name, so a
+# test that commits without naming its author fails here too.
+GIT_BARE := GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+	GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.useConfigOnly GIT_CONFIG_VALUE_0=true
+
 # Fast tier: no race detector and no kill -9.
 test-fast:
-	go test -short ./... $(if $(RUN),-run $(RUN) -count=1,)
+	$(GIT_BARE) go test -short ./... $(if $(RUN),-run $(RUN) -count=1,)
 
 test:
-	go test -count=1 ./... $(if $(RUN),-run $(RUN),)
+	$(GIT_BARE) go test -count=1 ./... $(if $(RUN),-run $(RUN),)
 
 # The TUI, the watcher and the store run goroutines at once: CI runs every test with the race detector.
 test-race:
-	go test -race -count=1 ./...
+	$(GIT_BARE) go test -race -count=1 ./...
 
 vet:
 	go vet ./...

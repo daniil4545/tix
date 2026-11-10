@@ -81,6 +81,10 @@ func newBox(t *testing.T) *box {
 		"TIX_LOCK_TIMEOUT=30s",
 		"GIT_CONFIG_GLOBAL=/dev/null",
 		"GIT_CONFIG_NOSYSTEM=1",
+		// No author guessed from the host name: a commit that names none fails as on a CI runner.
+		"GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=user.useConfigOnly",
+		"GIT_CONFIG_VALUE_0=true",
 	}
 	return b
 }
