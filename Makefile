@@ -83,3 +83,17 @@ bench: build
 # Without E2E_ARGS=--yes the script prints a warning and exits with code 2. Subset: E2E_ARGS="--yes --agents claude".
 e2e-agents:
 	scripts/e2e-agents.sh $(E2E_ARGS)
+
+probe:
+	@echo 1
+	@echo 2
+	@echo 3
+	@echo 4
+	@echo 5
+	@echo 6
+	@echo 7
+	@echo 8
+	@echo 9
+	@echo 10
+	@echo 11
+	@echo 12
