@@ -20,8 +20,8 @@ func TestS17_Show_ParentAndChildren(t *testing.T) {
 	ensure(t, strings.Contains(b.ok("", "show", c1).out, "\nParent: "+p+"\n"), "show child")
 	b.ok("", "set", c1, "parent=")
 	ensure(t, !strings.Contains(b.ok("", "show", c1).out, "\nParent: "), "cleared parent still printed")
-	b.rule("new", "X", "--parent", "T-999")
-	b.rule("set", p, "parent="+c1)
+	ensure(t, strings.Contains(b.rule("new", "X", "--parent", "T-999"), "not found"), "new under a missing parent")
+	ensure(t, strings.Contains(b.rule("set", p, "parent="+c1), "has children"), "set parent on a task with children")
 }
 
 func TestS28_Show_ManualParent(t *testing.T) {
@@ -32,4 +32,11 @@ func TestS28_Show_ManualParent(t *testing.T) {
 	b.rewrite(c, func(s string) string { return strings.Replace(s, "\nstatus:", "\nparent: "+c+"\nstatus:", 1) })
 	ensure(t, strings.Contains(b.ok("", "show", a).out, "\nParent: T-999 (not found)\n"), "missing parent")
 	ensure(t, strings.Contains(b.ok("", "show", c).out, "\nParent: "+c+"\n"), "self parent")
+	// a parent that has a parent: shown as written, set refuses it
+	f, d, e := b.newTask("F", "idea"), b.newTask("D", "idea"), b.newTask("E", "idea")
+	b.ok("", "set", d, "parent="+f)
+	b.rewrite(e, func(s string) string { return strings.Replace(s, "\nstatus:", "\nparent: "+d+"\nstatus:", 1) })
+	ensure(t, strings.Contains(b.ok("", "show", e).out, "\nParent: "+d+"\n"), "parent that has a parent")
+	b.ok("", "note", e, "x") // commits the hand edit, so the refusal below adds nothing
+	ensure(t, strings.Contains(b.rule("set", e, "parent="+d), "already has a parent"), "set applies the refusal")
 }

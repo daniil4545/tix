@@ -208,7 +208,12 @@ func (t *Task) parseFields(path, fm string) error {
 // setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
-	case "id", "title", "project", "status", "external", "waiting", "claim", "parent":
+	case "parent":
+		// a hand-written value of another type (`[[T-5]]`, a list) reads as no parent; the file keeps it
+		if val.Kind == yaml.ScalarNode {
+			t.Parent = scalarText(val)
+		}
+	case "id", "title", "project", "status", "external", "waiting", "claim":
 		if val.Kind != yaml.ScalarNode {
 			return errors.New("string required")
 		}
@@ -492,6 +497,10 @@ func (t *Task) sameField(key string, val *yaml.Node) bool {
 	case "tags":
 		tags, err := nodeTags(val)
 		return err == nil && slices.Equal(tags, t.Tags)
+	case "parent":
+		if val.Kind != yaml.ScalarNode {
+			return t.Parent == "" // not parsed as text: left as written until a parent is set
+		}
 	}
 	return val.Kind == yaml.ScalarNode && scalarText(val) == *t.stringField(key)
 }

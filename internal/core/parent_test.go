@@ -109,3 +109,21 @@ func TestS28_ManualParent_NothingFails(t *testing.T) {
 	}
 	wantRule(t, "set parent on a self-parent", setParent(s, a, a), "own parent")
 }
+
+// Children sorts by number, whatever the order of creation under the parent.
+func TestS17_Children_OrderByNumber(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	a, b, c := mkIn(t, s, "A", "idea"), mkIn(t, s, "B", "idea"), mkIn(t, s, "C", "idea")
+	p := mkIn(t, s, "Parent", "idea")
+	for _, id := range []string{c, a, b} {
+		if err := setParent(s, id, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	kids, _ := s.Children(p)
+	if len(kids) != 3 || kids[0].ID != a || kids[1].ID != b || kids[2].ID != c {
+		t.Errorf("children order %v, want %s %s %s", kids, a, b, c)
+	}
+}

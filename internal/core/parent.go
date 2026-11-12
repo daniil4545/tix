@@ -1,6 +1,8 @@
 package core
 
 import (
+	"bytes"
+	"os"
 	"sort"
 	"strings"
 
@@ -42,13 +44,19 @@ func (s *Store) checkParent(t *task.Task, parent string) error {
 }
 
 // Children returns the tasks whose parent is id, by number, and how many of them are of the kind closed.
-// One pass over the task list.
+// One pass over the task files; a byte prefilter skips the parse of files without "parent:" and the id.
 func (s *Store) Children(id string) ([]*task.Task, int) {
-	tasks, _ := s.List()
+	refs, err := s.taskFiles()
+	if err != nil {
+		s.log.Warn("children not read", "op", "children", "id", id, "err", err)
+		return nil, 0
+	}
+	found := make([]*task.Task, len(refs))
+	forEachChunked(len(refs), func(i int) { found[i] = s.childOf(refs[i], id) })
 	var kids []*task.Task
 	closed := 0
-	for _, o := range tasks {
-		if o.Parent == id && o.ID != id {
+	for _, o := range found {
+		if o != nil {
 			kids = append(kids, o)
 			if s.kindOf(o.Status) == config.Closed {
 				closed++
@@ -57,6 +65,30 @@ func (s *Store) Children(id string) ([]*task.Task, int) {
 	}
 	sort.SliceStable(kids, func(i, j int) bool { return IDNum(kids[i].ID) < IDNum(kids[j].ID) })
 	return kids, closed
+}
+
+// childOf returns the task in file r if its parent is id, otherwise nil.
+func (s *Store) childOf(r taskRef, id string) *task.Task {
+	if r.id == id {
+		return nil
+	}
+	data, err := os.ReadFile(r.path) //nolint:gosec // the path is built by the core
+	if err != nil {
+		s.log.Warn("child not read", "op", "children", "id", r.id, "err", err)
+		return nil
+	}
+	if !bytes.Contains(data, []byte("parent:")) || !bytes.Contains(data, []byte(id)) {
+		return nil
+	}
+	t, err := task.Parse(r.path, data)
+	if err != nil {
+		s.log.Warn("child not read", "op", "children", "id", r.id, "err", err)
+		return nil
+	}
+	if t.Parent != id {
+		return nil
+	}
+	return t
 }
 
 // HasTask reports whether a task file with this id exists.
