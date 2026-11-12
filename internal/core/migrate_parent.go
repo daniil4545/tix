@@ -161,20 +161,25 @@ func (s *Store) migrateParent(tx *txEnv) error {
 		if ok, err := s.replace(st.ref.path, st.data, out); err != nil || !ok {
 			return errors.Join(err, fmt.Errorf("%s changed during the migration, retry the command", st.ref.id))
 		}
+		st.data = out // a task that is both a child and an epic is written once
 		files = append(files, gitx.File{Path: filepath.Base(st.ref.path), Data: out})
 		return nil
 	}
 	linked := map[string]bool{}
-	for _, n := range sortedIDsOf(p.parent) { // the children first
+	for n, parent := range p.parent {
 		linked[n] = true
-		snap[n].t.Parent = p.parent[n]
+		snap[n].t.Parent = parent
+	}
+	for _, st := range p.epics {
+		st.t.DropLines(linked)
+		st.t.Tags = slices.DeleteFunc(st.t.Tags, func(tag string) bool { return tag == "epic" })
+	}
+	for _, n := range sortedIDsOf(p.parent) { // the children first
 		if err := write(snap[n]); err != nil {
 			return err
 		}
 	}
-	for _, st := range p.epics { // each epic once, ascending: the chosen (largest) epic is written last
-		st.t.DropLines(linked)
-		st.t.Tags = slices.DeleteFunc(st.t.Tags, func(tag string) bool { return tag == "epic" })
+	for _, st := range p.epics { // ascending: the chosen (largest) epic is written last
 		if err := write(st); err != nil {
 			return err
 		}

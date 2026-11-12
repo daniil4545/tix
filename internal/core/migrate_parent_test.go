@@ -81,6 +81,20 @@ func TestMigrateParent_S22_FixtureCounts(t *testing.T) {
 	ensure(t, e.git("status", "--porcelain") == "", "dirty tree:\n%s", e.git("status", "--porcelain"))
 }
 
+// A tagged task with no task lines listed in another epic is both a child and an epic: one write.
+func TestMigrateParent_TaggedChild(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	e.writeConfig("")
+	e.putTask("T-1", "open", epicTags, "## Details\n- [ ] T-2 two\n")
+	e.putTask("T-2", "open", epicTags, "## Details\n- [ ] plain\n")
+	e.writeProbe()
+	t2 := e.text("T-2")
+	ensure(t, strings.Contains(t2, "parent: T-1") && !strings.Contains(t2, "epic"), "T-2 wrong:\n%s", t2)
+	ensure(t, e.migrateSubjects() == 1, "want one migrate commit:\n%s", e.git("log", "--format=%s"))
+	ensure(t, e.git("status", "--porcelain") == "", "dirty tree:\n%s", e.git("status", "--porcelain"))
+}
+
 func TestMigrateParent_RerunChangesNothing(t *testing.T) {
 	defer guard(t)
 	e := newEnv(t)
