@@ -46,7 +46,7 @@ func wrap(id string, err error) error {
 }
 
 func (a *app) cmdNew(args []string) error {
-	p, err := parseArgs(args, withCommon(flagSpec{"to": true, "project": true, "body-file": true}))
+	p, err := parseArgs(args, withCommon(flagSpec{"to": true, "project": true, "body-file": true, "parent": true}))
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (a *app) cmdNew(args []string) error {
 	if err != nil {
 		return err
 	}
-	res, err := a.store.CreateWithBody(title, proj, column, body, actor)
+	res, err := a.store.CreateUnder(p.vals["parent"], title, proj, column, body, actor)
 	if err != nil {
 		return err
 	}
@@ -270,6 +270,7 @@ func (a *app) cmdShow(args []string) error {
 		for _, e := range a.store.EpicsOf(id) {
 			a.out("Epic: %s", e)
 		}
+		a.printFamily(id, sh.Task)
 		if after := a.waitingOn(sh.Task); len(after) > 0 {
 			a.out("after %s", strings.Join(after, ", "))
 		}
@@ -289,6 +290,25 @@ func (a *app) cmdShow(args []string) error {
 		t.Comments = []task.Comment{}
 	}
 	return a.printJSON(t)
+}
+
+// printFamily prints the parent line of a child and the children of a parent, as written, one step deep.
+func (a *app) printFamily(id string, t *task.Task) {
+	if t.Parent != "" {
+		if a.store.HasTask(t.Parent) {
+			a.out("Parent: %s", t.Parent)
+		} else {
+			a.out("Parent: %s (not found)", t.Parent)
+		}
+	}
+	kids, closed := a.store.Children(id)
+	if len(kids) == 0 {
+		return
+	}
+	a.out("Children: %d/%d", closed, len(kids))
+	for _, k := range kids {
+		a.out("  %s %s %s", a.label(k.Status), k.ID, k.Title)
+	}
 }
 
 // showNotesDefault - how many latest notes `show` prints without -v.

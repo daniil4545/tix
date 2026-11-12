@@ -43,6 +43,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 - `tix list` hides closed tasks; `--all` or `--status closed` shows them. `--grep TEXT` matches the title, Abstract and criteria, ignoring case; notes, comments and history are excluded.
 - `status`, `claim`, `rank`, `id` and `created` are not set with `set`. Use `move`, `take` and `done`.
 - `tix projects` lists the known projects with paths; `tix projects add NAME PATH` registers one. Use a name from that list in `tix new --project` and `tix set project=`; `tix new` without `--project` takes the project of the current folder, which must be in the list too. An unknown name is refused with code 5 once the catalog is not empty.
+- `tix status` lists the statuses with their kind and task count; `tix status add NAME --kind KIND`, `tix status rename OLD NEW` and `tix status rm NAME` change the list. A status with tasks cannot be removed.
 - A body line `After: T-1, T-2` means the task waits for those tasks: `tix ctx` does not offer it as next until they close (`take` still works). `tix list` and `tix show` mark it.
 - `set` takes: title, project, waiting, tags, external, abstract.
 - Repeating a command that changes nothing answers `ok` and writes no commit.
@@ -51,6 +52,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 ## Scope
 
 - Leftover work goes into a new task. New scope is a new task too. Do not stretch the open one.
+- A task can have a parent: `tix new <title> --parent T-N` or `tix set T-5 parent=T-N` (`parent=` clears it). The depth is one: a parent has no parent, a task with children has no parent, a closed parent takes no new child. `tix show` prints `Parent: T-N` or `Children: 3/7` with a line per child.
 - Bigger work is an epic: a task tagged `epic` whose `## Details` lists its tasks as `- [ ] T-N <gist>`; a line without T-N is an acceptance criterion. The list lives only in the epic, a child task has no `Epic:` line (`tix show` prints it). The mark of a task line follows the task status by itself: `tix done` ticks it, a move out of closed clears it, `tix check` refuses it. When the last task line is ticked, `tix done` says the epic is ready for acceptance. Closing the epic ticks the lines of closed tasks; a line of an open or missing task refuses it, even with `--force`.
 - `tix ctx` prints `stale 14d+: N (T-1, ...)` for idea and open tasks without a move for 14 days; `tix list --stale` shows them with the idle days. Seeing the line, offer the human one review list: close as outdated (`tix done T-12 --force -m "outdated"`), keep, or delete obvious junk (`tix rm`). Do not close or delete them yourself.
 - Frozen work stays in idea with the tag `frozen`: `tix set T-12 tags=frozen`. Do not close it and do not fold several tasks into one.

@@ -11,11 +11,11 @@ import (
 // in the list so an old file keeps its place for the insertion order.
 var sections = []string{"Abstract", "Summary", "Details"}
 
-// SetField changes a frontmatter field: title, project, waiting, tags, external.
+// SetField changes a frontmatter field: title, project, waiting, tags, external, parent.
 // The value is one line; title is never empty.
 func (t *Task) SetField(name, value string) error {
 	switch name {
-	case "title", "project", "waiting", "external":
+	case "title", "project", "waiting", "external", "parent":
 		if strings.ContainsAny(value, "\r\n") {
 			return fmt.Errorf("%s must be one line", name)
 		}
@@ -23,7 +23,7 @@ func (t *Task) SetField(name, value string) error {
 		t.Tags = splitTags(value)
 		return nil
 	default:
-		return fmt.Errorf("field %q cannot be set: allowed title project waiting tags external", name)
+		return fmt.Errorf("field %q cannot be set: allowed title project waiting tags external parent", name)
 	}
 	if name == "title" && strings.TrimSpace(value) == "" {
 		return errors.New("title is empty")

@@ -169,6 +169,11 @@ func (s *Store) Create(title, project, column, actor string) (Result, error) {
 
 // CreateWithBody creates a task with its body and checks the destination before writing.
 func (s *Store) CreateWithBody(title, project, column, body, actor string) (Result, error) {
+	return s.CreateUnder("", title, project, column, body, actor)
+}
+
+// CreateUnder is CreateWithBody for a child of parent; an empty parent makes a plain task.
+func (s *Store) CreateUnder(parent, title, project, column, body, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
@@ -189,14 +194,14 @@ func (s *Store) CreateWithBody(title, project, column, body, actor string) (Resu
 		if err := s.syncExternal(tx); err != nil {
 			return err
 		}
-		r, err := s.create(tx, title, project, column, body, actor)
+		r, err := s.create(tx, parent, title, project, column, body, actor)
 		res = r
 		return err
 	})
 	return res, err
 }
 
-func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (Result, error) {
+func (s *Store) create(tx *txEnv, parent, title, project, column, body, actor string) (Result, error) {
 	if column == "" {
 		column = s.conf().DefaultOf(config.Idea)
 	}
@@ -209,6 +214,12 @@ func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (R
 	}
 	if err := s.checkNewEntry(t); err != nil {
 		return Result{}, err
+	}
+	if parent != "" {
+		if err := s.checkParent(t, parent); err != nil {
+			return Result{}, err
+		}
+		t.Parent = parent
 	}
 	files, err := s.taskFiles()
 	if err != nil {
