@@ -45,16 +45,17 @@ func firstNonEmpty(vals ...string) string {
 }
 
 // createTask queues Create to the write queue; success arrives as taskCreated. A column whose entry
-// check refuses a new task (open, blocked, closed) gets it in idea, the title is kept.
+// check refuses a new task (not of kind idea) gets it in the default idea status, the title is kept.
 func (m *Model) createTask(title, project, column string) tea.Cmd {
+	idea, isIdea := m.conf.DefaultOf(config.Idea), m.kind(column) == config.Idea // read here: the write runs on another goroutine
 	write := m.submit("new", "created", nil, func() (core.Result, error) {
 		res, err := m.d.Store.Create(title, project, column, m.d.Actor)
-		if !errors.Is(err, core.ErrRule) || column == config.Idea {
+		if !errors.Is(err, core.ErrRule) || isIdea {
 			return res, err
 		}
-		res, err = m.d.Store.Create(title, project, config.Idea, m.d.Actor)
+		res, err = m.d.Store.Create(title, project, idea, m.d.Actor)
 		if err == nil {
-			res.Info = "created in idea: add criteria, then move it to " + column
+			res.Info = "created in " + idea + ": add criteria, then move it to " + column
 		}
 		return res, err
 	})

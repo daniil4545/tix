@@ -174,3 +174,26 @@ func (t *Task) SetLine(id string, done bool) (changed bool) {
 	}
 	return true
 }
+
+// DropLines removes the criterion lines that name one of the task ids and returns how many it removed.
+func (t *Task) DropLines(ids map[string]bool) int {
+	lines, at := t.criterionLines()
+	drop := map[int]bool{}
+	for _, i := range at {
+		m := reCriterion.FindStringSubmatch(strings.TrimRight(lines[i], "\r"))
+		if ids[LineTask(strings.TrimSpace(m[4]))] {
+			drop[i] = true
+		}
+	}
+	if len(drop) == 0 {
+		return 0
+	}
+	kept := make([]string, 0, len(lines)-len(drop))
+	for i, ln := range lines {
+		if !drop[i] {
+			kept = append(kept, ln)
+		}
+	}
+	t.Body = strings.Join(kept, "\n")
+	return len(drop)
+}

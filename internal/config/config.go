@@ -14,7 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// The five fixed statuses of a task (spec 2.5): no roles, no columns in config.toml.
+// The five kinds of a status (spec 0.9.0 2.1). Each is also the name of a default status.
 const (
 	Idea       = "idea"
 	Open       = "open"
@@ -23,8 +23,27 @@ const (
 	Closed     = "closed"
 )
 
-// Statuses - the statuses in board order.
-var Statuses = []string{Idea, Open, InProgress, Blocked, Closed}
+// Kinds - the five kinds in board order.
+var Kinds = []string{Idea, Open, InProgress, Blocked, Closed}
+
+// Status - a name and its kind, one [[status]] section.
+type Status struct {
+	Name string `toml:"name"`
+	Kind string `toml:"kind"`
+}
+
+var reName = regexp.MustCompile(`^[a-z0-9_]{1,20}$`)
+
+// reStatusHead - the head line of a [[status]] section, with spaces and a comment allowed.
+var reStatusHead = regexp.MustCompile(`^\s*\[\[\s*status\s*\]\]\s*(#.*)?$`)
+
+func defaultStatuses() []Status {
+	l := make([]Status, len(Kinds))
+	for i, k := range Kinds {
+		l[i] = Status{k, k}
+	}
+	return l
+}
 
 // legacy - the words of the former columns and roles and the status each one is now.
 var legacy = map[string]string{
@@ -32,14 +51,14 @@ var legacy = map[string]string{
 	"todo": Open, "doing": InProgress, "done": Closed, "closed": Closed,
 }
 
-// Check returns nil for one of the five statuses, else an error that names them; an old
+// checkIn returns nil for a name of the list, else an error that names them; an old
 // column or role word gets the hint "maybe open?".
-func Check(name string) error {
-	if slices.Contains(Statuses, name) {
+func checkIn(names []string, name string) error {
+	if slices.Contains(names, name) {
 		return nil
 	}
-	list := strings.Join(Statuses, " ")
-	if to, ok := legacy[name]; ok {
+	list := strings.Join(names, " ")
+	if to, ok := legacy[name]; ok && slices.Contains(names, to) {
 		return fmt.Errorf("unknown status %q: maybe %s? statuses: %s", name, to, list)
 	}
 	return fmt.Errorf("unknown status %q; statuses: %s", name, list)
@@ -49,6 +68,8 @@ func Check(name string) error {
 type Config struct {
 	Projects map[string]string
 	Paths    map[string]string // project name (lower case) = absolute path; "" - a project with no path
+	Format   int               // store format; 0 - not set
+	statuses []Status          // nil - no [[status]] in the file: the default five, not printed
 	extra    map[string]any    // foreign sections, kept as they are on Render
 }
 
@@ -58,6 +79,8 @@ var reLine = regexp.MustCompile(`^toml: line (\d+)[^:]*: `)
 type file struct {
 	Projects map[string]string `toml:"projects"`
 	Paths    map[string]string `toml:"paths,omitempty"`
+	Format   int               `toml:"format"`
+	Status   []Status          `toml:"status"`
 }
 
 // Default returns the config for the first write.
@@ -86,10 +109,13 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("%s:%d: %s", path, line, msg)
 	}
 	c := build(f)
+	if err := c.validate(path, string(data)); err != nil {
+		return nil, err
+	}
 	var all map[string]any
 	if _, err := toml.Decode(string(data), &all); err == nil {
 		for k, v := range all {
-			if k != "projects" && k != "paths" && k != "column" { // [[column]] is the old shape, migrated away
+			if k != "projects" && k != "paths" && k != "column" && k != "status" && k != "format" { // [[column]] is the old shape, migrated away
 				if c.extra == nil {
 					c.extra = map[string]any{}
 				}
@@ -101,7 +127,7 @@ func Load(path string) (*Config, error) {
 }
 
 func build(f file) *Config {
-	c := &Config{Projects: f.Projects, Paths: f.Paths}
+	c := &Config{Projects: f.Projects, Paths: f.Paths, Format: f.Format, statuses: f.Status}
 	if c.Projects == nil {
 		c.Projects = map[string]string{}
 	}
@@ -117,6 +143,163 @@ func build(f file) *Config {
 	return c
 }
 
+// validate checks the status list (spec 2.1). The line is that of the [[status]] section at fault.
+func (c *Config) validate(path, text string) error {
+	var lines []int // line of each [[status]] section
+	for i, l := range strings.Split(text, "\n") {
+		if reStatusHead.MatchString(l) {
+			lines = append(lines, i+1)
+		}
+	}
+	fail := func(i int, format string, a ...any) error {
+		line := 1
+		if i < len(lines) {
+			line = lines[i]
+		}
+		return fmt.Errorf("%s:%d: %s", path, line, fmt.Sprintf(format, a...))
+	}
+	seen := map[string]bool{}
+	kinds := map[string]bool{}
+	for i, s := range c.statuses {
+		switch {
+		case !reName.MatchString(s.Name):
+			return fail(i, "status name %q: use a-z, 0-9, _, up to 20 characters", s.Name)
+		case seen[s.Name]:
+			return fail(i, "status %q is listed twice", s.Name)
+		case !slices.Contains(Kinds, s.Kind):
+			return fail(i, "status %q: unknown kind %q; kinds: %s", s.Name, s.Kind, strings.Join(Kinds, " "))
+		case slices.Contains(Kinds, s.Name) && s.Name != s.Kind:
+			return fail(i, "status %q is a kind word, it can only have the kind %s", s.Name, s.Name)
+		}
+		seen[s.Name], kinds[s.Kind] = true, true
+	}
+	if len(c.statuses) == 0 {
+		return nil
+	}
+	for _, k := range Kinds {
+		if !kinds[k] {
+			return fail(0, "no status of the kind %s", k)
+		}
+	}
+	return nil
+}
+
+// StatusList returns the statuses in config order: the default five when the file has none.
+func (c *Config) StatusList() []Status {
+	if len(c.statuses) == 0 {
+		return defaultStatuses()
+	}
+	return slices.Clone(c.statuses)
+}
+
+// KindOf returns the kind of a status; false if there is no such status.
+func (c *Config) KindOf(name string) (string, bool) {
+	for _, s := range c.StatusList() {
+		if s.Name == name {
+			return s.Kind, true
+		}
+	}
+	return "", false
+}
+
+// DefaultOf returns the first status of a kind; "" if the kind is unknown.
+func (c *Config) DefaultOf(kind string) string {
+	for _, s := range c.StatusList() {
+		if s.Kind == kind {
+			return s.Name
+		}
+	}
+	return ""
+}
+
+// CheckStatus returns nil for a configured status name, else an error that lists them.
+func (c *Config) CheckStatus(name string) error {
+	l := c.StatusList()
+	names := make([]string, len(l))
+	for i, s := range l {
+		names[i] = s.Name
+	}
+	return checkIn(names, name)
+}
+
+// materialize writes the default five into a config that has no [[status]] section.
+func (c *Config) materialize() {
+	if len(c.statuses) == 0 {
+		c.statuses = defaultStatuses()
+	}
+}
+
+// checkNewName refuses a name that cannot be a new status of the kind (spec 2.1, 2.3).
+func (c *Config) checkNewName(name, kind string) error {
+	switch {
+	case !reName.MatchString(name):
+		return fmt.Errorf("status name %q: use a-z, 0-9, _, up to 20 characters", name)
+	case slices.Contains(Kinds, name) && name != kind:
+		return fmt.Errorf("status name %q is a kind word, it can only have the kind %s", name, name)
+	}
+	if _, ok := c.KindOf(name); ok {
+		return fmt.Errorf("status %q already exists", name)
+	}
+	return nil
+}
+
+// AddStatus appends a status after the last one of its kind; it is never the default of the kind.
+func (c *Config) AddStatus(name, kind string) error {
+	if !slices.Contains(Kinds, kind) {
+		return fmt.Errorf("unknown kind %q; kinds: %s", kind, strings.Join(Kinds, " "))
+	}
+	if err := c.checkNewName(name, kind); err != nil {
+		return err
+	}
+	c.materialize()
+	at := 0
+	for i, s := range c.statuses {
+		if s.Kind == kind {
+			at = i + 1
+		}
+	}
+	c.statuses = slices.Insert(c.statuses, at, Status{name, kind})
+	return nil
+}
+
+// RenameStatus renames a status in place; its kind and place stay.
+func (c *Config) RenameStatus(oldName, newName string) error {
+	if err := c.CheckStatus(oldName); err != nil {
+		return err
+	}
+	kind, _ := c.KindOf(oldName)
+	if err := c.checkNewName(newName, kind); err != nil {
+		return err
+	}
+	c.materialize()
+	for i := range c.statuses {
+		if c.statuses[i].Name == oldName {
+			c.statuses[i].Name = newName
+		}
+	}
+	return nil
+}
+
+// RemoveStatus drops a status; the last one of a kind stays.
+func (c *Config) RemoveStatus(name string) error {
+	if err := c.CheckStatus(name); err != nil {
+		return err
+	}
+	kind, _ := c.KindOf(name)
+	n := 0
+	for _, s := range c.StatusList() {
+		if s.Kind == kind {
+			n++
+		}
+	}
+	if n == 1 {
+		return fmt.Errorf("status %q is the last of the kind %s", name, kind)
+	}
+	c.materialize()
+	c.statuses = slices.DeleteFunc(c.statuses, func(s Status) bool { return s.Name == name })
+	return nil
+}
+
 // Render prints config.toml.
 func (c *Config) Render() []byte {
 	var b bytes.Buffer
@@ -126,6 +309,12 @@ func (c *Config) Render() []byte {
 	all := map[string]any{"projects": c.Projects}
 	if len(c.Paths) > 0 {
 		all["paths"] = c.Paths
+	}
+	if c.Format != 0 {
+		all["format"] = c.Format
+	}
+	if len(c.statuses) > 0 {
+		all["status"] = c.statuses
 	}
 	for k, v := range c.extra {
 		all[k] = v

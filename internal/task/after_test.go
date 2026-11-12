@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/task"
 )
 
@@ -31,7 +32,7 @@ func TestAfter_Lines(t *testing.T) {
 func TestWaitingOn_UnknownAndClosedAreDone(t *testing.T) {
 	all := []*task.Task{{ID: "T-1", Status: "open"}, {ID: "T-2", Status: "closed"}}
 	w := &task.Task{ID: "T-9", Body: "After: T-1, T-2, T-77"}
-	if got := task.WaitingOn(w, task.NotClosed(all)); !reflect.DeepEqual(got, []string{"T-1"}) {
+	if got := task.WaitingOn(w, task.NotClosed(all, config.Default())); !reflect.DeepEqual(got, []string{"T-1"}) {
 		t.Errorf("got %v, want [T-1]", got)
 	}
 }

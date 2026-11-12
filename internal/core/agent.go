@@ -63,7 +63,7 @@ type MoveOpts struct {
 type Field struct{ Name, Value string }
 
 const (
-	allowedFields = "title project waiting tags external abstract"
+	allowedFields = "title project waiting tags external abstract parent"
 )
 
 func (s *Store) claimed(id string, c task.Claim) error {
@@ -106,28 +106,30 @@ func (s *Store) release(t *task.Task, actor string) (string, error) {
 	if has {
 		t.ClearClaim() // own or expired: a live foreign claim was refused above
 	}
-	if t.Status != config.InProgress {
+	if s.kindOf(t.Status) != config.InProgress {
 		return "released", nil
 	}
-	pl, err := s.place(t, config.Open, Place{First: true})
+	from, to := t.Status, s.conf().DefaultOf(config.Open)
+	pl, err := s.place(t, to, Place{First: true})
 	if err != nil {
 		return "", err
 	}
-	t.Status, t.Rank = config.Open, pl.rank
-	return "released  " + transition(config.InProgress, config.Open), nil
+	t.Status, t.Rank = to, pl.rank
+	return "released  " + s.transition(from, to), nil
 }
 
 func (s *Store) take(t *task.Task, actor string, steal bool, op *opInfo) (string, error) {
-	canTake := slices.Contains([]string{config.Open, config.Blocked, config.InProgress}, t.Status)
-	if t.Status == config.Idea {
+	kind := s.kindOf(t.Status)
+	canTake := slices.Contains([]string{config.Open, config.Blocked, config.InProgress}, kind)
+	if kind == config.Idea {
 		canTake = len(t.Criteria()) > 0
 	}
 	if !canTake {
 		if len(t.Criteria()) == 0 {
 			return "", rule("%s is in %s and has no criteria; add `- [ ]` lines under ## Details with tix edit, "+
-				"then run: tix move %s open, then tix take %s", t.ID, t.Status, t.ID, t.ID)
+				"then run: tix move %s %s, then tix take %s", t.ID, t.Status, t.ID, s.conf().DefaultOf(config.Open), t.ID)
 		}
-		return "", rule("%s is in %s; run: tix move %s open", t.ID, t.Status, t.ID)
+		return "", rule("%s is in %s; run: tix move %s %s", t.ID, t.Status, t.ID, s.conf().DefaultOf(config.Open))
 	}
 	claim, has := t.ClaimInfo()
 	live := has && claim.Until.After(s.now())
@@ -139,50 +141,76 @@ func (s *Store) take(t *task.Task, actor string, steal bool, op *opInfo) (string
 		op.subject = "steal " + ident.Short(claim.Actor)
 	}
 	from := t.Status
-	if from == config.Blocked {
+	if kind == config.Blocked {
 		if err := t.SetField("waiting", ""); err != nil {
 			return "", err
 		}
 	}
-	if from != config.InProgress {
-		pl, err := s.place(t, config.InProgress, Place{})
+	if kind != config.InProgress {
+		to := s.conf().DefaultOf(config.InProgress)
+		pl, err := s.place(t, to, Place{})
 		if err != nil {
 			return "", err
 		}
-		t.Status, t.Rank = config.InProgress, pl.rank
+		t.Status, t.Rank = to, pl.rank
 	}
 	if !live || foreign {
 		t.SetClaim(task.Claim{Actor: actor, Until: s.now().Add(claimTTL)})
 	}
 	c, _ := t.ClaimInfo()
-	return fmt.Sprintf("%s  @%s until %s", transition(from, config.InProgress), ident.Short(c.Actor), c.Until.Format("15:04")), nil
+	return fmt.Sprintf("%s  @%s until %s", s.transition(from, t.Status), ident.Short(c.Actor), c.Until.Format("15:04")), nil
 }
 
 // transition prints "from > to"; a move into the same column is just its name.
-func transition(from, to string) string {
+func (s *Store) transition(from, to string) string {
 	if from == to {
-		return to
+		return s.label(to)
 	}
-	return from + " > " + to
+	return s.label(from) + " > " + s.label(to)
+}
+
+// label prints a status as its name, or "name [kind]" when the name is not the kind word.
+func (s *Store) label(name string) string {
+	if k := s.kindOf(name); k != "" && k != name {
+		return name + " [" + k + "]"
+	}
+	return name
 }
 
 // Move moves a task into a status by the entry rules.
 func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error) {
+	return s.moveTo(id, func(*task.Task) string { return column }, o, actor)
+}
+
+// Close moves a task to the default status of the kind closed; a task already of that kind stays
+// where it is (ok, no commit). This is "done"; Move to a name would send a task of another closed status away.
+func (s *Store) Close(id string, o MoveOpts, actor string) (Result, error) {
+	return s.moveTo(id, func(t *task.Task) string {
+		if s.kindOf(t.Status) == config.Closed {
+			return t.Status
+		}
+		return s.conf().DefaultOf(config.Closed)
+	}, o, actor)
+}
+
+// moveTo is Move with the target status chosen under the lock, after the config is read.
+func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, actor string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
 	}
 	op := &opInfo{kind: "move"}
 	var info string
-	var ready []string
+	var ready, notices []string
 	res, err := s.modifyTx(id, actor, op, func(tx *txEnv, t *task.Task, _ string) error {
-		if err := config.Check(column); err != nil {
+		column := target(t)
+		if err := s.conf().CheckStatus(column); err != nil {
 			return rule("%v", err)
 		}
-		wasClosed := t.Status == config.Closed
-		nowClosed := column == config.Closed
-		if nowClosed && !wasClosed && t.IsEpic() {
-			if err := s.settleLines(t); err != nil {
+		wasClosed := s.kindOf(t.Status) == config.Closed
+		nowClosed := s.kindOf(column) == config.Closed
+		if nowClosed && !wasClosed {
+			if err := s.checkCloseEpic(t); err != nil {
 				return err
 			}
 		}
@@ -190,11 +218,13 @@ func (s *Store) Move(id, column string, o MoveOpts, actor string) (Result, error
 		info, err = s.move(tx, t, column, o, actor, op)
 		if err == nil && wasClosed != nowClosed {
 			ready = s.syncEpics(tx, t.ID, nowClosed)
+			ready, notices = s.childMoved(t, nowClosed, ready)
 		}
 		return err
 	})
 	res.Info = info
 	res.Ready = ready
+	res.Notices = notices
 	return res, err
 }
 
@@ -202,17 +232,18 @@ func (s *Store) move(tx *txEnv, t *task.Task, column string, o MoveOpts,
 	actor string, op *opInfo) (string, error) {
 	from := t.Status
 	msg := strings.TrimSpace(o.Message)
-	if msg != "" && column != config.Blocked && column != config.Closed {
+	fromKind, toKind := s.kindOf(from), s.kindOf(column)
+	if msg != "" && toKind != config.Blocked && toKind != config.Closed {
 		return "", rule("-m is only for moves to %s and %s", config.Blocked, config.Closed)
 	}
 	op.subject = "move " + from + " > " + column
 	same := from == column
 	switch {
-	case !same:
-		if err := s.leave(t, from, column, msg, o, actor, op); err != nil {
+	case fromKind != toKind: // an unknown status has the kind "": it gets the checks of the target
+		if err := s.leave(t, fromKind, toKind, column, msg, o, actor, op); err != nil {
 			return "", err
 		}
-	case column == config.Blocked && msg != "":
+	case toKind == config.Blocked && msg != "":
 		if err := t.SetField("waiting", msg); err != nil {
 			return "", err
 		}
@@ -228,12 +259,13 @@ func (s *Store) move(tx *txEnv, t *task.Task, column string, o MoveOpts,
 		}
 	}
 	t.Status = column
-	return transition(from, column), nil
+	return s.transition(from, column), nil
 }
 
 // leave applies a transition between different columns: entry checks, fields and claim.
-func (s *Store) leave(t *task.Task, from, to, msg string, o MoveOpts, actor string, op *opInfo) error {
-	forced, err := s.enter(t, to, msg, o, actor)
+// from and to are kinds; name is the target status.
+func (s *Store) leave(t *task.Task, from, to, name, msg string, o MoveOpts, actor string, op *opInfo) error {
+	forced, err := s.enter(t, name, msg, o, actor)
 	if err != nil {
 		return err
 	}
@@ -248,7 +280,7 @@ func (s *Store) leave(t *task.Task, from, to, msg string, o MoveOpts, actor stri
 			return err
 		}
 	}
-	if from == config.InProgress || to == config.Closed {
+	if from == config.InProgress || from == "" || to == config.Closed {
 		t.ClearClaim()
 	}
 	return nil
@@ -257,7 +289,7 @@ func (s *Store) leave(t *task.Task, from, to, msg string, o MoveOpts, actor stri
 // enter checks the entry into the status to and writes its fields (waiting, the Result comment).
 // forced: the closing bypassed unchecked criteria.
 func (s *Store) enter(t *task.Task, to, msg string, o MoveOpts, actor string) (bool, error) {
-	switch to {
+	switch s.kindOf(to) {
 	case config.Open:
 		if len(t.Criteria()) == 0 {
 			return false, rule("open needs a criterion")
@@ -328,7 +360,7 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
 		old := t.Project
 		for _, f := range fields {
-			if err := setField(t, f); err != nil {
+			if err := s.setField(t, f); err != nil {
 				return err
 			}
 		}
@@ -341,7 +373,7 @@ func (s *Store) Set(id string, fields []Field, actor string) (Result, error) {
 	return res, err
 }
 
-func setField(t *task.Task, f Field) error {
+func (s *Store) setField(t *task.Task, f Field) error {
 	switch f.Name {
 	case "status", "claim", "rank":
 		return rule("%s is changed by tix move", f.Name)
@@ -361,9 +393,15 @@ func setField(t *task.Task, f Field) error {
 		}
 		return t.SetField("project", project)
 	case "waiting":
-		if strings.TrimSpace(f.Value) == "" && t.Status == config.Blocked {
+		if strings.TrimSpace(f.Value) == "" && s.kindOf(t.Status) == config.Blocked {
 			return rule("blocked needs a reason: use -m, or leave with tix move")
 		}
+	case "parent":
+		parent := strings.TrimSpace(f.Value)
+		if err := s.checkParent(t, parent); err != nil {
+			return err
+		}
+		return t.SetField("parent", parent)
 	case "tags", "external":
 	default:
 		return rule("field %s cannot be set; allowed: %s", f.Name, allowedFields)
@@ -373,21 +411,35 @@ func setField(t *task.Task, f Field) error {
 
 // Check marks criteria with numbers nums. A task line of an epic follows the status of its task and is refused.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
+	return s.mark(id, nums, actor, "check")
+}
+
+// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed and a task line of
+// an epic are refused.
+func (s *Store) Uncheck(id string, nums []int, actor string) (Result, error) {
+	return s.mark(id, nums, actor, "uncheck")
+}
+
+// mark is Check (verb "check") or Uncheck (verb "uncheck").
+func (s *Store) mark(id string, nums []int, actor, verb string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
 	}
 	if len(nums) == 0 {
-		return Result{}, errors.New("check needs criterion numbers")
+		return Result{}, fmt.Errorf("%s needs criterion numbers", verb)
 	}
 	parts := make([]string, len(nums))
 	for i, n := range nums {
 		parts[i] = strconv.Itoa(n)
 	}
-	op := &opInfo{kind: "check", subject: "check " + strings.Join(parts, " ")}
+	op := &opInfo{kind: verb, subject: verb + " " + strings.Join(parts, " ")}
 	var info string
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
 		crit := t.Criteria()
+		if verb == "uncheck" && s.kindOf(t.Status) == config.Closed {
+			return rule("%s is closed: reopen it first with tix move %s <status>", t.ID, t.ID)
+		}
 		if t.IsEpic() {
 			for _, n := range nums {
 				if n >= 1 && n <= len(crit) && task.LineTask(crit[n-1].Text) != "" {
@@ -395,21 +447,29 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 				}
 			}
 		}
-		if _, err := t.Check(nums...); err != nil {
+		change := t.Check
+		if verb == "uncheck" {
+			change = t.Uncheck
+		}
+		if _, err := change(nums...); err != nil {
 			return err
 		}
-		crit = t.Criteria()
-		done := 0
-		for _, c := range crit {
-			if c.Done {
-				done++
-			}
-		}
-		info = fmt.Sprintf("%d/%d", done, len(crit))
+		info = progress(t.Criteria())
 		return nil
 	})
 	res.Info = info
 	return res, err
+}
+
+// progress - "done/all" of the criteria.
+func progress(crit []task.Criterion) string {
+	done := 0
+	for _, c := range crit {
+		if c.Done {
+			done++
+		}
+	}
+	return fmt.Sprintf("%d/%d", done, len(crit))
 }
 
 // ReleaseAll drops every live claim of the actor in one commit: an in_progress task goes back to the head
@@ -430,7 +490,7 @@ func (s *Store) ReleaseAll(actor string) ([]string, Result, error) {
 		}
 		var files []gitx.File
 		for _, e := range s.rankIndex() {
-			if e.status != config.InProgress {
+			if s.kindOf(e.status) != config.InProgress {
 				continue // only in_progress carries a claim: no parse of the rest
 			}
 			f, ok, err := s.releaseOwn(e.path, actor)

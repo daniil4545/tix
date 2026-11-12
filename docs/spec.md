@@ -143,13 +143,15 @@ flowchart TD
 |---|---|
 | `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters; the line `stale 14d+: N (up to 10 ids)` names idea and open tasks without a move for 14 days: a move is a commit `T-N: new|note|comment|move|take|steal|done|edit|check`, set, release, external edits and mass commits of tix do not count; `list --stale` shows them with the idle days |
 | `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, Abstract and criteria, case-insensitive; `--like TEXT|T-N` lists similar tasks of the project by shared 5-letter word stems; `--stale` keeps idea and open tasks without a move for 14 days with their idle days; alias `ls`; the whole task, with `rev` |
-| `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
+| `new` | new task, in `idea` by default; `--parent T-N` makes it a child (depth one, same refusals as `set parent=`); `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open`; without a number it drops every live claim of the actor in one commit (the SessionEnd hook); for a project with a path it prints `project: NAME /path docs: ...` |
 | `projects` | lists the catalog `[paths]` of config.toml with open counts; `projects add NAME [PATH]` registers a project; once the catalog is not empty `new` and `set project=` refuse an unknown project (code 5) |
+| `status` | lists the statuses with kind and task count; `status add NAME --kind KIND`, `status rename OLD NEW`, `status rm NAME` change the list in config.toml (0.9.0 2.3) |
 | `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
-| `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`; any other field is refused |
+| `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `parent`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
+| `uncheck` | clear the check of a criterion; a task of the kind closed and a task line of an epic are refused (code 5) |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`; a failed epic write is a Warning; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
 | `rm` | delete |
 
@@ -195,7 +197,7 @@ arrows select  enter open  space grab  n new  e edit  c comment  del delete  p p
      for `blocked`), the title, the latest note with its age (2h, 1d), the criteria and the `claim`.
      The latest note comes from the window of the last 300 notes of the whole store
      (`noteLimit`, `gitx/history.go`); a task older than the window has an empty line;
-     a status outside the five is the column `?`;
+     a status outside the config is the column `?`;
    - the hint line holds the common keys only, the rest is under `?`;
    - the title and the fields (tags, project, external) are changed with `tix set`; `e` in the TUI edits the body;
    - the card: title and status, one fields line, abstract, details with the criteria, history:
@@ -316,7 +318,7 @@ See section 8.
 ## 5. Code model
 
 - Task: frontmatter `id`, `title`, `project`, `status`, `rank` (fractional), `created`,
-  `external`, `waiting`, `claim`, `tags`. Body (D23, D25): `## Abstract`,
+  `external`, `waiting`, `claim`, `parent` (optional `T-N`), `tags`. Body (D23, D25): `## Abstract`,
   `## Details` (criteria as checkboxes, links),
   `## Comments` (append only).
 - `claim`: `actor until ISO`; only `take` checks it; the owner's writes to the file extend it by 3 h

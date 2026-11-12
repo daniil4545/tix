@@ -1,12 +1,10 @@
 package tui
 
 import (
-	"slices"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/tui/view"
 )
@@ -129,8 +127,11 @@ func (m *Model) mouseRelease(e tea.Mouse) tea.Cmd {
 	return m.moveTo(t, target, core.MoveOpts{})
 }
 
-// configured: the status is one of the five.
-func (m *Model) configured(name string) bool { return slices.Contains(config.Statuses, name) }
+// configured: the status is one of the config.
+func (m *Model) configured(name string) bool { _, ok := m.conf.KindOf(name); return ok }
+
+// kind returns the kind of a status by the config of the last refresh; "" for an unknown one.
+func (m *Model) kind(name string) string { k, _ := m.conf.KindOf(name); return k }
 
 // selectTask puts the cursor on task id; false if it is not on the board (project filter).
 func (m *Model) selectTask(id string) bool {

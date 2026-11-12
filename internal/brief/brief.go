@@ -23,8 +23,8 @@ const maxStaleIDs = 10
 // howto - the second line of ctx: the three commands of the agent cycle.
 const howto = "- take: tix take; step: tix note; end: tix done"
 
-// ctxStatuses - the statuses a project ctx lists, in display order.
-var ctxStatuses = []string{config.InProgress, config.Blocked, config.Open}
+// ctxKinds - the kinds a project ctx lists, in display order.
+var ctxKinds = []string{config.InProgress, config.Blocked, config.Open}
 
 // Input - the input of Build. PerColumn - how many tasks per column before compression, Limit - the rune limit
 // of the text; 0 removes the limit (this is how JSON is built).
@@ -35,7 +35,9 @@ type Input struct {
 	Path                      string // the project folder; empty - no line
 	Now                       time.Time
 	PerColumn, Limit          int
-	Stale                     []string // idea and open tasks without a move for 14 days, most idle first
+	Stale                     []string          // idea and open tasks without a move for 14 days, most idle first
+	Config                    *config.Config    // the statuses and their kinds; nil - the default statuses
+	counts                    map[string][2]int // {closed, all} children per parent, set by Build
 }
 
 // Row - a task line. Detail: "Waiting: ...", "k/n"; own claim - "@you".
@@ -45,13 +47,25 @@ type Row struct {
 	Detail string `json:"detail"`
 	Claim  string `json:"claim"`
 	Epic   bool   `json:"epic,omitempty"`
+	// Children and ChildrenClosed: the progress of a parent; zero for a task without children.
+	Children       int `json:"children,omitempty"`
+	ChildrenClosed int `json:"children_closed,omitempty"`
 }
 
 // Section - a column of tasks; More - how many tasks are hidden.
 type Section struct {
 	Column string `json:"column"`
+	Kind   string `json:"kind"`
 	Rows   []Row  `json:"rows"`
 	More   int    `json:"more"`
+}
+
+// label prints the column as its name, or "name [kind]" when the name is not the kind word.
+func (s Section) label() string {
+	if s.Kind == "" || s.Kind == s.Column {
+		return s.Column
+	}
+	return s.Column + " [" + s.Kind + "]"
 }
 
 // Brief - the built ctx. In JSON the field names are lowercase, the limit applies to text only.
@@ -74,35 +88,55 @@ func Build(in Input) Brief {
 	if b.Project == "" {
 		b.Project = "all"
 	}
-	statuses := config.Statuses
+	cfg := in.Config
+	if cfg == nil {
+		cfg = config.Default()
+	}
+	statuses := cfg.StatusList()
 	if in.Project != "" {
-		statuses = ctxStatuses
+		statuses = projectStatuses(statuses)
 	}
 	known := in.All
 	if len(known) == 0 {
 		known = in.Tasks
 	}
-	for _, status := range statuses {
+	in.counts = task.ChildCounts(known, cfg)
+	for _, st := range statuses {
+		status, kind := st.Name, st.Kind
 		tasks := ranked(in.Tasks, status)
-		if status == config.Open {
-			b.Next = nextID(tasks, in, task.NotClosed(known))
+		if kind == config.Open && b.Next == "" {
+			b.Next = nextID(tasks, in, task.NotClosed(known, cfg))
 		}
 		if len(tasks) == 0 {
 			continue
 		}
-		sec := Section{Column: status, Rows: make([]Row, 0, len(tasks))}
-		if in.Project == "" && status != config.InProgress && status != config.Blocked {
+		sec := Section{Column: status, Kind: kind, Rows: make([]Row, 0, len(tasks))}
+		if in.Project == "" && kind != config.InProgress && kind != config.Blocked {
 			sec.More = len(tasks)
 			b.Sections = append(b.Sections, sec)
 			continue
 		}
 		for _, t := range tasks[:min(len(tasks), cmp.Or(in.PerColumn, len(tasks)))] {
-			sec.Rows = append(sec.Rows, makeRow(t, status, in))
+			sec.Rows = append(sec.Rows, makeRow(t, kind, in))
 		}
 		sec.More = len(tasks) - len(sec.Rows)
 		b.Sections = append(b.Sections, sec)
 	}
 	return b.fit(in.Limit)
+}
+
+// projectStatuses keeps the statuses a project ctx lists: the kinds of ctxKinds in that order,
+// within a kind in config order.
+func projectStatuses(all []config.Status) []config.Status {
+	var out []config.Status
+	for _, k := range ctxKinds {
+		for _, s := range all {
+			if s.Kind == k {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
 }
 
 // fit reduces the number of tasks per column until the text fits into limit.
@@ -168,8 +202,11 @@ func nextID(ready []*task.Task, in Input, notClosed map[string]bool) string {
 	return ""
 }
 
-func makeRow(t *task.Task, status string, in Input) Row {
-	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, status), Epic: t.IsEpic()}
+func makeRow(t *task.Task, kind string, in Input) Row {
+	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, kind), Epic: t.IsEpic()}
+	if c, ok := in.counts[t.ID]; ok {
+		r.Epic, r.ChildrenClosed, r.Children = true, c[0], c[1]
+	}
 	if c, ok := liveClaim(t, in.Now); ok {
 		r.Claim = actor.Short(c.Actor)
 		if in.Actor != "" && c.Actor == in.Actor {
@@ -179,9 +216,9 @@ func makeRow(t *task.Task, status string, in Input) Row {
 	return r
 }
 
-// detail: for blocked - the reason, for open - checked/total, otherwise empty.
-func detail(t *task.Task, status string) string {
-	switch status {
+// detail: for the kind blocked - the reason, for open - checked/total, otherwise empty.
+func detail(t *task.Task, kind string) string {
+	switch kind {
 	case config.Blocked:
 		if t.Waiting != "" {
 			return "Waiting: " + oneLine(t.Waiting)
@@ -221,10 +258,10 @@ func (b Brief) Text() string {
 	}
 	width := 0
 	for _, s := range b.Sections {
-		width = max(width, utf8.RuneCountInString(s.Column))
+		width = max(width, utf8.RuneCountInString(s.label()))
 	}
 	for _, s := range b.Sections {
-		pad := s.Column + strings.Repeat(" ", width-utf8.RuneCountInString(s.Column)) + " "
+		pad := s.label() + strings.Repeat(" ", width-utf8.RuneCountInString(s.label())) + " "
 		for _, r := range s.Rows {
 			lines = append(lines, rowLine(pad, r))
 		}
@@ -253,7 +290,10 @@ func rowLine(pad string, r Row) string {
 		tail = "  " + r.Claim
 	}
 	text := r.ID + " " + r.Title
-	if r.Epic {
+	switch {
+	case r.Children > 0:
+		text = fmt.Sprintf("%s [epic %d/%d] %s", r.ID, r.ChildrenClosed, r.Children, r.Title)
+	case r.Epic:
 		text = r.ID + " [epic] " + r.Title
 	}
 	if r.Detail != "" {

@@ -28,18 +28,18 @@ func (s *Store) Catalog() []CatalogEntry {
 		if t.Project == "" {
 			continue
 		}
-		if t.Status != config.Closed {
+		if s.kindOf(t.Status) != config.Closed {
 			count[t.Project]++
 		} else {
 			count[t.Project] += 0
 		}
 	}
-	for n := range s.cfg.Paths {
+	for n := range s.conf().Paths {
 		count[n] += 0
 	}
 	out := make([]CatalogEntry, 0, len(count))
 	for n, c := range count {
-		p, known := s.cfg.Paths[n]
+		p, known := s.conf().Paths[n]
 		out = append(out, CatalogEntry{Name: n, Path: p, Tasks: c, Known: known})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
@@ -90,7 +90,7 @@ func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (b
 	}
 	cur, known := cfg.Paths[name]
 	if known && (path == "" || cur == path) {
-		s.cfg = cfg
+		s.cfg.Store(cfg)
 		return true, nil
 	}
 	if known && cur != "" {
@@ -101,7 +101,7 @@ func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (b
 	if ok, err := s.replace(cfgPath, old, out); err != nil || !ok {
 		return false, err
 	}
-	s.cfg = cfg
+	s.cfg.Store(cfg)
 	files := []gitx.File{{Path: cfgRel, Data: out}}
 	for _, f := range tx.extra { // prepare's own config.toml is older than ours
 		if f.Path != cfgRel {
@@ -114,14 +114,14 @@ func (s *Store) setPathOnce(tx *txEnv, res *Result, name, path, actor string) (b
 
 // checkKnownProject refuses a project outside [paths] and not "personal". An empty catalog: no check.
 func (s *Store) checkKnownProject(project string) error {
-	if len(s.cfg.Paths) == 0 || project == defaultProject {
+	if len(s.conf().Paths) == 0 || project == defaultProject {
 		return nil
 	}
-	if _, ok := s.cfg.Paths[strings.ToLower(project)]; ok {
+	if _, ok := s.conf().Paths[strings.ToLower(project)]; ok {
 		return nil
 	}
 	known := []string{defaultProject}
-	for n := range s.cfg.Paths {
+	for n := range s.conf().Paths {
 		if n != defaultProject { // personal is always allowed: one row, not two
 			known = append(known, n)
 		}

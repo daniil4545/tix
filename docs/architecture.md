@@ -233,7 +233,7 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
-| The statuses | `config.Statuses`, `config.Check`, `core.migrateStatuses` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
+| The statuses | `config.StatusList`, `config.KindOf`, `config.CheckStatus`, `core.migrateStatuses` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
 | `RULES.md` text | `internal/assets/RULES.md` | move the old `assets.RulesHash` into `previousRules`: stores with an untouched copy get the new text |
 
 ## 10. Limits and open items

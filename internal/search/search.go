@@ -28,8 +28,20 @@ var stop = map[string]bool{
 type Query struct {
 	Text    string
 	Project string
-	SelfID  string // a task that never matches itself
-	All     bool   // closed tasks are candidates too
+	SelfID  string          // a task that never matches itself
+	All     bool            // closed tasks are candidates too
+	Config  *config.Config  // the kinds of the statuses; nil - the default statuses
+	Parents map[string]bool // tasks with children among all tasks, not only the candidates
+}
+
+// closed reports whether t has a status of the kind closed.
+func (q Query) closed(t *task.Task) bool {
+	cfg := q.Config
+	if cfg == nil {
+		cfg = config.Default()
+	}
+	k, _ := cfg.KindOf(t.Status)
+	return k == config.Closed
 }
 
 // Result is one similar task.
@@ -103,8 +115,12 @@ func Similar(q Query, tasks []*task.Task) []Result {
 		return nil
 	}
 	var out []Result
+	parents := map[string]bool{}
 	for _, t := range tasks {
-		if t.ID == q.SelfID || t.IsEpic() || (t.Status == config.Closed && !q.All) {
+		parents[t.Parent] = true
+	}
+	for _, t := range tasks {
+		if t.ID == q.SelfID || t.IsEpic() || parents[t.ID] || q.Parents[t.ID] || (!q.All && q.closed(t)) {
 			continue
 		}
 		if q.Project != "" && !strings.EqualFold(t.Project, q.Project) {

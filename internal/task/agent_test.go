@@ -190,3 +190,47 @@ func TestParse_OldDueLine_KeptOnRender(t *testing.T) {
 		t.Error("SetField(due) accepted")
 	}
 }
+
+func TestParent_RoundTrip(t *testing.T) {
+	tk := parseText(t, strings.Replace(fm, "status:", "parent: T-5\nstatus:", 1))
+	if tk.Parent != "T-5" {
+		t.Fatalf("Parent = %q", tk.Parent)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "parent: T-5\n") {
+		t.Errorf("render lost parent:\n%s", out)
+	}
+	if err := tk.SetField("parent", "T-7"); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "parent: T-7\n") || strings.Contains(out, "T-5") {
+		t.Errorf("changed parent:\n%s", out)
+	}
+	if err := tk.SetField("parent", ""); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); strings.Contains(out, "parent") {
+		t.Errorf("cleared parent stays:\n%s", out)
+	}
+	if parseText(t, fm).Parent != "" {
+		t.Error("parent of a task without the field")
+	}
+}
+
+// A hand-written parent of another type reads as no parent, and Render keeps the file text.
+func TestParent_OddValuesKeepFile(t *testing.T) {
+	for _, v := range []string{"[[T-5]]", "[T-5]"} {
+		tk := parseText(t, strings.Replace(fm, "status:", "parent: "+v+"\nstatus:", 1))
+		if tk.Parent != "" {
+			t.Errorf("%s: Parent = %q", v, tk.Parent)
+		}
+		if out := string(tk.Render()); !strings.Contains(out, "parent: "+v+"\n") {
+			t.Errorf("%s: render changed the value:\n%s", v, out)
+		}
+		if err := tk.SetField("parent", "T-7"); err != nil {
+			t.Fatal(err)
+		}
+		if out := string(tk.Render()); !strings.Contains(out, "parent: T-7\n") {
+			t.Errorf("%s: set not written:\n%s", v, out)
+		}
+	}
+}

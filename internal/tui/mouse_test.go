@@ -67,7 +67,7 @@ func firstShownColumn(m *Model) int {
 // so a release over the drawn blocked moves to blocked.
 func TestMouse_Drag_ColumnWindowStaysAfterPress_MovesToDrawnColumn(t *testing.T) {
 	e := mvNewEnv(t, "")
-	for _, st := range config.Statuses {
+	for _, st := range config.Kinds {
 		e.create("task-"+st, st)
 	}
 	m := newMouseModel(t, e, 80, 30)

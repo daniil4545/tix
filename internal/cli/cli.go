@@ -31,7 +31,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm|projects; " +
+	usage              = "tix ctx|inbox|take|move|set|check|uncheck|done|new|list|show|edit|comment|note|rm|projects|status; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -148,12 +148,14 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdMove(args)
 	case "set":
 		return a.cmdSet(args)
-	case "check":
-		return a.cmdCheck(args)
+	case "check", "uncheck":
+		return a.cmdMark(a.cmd, args)
 	case "done":
 		return a.cmdDone(args)
 	case "projects":
 		return a.cmdProjects(args)
+	case "status":
+		return a.cmdStatus(args)
 	case "version":
 		a.out("%s", a.env.Version)
 		return nil
@@ -166,8 +168,8 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 
 // usageCmds - the commands of the usage line in usage order.
 var usageCmds = []string{
-	"ctx", "inbox", "take", "move", "set", "check", "done",
-	"new", "list", "show", "edit", "comment", "note", "rm", "projects",
+	"ctx", "inbox", "take", "move", "set", "check", "uncheck", "done",
+	"new", "list", "show", "edit", "comment", "note", "rm", "projects", "status",
 }
 
 // suggest returns the closest command within edit distance 2 of a word,
@@ -212,8 +214,8 @@ func editDistance(a, b string) int {
 var commandHelp = map[string]string{
 	"ctx":      "ctx [--project P] [--json] [--hook]",
 	"inbox":    "inbox [--hook]",
-	"new":      "new <title> [--to status] [--project P] [--body-file FILE|-]",
-	"list":     "list [--project P] [--status status] [--all] [--grep TEXT] [--like TEXT|T-N] [--stale] [--json]; alias: ls",
+	"new":      "new <title> [--to status] [--project P] [--body-file FILE|-] [--parent T-N]",
+	"list":     "list [--project P] [--status status] [--kind kind] [--all] [--grep TEXT] [--like TEXT|T-N] [--stale] [--json]; alias: ls",
 	"show":     "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":     "edit <id> --base <rev> < body.md",
 	"comment":  "comment <id> <text>",
@@ -223,7 +225,9 @@ var commandHelp = map[string]string{
 	"move":     "move <id> <status> [--first|--after T-9] [-m text] [--force]",
 	"set":      "set <id> field=value...; fields: title project waiting tags external abstract",
 	"check":    "check <id> N...",
+	"uncheck":  "uncheck <id> N...",
 	"projects": "projects | projects add NAME [PATH]",
+	"status":   "status | status add NAME --kind KIND | status rename OLD NEW | status rm NAME",
 	"done":     "done <id> [-m result] [--force]",
 }
 

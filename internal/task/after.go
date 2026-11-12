@@ -34,11 +34,12 @@ func (t *Task) After() []string {
 	return ids
 }
 
-// NotClosed is the set of ids of the tasks that are not closed.
-func NotClosed(all []*Task) map[string]bool {
+// NotClosed is the set of ids of the tasks that are not of the kind closed; a status that is not
+// in cfg counts as not closed.
+func NotClosed(all []*Task, cfg *config.Config) map[string]bool {
 	m := make(map[string]bool, len(all))
 	for _, t := range all {
-		if t.Status != config.Closed {
+		if k, _ := cfg.KindOf(t.Status); k != config.Closed {
 			m[t.ID] = true
 		}
 	}
@@ -54,4 +55,22 @@ func WaitingOn(t *Task, notClosed map[string]bool) []string {
 		}
 	}
 	return open
+}
+
+// ChildCounts returns, for every task that is the parent of some task in all, {closed, all} of its children.
+// A status that is not in cfg counts as not closed.
+func ChildCounts(all []*Task, cfg *config.Config) map[string][2]int {
+	m := map[string][2]int{}
+	for _, t := range all {
+		if t.Parent == "" {
+			continue
+		}
+		c := m[t.Parent]
+		if k, _ := cfg.KindOf(t.Status); k == config.Closed {
+			c[0]++
+		}
+		c[1]++
+		m[t.Parent] = c
+	}
+	return m
 }
