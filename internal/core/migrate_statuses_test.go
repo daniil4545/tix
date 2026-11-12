@@ -53,8 +53,9 @@ func TestOpen_MigratesStatusesByRole_OneCommit_Idempotent(t *testing.T) {
 	n := e.count()
 
 	e.open(5 * 1e9)
-	if e.count() != n+1 {
-		t.Fatalf("commits %d, want %d: the migration is one commit", e.count(), n+1)
+	// spec 0.9.0 section 4: a store without format = 2 also gets the parent migration, its own commit
+	if e.count() != n+2 {
+		t.Fatalf("commits %d, want %d: the columns commit and the parent commit", e.count(), n+2)
 	}
 	want := []string{"idea", "open", "in_progress", "blocked", "closed", "review"}
 	for i, id := range ids {
@@ -74,8 +75,8 @@ func TestOpen_MigratesStatusesByRole_OneCommit_Idempotent(t *testing.T) {
 	}
 
 	e.open(5 * 1e9)
-	if e.count() != n+1 {
-		t.Errorf("the second Open added commits: %d, want %d", e.count(), n+1)
+	if e.count() != n+2 {
+		t.Errorf("the second Open added commits: %d, want %d", e.count(), n+2)
 	}
 }
 
@@ -98,11 +99,12 @@ func TestOpen_MigratesDefaultNamesWithoutColumns(t *testing.T) {
 			t.Errorf("%s: want %q", id, got)
 		}
 	}
-	if e.count() != n+1 {
-		t.Errorf("commits %d, want %d", e.count(), n+1)
+	// spec 0.9.0 section 4: the parent migration adds its own commit
+	if e.count() != n+2 {
+		t.Errorf("commits %d, want %d", e.count(), n+2)
 	}
 	e.open(5 * 1e9)
-	if e.count() != n+1 {
+	if e.count() != n+2 {
 		t.Errorf("the second Open added commits: %d", e.count())
 	}
 }
