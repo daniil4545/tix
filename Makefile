@@ -68,7 +68,7 @@ lint: fmt-check vet
 	git ls-files -z '*.sh' | xargs -0 $(SHELLCHECK)
 	$(ACTIONLINT)
 	$(TYPOS)
-	$(YAMLLINT) -c .yamllint.yml .
+	$(YAMLLINT) -c .yamllint.yml $$(git ls-files '*.yml' '*.yaml')
 	$(MARKDOWNLINT) '*.md'
 	$(CHECKMAKE) --config=checkmake.ini Makefile
 
