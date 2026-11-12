@@ -190,3 +190,28 @@ func TestParse_OldDueLine_KeptOnRender(t *testing.T) {
 		t.Error("SetField(due) accepted")
 	}
 }
+
+func TestParent_RoundTrip(t *testing.T) {
+	tk := parseText(t, strings.Replace(fm, "status:", "parent: T-5\nstatus:", 1))
+	if tk.Parent != "T-5" {
+		t.Fatalf("Parent = %q", tk.Parent)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "parent: T-5\n") {
+		t.Errorf("render lost parent:\n%s", out)
+	}
+	if err := tk.SetField("parent", "T-7"); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); !strings.Contains(out, "parent: T-7\n") || strings.Contains(out, "T-5") {
+		t.Errorf("changed parent:\n%s", out)
+	}
+	if err := tk.SetField("parent", ""); err != nil {
+		t.Fatal(err)
+	}
+	if out := string(tk.Render()); strings.Contains(out, "parent") {
+		t.Errorf("cleared parent stays:\n%s", out)
+	}
+	if parseText(t, fm).Parent != "" {
+		t.Error("parent of a task without the field")
+	}
+}

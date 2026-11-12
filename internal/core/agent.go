@@ -63,7 +63,7 @@ type MoveOpts struct {
 type Field struct{ Name, Value string }
 
 const (
-	allowedFields = "title project waiting tags external abstract"
+	allowedFields = "title project waiting tags external abstract parent"
 )
 
 func (s *Store) claimed(id string, c task.Claim) error {
@@ -394,6 +394,12 @@ func (s *Store) setField(t *task.Task, f Field) error {
 		if strings.TrimSpace(f.Value) == "" && s.kindOf(t.Status) == config.Blocked {
 			return rule("blocked needs a reason: use -m, or leave with tix move")
 		}
+	case "parent":
+		parent := strings.TrimSpace(f.Value)
+		if err := s.checkParent(t, parent); err != nil {
+			return err
+		}
+		return t.SetField("parent", parent)
 	case "tags", "external":
 	default:
 		return rule("field %s cannot be set; allowed: %s", f.Name, allowedFields)
