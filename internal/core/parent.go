@@ -1,0 +1,98 @@
+package core
+
+import (
+	"bytes"
+	"os"
+	"sort"
+	"strings"
+
+	"github.com/daniil4545/tix/internal/config"
+	"github.com/daniil4545/tix/internal/task"
+)
+
+// checkParent applies the refusals of setting task t under parent; "" clears and is always allowed.
+// t.ID is empty for a task that is not created yet.
+func (s *Store) checkParent(t *task.Task, parent string) error {
+	if parent == "" {
+		return nil
+	}
+	if !idRe.MatchString(parent) {
+		return rule("parent must look like T-N, got %q", parent)
+	}
+	if parent == t.ID {
+		return rule("a task cannot be its own parent")
+	}
+	tasks, _ := s.List() // broken files do not affect the check
+	var p *task.Task
+	for _, o := range tasks {
+		switch {
+		case o.ID == parent:
+			p = o
+		case t.ID != "" && o.Parent == t.ID:
+			return rule("%s has children (%s): clear or move them first, the depth is one", t.ID, o.ID)
+		}
+	}
+	switch {
+	case p == nil:
+		return rule("parent %s not found", parent)
+	case p.Parent != "":
+		return rule("%s already has a parent (%s): the depth is one", parent, p.Parent)
+	case s.kindOf(p.Status) == config.Closed:
+		return rule("parent %s is closed: reopen it first", parent)
+	}
+	return nil
+}
+
+// Children returns the tasks whose parent is id, by number, and how many of them are of the kind closed.
+// One pass over the task files; a byte prefilter skips the parse of files without "parent:" and the id.
+func (s *Store) Children(id string) ([]*task.Task, int) {
+	refs, err := s.taskFiles()
+	if err != nil {
+		s.log.Warn("children not read", "op", "children", "id", id, "err", err)
+		return nil, 0
+	}
+	found := make([]*task.Task, len(refs))
+	forEachChunked(len(refs), func(i int) { found[i] = s.childOf(refs[i], id) })
+	var kids []*task.Task
+	closed := 0
+	for _, o := range found {
+		if o != nil {
+			kids = append(kids, o)
+			if s.kindOf(o.Status) == config.Closed {
+				closed++
+			}
+		}
+	}
+	sort.SliceStable(kids, func(i, j int) bool { return IDNum(kids[i].ID) < IDNum(kids[j].ID) })
+	return kids, closed
+}
+
+// childOf returns the task in file r if its parent is id, otherwise nil.
+func (s *Store) childOf(r taskRef, id string) *task.Task {
+	if r.id == id {
+		return nil
+	}
+	data, err := os.ReadFile(r.path) //nolint:gosec // the path is built by the core
+	if err != nil {
+		s.log.Warn("child not read", "op", "children", "id", r.id, "err", err)
+		return nil
+	}
+	if !bytes.Contains(data, []byte("parent:")) || !bytes.Contains(data, []byte(id)) {
+		return nil
+	}
+	t, err := task.Parse(r.path, data)
+	if err != nil {
+		s.log.Warn("child not read", "op", "children", "id", r.id, "err", err)
+		return nil
+	}
+	if t.Parent != id {
+		return nil
+	}
+	return t
+}
+
+// HasTask reports whether a task file with this id exists.
+func (s *Store) HasTask(id string) bool {
+	_, err := s.findPath(strings.TrimSpace(id))
+	return err == nil
+}

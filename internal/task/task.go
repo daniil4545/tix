@@ -31,6 +31,7 @@ type Task struct {
 	External string    `json:"external"`
 	Waiting  string    `json:"waiting"`
 	Claim    string    `json:"claim"`
+	Parent   string    `json:"parent,omitempty"`
 	Rank     float64   `json:"rank"`
 	Created  time.Time `json:"created"`
 	Tags     []string  `json:"tags"`
@@ -80,7 +81,7 @@ var (
 
 	// frontmatter key order of a new task
 	fieldOrder = []string{"id", "title", "project", "status", "rank", "created",
-		"external", "waiting", "claim", "tags"}
+		"external", "waiting", "claim", "parent", "tags"}
 	requiredFields = map[string]bool{"id": true, "title": true, "project": true,
 		"status": true, "rank": true, "created": true}
 )
@@ -207,6 +208,11 @@ func (t *Task) parseFields(path, fm string) error {
 // setField puts a node value into a task field; foreign keys are skipped.
 func (t *Task) setField(key string, val *yaml.Node) error {
 	switch key {
+	case "parent":
+		// a hand-written value of another type (`[[T-5]]`, a list) reads as no parent; the file keeps it
+		if val.Kind == yaml.ScalarNode {
+			t.Parent = scalarText(val)
+		}
 	case "id", "title", "project", "status", "external", "waiting", "claim":
 		if val.Kind != yaml.ScalarNode {
 			return errors.New("string required")
@@ -254,6 +260,8 @@ func (t *Task) stringField(key string) *string {
 		return &t.External
 	case "waiting":
 		return &t.Waiting
+	case "parent":
+		return &t.Parent
 	default:
 		return &t.Claim
 	}
@@ -489,6 +497,10 @@ func (t *Task) sameField(key string, val *yaml.Node) bool {
 	case "tags":
 		tags, err := nodeTags(val)
 		return err == nil && slices.Equal(tags, t.Tags)
+	case "parent":
+		if val.Kind != yaml.ScalarNode {
+			return t.Parent == "" // not parsed as text: left as written until a parent is set
+		}
 	}
 	return val.Kind == yaml.ScalarNode && scalarText(val) == *t.stringField(key)
 }
