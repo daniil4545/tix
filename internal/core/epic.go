@@ -119,7 +119,7 @@ func (s *Store) settleLines(t *task.Task) error {
 			continue
 		}
 		line, err := readTask(path)
-		if err != nil || line.Status != config.Closed {
+		if err != nil || s.kindOf(line.Status) != config.Closed {
 			bad = append(bad, id+" (not closed)")
 			continue
 		}

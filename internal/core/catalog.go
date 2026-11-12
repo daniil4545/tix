@@ -28,7 +28,7 @@ func (s *Store) Catalog() []CatalogEntry {
 		if t.Project == "" {
 			continue
 		}
-		if t.Status != config.Closed {
+		if s.kindOf(t.Status) != config.Closed {
 			count[t.Project]++
 		} else {
 			count[t.Project] += 0

@@ -125,6 +125,12 @@ func Open(root string, o Options) (*Store, error) {
 	return s, nil
 }
 
+// kindOf returns the kind of a status by the current config; "" for a name that is not in it.
+func (s *Store) kindOf(name string) string {
+	k, _ := s.cfg.KindOf(name)
+	return k
+}
+
 // Config returns the store config.
 func (s *Store) Config() *config.Config { return s.cfg }
 
@@ -177,9 +183,9 @@ func (s *Store) CreateWithBody(title, project, column, body, actor string) (Resu
 
 func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (Result, error) {
 	if column == "" {
-		column = config.Idea
+		column = s.cfg.DefaultOf(config.Idea)
 	}
-	if err := config.Check(column); err != nil {
+	if err := s.cfg.CheckStatus(column); err != nil {
 		return Result{}, rule("%v", err)
 	}
 	t := &task.Task{Title: title, Project: project, Status: column}
@@ -233,12 +239,13 @@ func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (R
 // checkNewEntry applies the destination entry check before the task is written.
 func (s *Store) checkNewEntry(t *task.Task) error {
 	column := t.Status
-	if column != config.Closed {
+	kind := s.kindOf(column)
+	if kind != config.Closed {
 		if _, err := s.enter(t, column, "", MoveOpts{}, ""); err == nil {
 			return nil
 		}
 	}
-	switch column {
+	switch kind {
 	case config.Blocked:
 		return rule("a new task has no blocking reason; create it, then run: tix move <id> %s -m <reason>", column)
 	case config.Closed:

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/daniil4545/tix/internal/assets"
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -65,6 +66,12 @@ func (s *Store) withLock(create bool, fn func(tx *txEnv) error) error {
 	if err != nil {
 		return err
 	}
+	// the config is read under the lock: a long-lived process never checks against a stale status list
+	cfg, err := config.Load(filepath.Join(s.root, tixDir, configFile))
+	if err != nil {
+		return err
+	}
+	s.cfg = cfg
 	err = fn(tx)
 	due := s.countCommits(tx.commits)
 	release()
