@@ -103,3 +103,16 @@ Accepted on 2026-10-20:
 - D69. Five fixed statuses `idea`, `open`, `in_progress`, `blocked`, `closed` replace configurable columns with
   roles (D5, D20, D24 are superseded): agents confused the two names of each column. Stores with `[[column]]` are
   migrated on opening by the role of the column, in one commit. User decision 2026-10-30, confirmed 2026-11-02.
+  Replaced by D70.
+- D70. A status is a name plus a kind (`idea`, `open`, `in_progress`, `blocked`, `closed`); the list lives in
+  `.tix/config.toml` (`[[status]]`, `format = 2`) and can be added to, renamed and shrunk with `tix status`.
+  Every rule of the core reads the kind, never the name. Replaces D69. It is not D24 again: a kind has any
+  number of statuses and is typed only when a status is added, so agents never face two names for one
+  column. User decision 2026-11-12.
+- D71. The link of an epic to its tasks is the field `parent: T-N` in the child; an epic is a task that has
+  children, depth is one. Progress and the closing rules come from the children. The tagged task with a
+  list of `- [ ] T-N` lines is replaced; stores migrate on the first write of 0.9.0, in one commit. User
+  decision 2026-11-12.
+- D72. Core first: every behavior is a public operation of `internal/core`, the CLI and the TUI only parse and
+  print. A test fails when code outside `internal/config` and `internal/core` compares `.Status` itself.
+  The 0.10.0 interface must need no change in the core. User decision 2026-11-12.
