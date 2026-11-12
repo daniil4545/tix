@@ -146,6 +146,7 @@ flowchart TD
 | `new` | new task, in `idea` by default; `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open`; without a number it drops every live claim of the actor in one commit (the SessionEnd hook); for a project with a path it prints `project: NAME /path docs: ...` |
 | `projects` | lists the catalog `[paths]` of config.toml with open counts; `projects add NAME [PATH]` registers a project; once the catalog is not empty `new` and `set project=` refuse an unknown project (code 5) |
+| `status` | lists the statuses with kind and task count; `status add NAME --kind KIND`, `status rename OLD NEW`, `status rm NAME` change the list in config.toml (0.9.0 2.3) |
 | `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |

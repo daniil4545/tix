@@ -227,6 +227,84 @@ func (c *Config) CheckStatus(name string) error {
 	return checkIn(names, name)
 }
 
+// materialize writes the default five into a config that has no [[status]] section.
+func (c *Config) materialize() {
+	if len(c.statuses) == 0 {
+		c.statuses = defaultStatuses()
+	}
+}
+
+// checkNewName refuses a name that cannot be a new status of the kind (spec 2.1, 2.3).
+func (c *Config) checkNewName(name, kind string) error {
+	switch {
+	case !reName.MatchString(name):
+		return fmt.Errorf("status name %q: use a-z, 0-9, _, up to 20 characters", name)
+	case slices.Contains(Kinds, name) && name != kind:
+		return fmt.Errorf("status name %q is a kind word, it can only have the kind %s", name, name)
+	}
+	if _, ok := c.KindOf(name); ok {
+		return fmt.Errorf("status %q already exists", name)
+	}
+	return nil
+}
+
+// AddStatus appends a status after the last one of its kind; it is never the default of the kind.
+func (c *Config) AddStatus(name, kind string) error {
+	if !slices.Contains(Kinds, kind) {
+		return fmt.Errorf("unknown kind %q; kinds: %s", kind, strings.Join(Kinds, " "))
+	}
+	if err := c.checkNewName(name, kind); err != nil {
+		return err
+	}
+	c.materialize()
+	at := 0
+	for i, s := range c.statuses {
+		if s.Kind == kind {
+			at = i + 1
+		}
+	}
+	c.statuses = slices.Insert(c.statuses, at, Status{name, kind})
+	return nil
+}
+
+// RenameStatus renames a status in place; its kind and place stay.
+func (c *Config) RenameStatus(oldName, newName string) error {
+	if err := c.CheckStatus(oldName); err != nil {
+		return err
+	}
+	kind, _ := c.KindOf(oldName)
+	if err := c.checkNewName(newName, kind); err != nil {
+		return err
+	}
+	c.materialize()
+	for i := range c.statuses {
+		if c.statuses[i].Name == oldName {
+			c.statuses[i].Name = newName
+		}
+	}
+	return nil
+}
+
+// RemoveStatus drops a status; the last one of a kind stays.
+func (c *Config) RemoveStatus(name string) error {
+	if err := c.CheckStatus(name); err != nil {
+		return err
+	}
+	kind, _ := c.KindOf(name)
+	n := 0
+	for _, s := range c.StatusList() {
+		if s.Kind == kind {
+			n++
+		}
+	}
+	if n == 1 {
+		return fmt.Errorf("status %q is the last of the kind %s", name, kind)
+	}
+	c.materialize()
+	c.statuses = slices.DeleteFunc(c.statuses, func(s Status) bool { return s.Name == name })
+	return nil
+}
+
 // Render prints config.toml.
 func (c *Config) Render() []byte {
 	var b bytes.Buffer
