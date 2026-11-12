@@ -17,11 +17,8 @@ import (
 // kindConsts - the kind constants of package config (spec 0.9.0 section 6).
 var kindConsts = map[string]bool{"Idea": true, "Open": true, "InProgress": true, "Blocked": true, "Closed": true}
 
-// guardSkip - the packages that may compare a status: the owners, and tui until slice 4.
-var guardSkip = []string{
-	"internal/config", "internal/core",
-	"internal/tui", // slice 4
-}
+// guardSkip - the packages that may compare a status: the owners.
+var guardSkip = []string{"internal/config", "internal/core"}
 
 func TestS26_NoStatusComparedOutsideConfigAndCore(t *testing.T) {
 	root := filepath.Join("..", "..")

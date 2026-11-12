@@ -137,6 +137,17 @@ func (s *Store) kindOf(name string) string {
 // Config returns the store config.
 func (s *Store) Config() *config.Config { return s.conf() }
 
+// ReloadConfig rereads config.toml without the store lock, for a long-lived reader (the board) after an
+// edit by another process. A broken file is an error and the old config stays.
+func (s *Store) ReloadConfig() error {
+	cfg, err := config.Load(filepath.Join(s.root, tixDir, configFile))
+	if err != nil {
+		return err
+	}
+	s.cfg.Store(cfg)
+	return nil
+}
+
 func (s *Store) conf() *config.Config { return s.cfg.Load() }
 
 // git finds the git binary once per Store.

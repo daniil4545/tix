@@ -14,7 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// The five kinds of a status (spec 0.9.0 2.1). Until slice 4 each is also the name of a default status.
+// The five kinds of a status (spec 0.9.0 2.1). Each is also the name of a default status.
 const (
 	Idea       = "idea"
 	Open       = "open"
@@ -25,9 +25,6 @@ const (
 
 // Kinds - the five kinds in board order.
 var Kinds = []string{Idea, Open, InProgress, Blocked, Closed}
-
-// Statuses - the names of the default statuses in board order. Wrapper until slice 4.
-var Statuses = Kinds
 
 // Status - a name and its kind, one [[status]] section.
 type Status struct {
@@ -54,10 +51,8 @@ var legacy = map[string]string{
 	"todo": Open, "doing": InProgress, "done": Closed, "closed": Closed,
 }
 
-// Check returns nil for one of the five statuses, else an error that names them; an old
+// checkIn returns nil for a name of the list, else an error that names them; an old
 // column or role word gets the hint "maybe open?".
-func Check(name string) error { return checkIn(Statuses, name) }
-
 func checkIn(names []string, name string) error {
 	if slices.Contains(names, name) {
 		return nil

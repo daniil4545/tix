@@ -40,7 +40,7 @@ func (m *Model) refind() {
 		return
 	}
 	for _, t := range m.tasks {
-		if m.project != "" && !s.all && !strings.EqualFold(t.Project, m.project) || !s.closed && t.Status == config.Closed {
+		if m.project != "" && !s.all && !strings.EqualFold(t.Project, m.project) || !s.closed && m.kind(t.Status) == config.Closed {
 			continue
 		}
 		if line, ok := t.MatchLine(needle); ok {

@@ -20,6 +20,7 @@ const unknownColumn = view.UnknownColumn
 // apply takes a fresh task list and rebuilds the board, the selection is kept by id.
 func (m *Model) apply(tasks []*task.Task, skipped int) {
 	m.tasks, m.skipped = tasks, skipped
+	m.conf = m.d.Store.Config() // the config of the last refresh: columns follow it without a restart
 	m.dropGone()
 	m.rebuild()
 	if m.find != nil {
@@ -45,7 +46,10 @@ func (m *Model) dropGone() {
 
 // rebuild builds the columns by the project filter and puts the cursor on selID.
 func (m *Model) rebuild() {
-	names := slices.Clone(config.Statuses)
+	var names []string
+	for _, s := range m.conf.StatusList() {
+		names = append(names, s.Name)
+	}
 	byCol := map[string][]*task.Task{}
 	total := 0
 	for _, t := range m.tasks {
@@ -183,7 +187,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 		out[i] = view.Row{
 			ProjectColor: colors[strings.ToLower(t.Project)], Epic: epicLabel(t),
 			ID: t.ID, Project: project, Title: t.Title,
-			Star: t.Status == config.Blocked, Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
+			Star: m.kind(t.Status) == config.Blocked, Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
 		}
 	}

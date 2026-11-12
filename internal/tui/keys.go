@@ -17,6 +17,7 @@ type (
 	loaded     struct {            // a fresh task list
 		tasks   []*task.Task
 		skipped int
+		cfgErr  string // the broken config.toml: the board stays on the old config
 	}
 )
 

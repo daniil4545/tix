@@ -197,7 +197,7 @@ arrows select  enter open  space grab  n new  e edit  c comment  del delete  p p
      for `blocked`), the title, the latest note with its age (2h, 1d), the criteria and the `claim`.
      The latest note comes from the window of the last 300 notes of the whole store
      (`noteLimit`, `gitx/history.go`); a task older than the window has an empty line;
-     a status outside the five is the column `?`;
+     a status outside the config is the column `?`;
    - the hint line holds the common keys only, the rest is under `?`;
    - the title and the fields (tags, project, external) are changed with `tix set`; `e` in the TUI edits the body;
    - the card: title and status, one fields line, abstract, details with the criteria, history:

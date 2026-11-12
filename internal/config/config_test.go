@@ -17,11 +17,11 @@ func guard(t *testing.T) {
 	}
 }
 
-func TestStatuses_FiveInBoardOrder(t *testing.T) {
+func TestKinds_FiveInBoardOrder(t *testing.T) {
 	defer guard(t)
 	want := []string{"idea", "open", "in_progress", "blocked", "closed"}
-	if !reflect.DeepEqual(config.Statuses, want) {
-		t.Errorf("statuses %v, want (spec 2.5) %v", config.Statuses, want)
+	if !reflect.DeepEqual(config.Kinds, want) {
+		t.Errorf("statuses %v, want (spec 2.5) %v", config.Kinds, want)
 	}
 }
 
@@ -86,21 +86,21 @@ func TestLoad_Broken_ErrorHasPathAndLine(t *testing.T) {
 	}
 }
 
-func TestCheck_FiveAccepted_OldWordsHinted(t *testing.T) {
+func TestCheckStatus_FiveAccepted_OldWordsHinted(t *testing.T) {
 	defer guard(t)
-	for _, s := range config.Statuses {
-		if err := config.Check(s); err != nil {
+	for _, s := range config.Kinds {
+		if err := config.Default().CheckStatus(s); err != nil {
 			t.Errorf("Check(%q) = %v", s, err)
 		}
 	}
 	for old, want := range map[string]string{"todo": "open", "ready": "open", "doing": "in_progress",
 		"active": "in_progress", "waiting": "blocked", "inbox": "idea", "done": "closed"} {
-		err := config.Check(old)
+		err := config.Default().CheckStatus(old)
 		if err == nil || !strings.Contains(err.Error(), "maybe "+want+"?") {
 			t.Errorf("Check(%q) = %v, want the hint %q", old, err, "maybe "+want+"?")
 		}
 	}
-	if err := config.Check("later"); err == nil || strings.Contains(err.Error(), "maybe") {
+	if err := config.Default().CheckStatus("later"); err == nil || strings.Contains(err.Error(), "maybe") {
 		t.Errorf("Check(later) = %v, want a refusal without a hint", err)
 	}
 }
@@ -218,7 +218,7 @@ func TestS1_NoStatusSection_FiveDefaults_RenderSilent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(names(c), config.Statuses) {
+	if !reflect.DeepEqual(names(c), config.Kinds) {
 		t.Errorf("statuses %v", names(c))
 	}
 	for _, k := range config.Kinds {
