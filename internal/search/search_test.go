@@ -108,3 +108,13 @@ func TestSimilar_Excerpt(t *testing.T) {
 		t.Errorf("excerpt %+v", r)
 	}
 }
+
+func TestSimilar_SkipsParents(t *testing.T) {
+	parent := tk("T-1", "Дубли карточки", "")
+	child := tk("T-2", "Дубли карточки список", "")
+	child.Parent = "T-1"
+	got := search.Similar(search.Query{Text: "карточки дубли", Project: "p"}, []*task.Task{parent, child})
+	if ids(got) != "T-2" {
+		t.Errorf("got %q, want T-2 only", ids(got))
+	}
+}

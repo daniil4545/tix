@@ -201,7 +201,7 @@ func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, ac
 	}
 	op := &opInfo{kind: "move"}
 	var info string
-	var ready []string
+	var ready, notices []string
 	res, err := s.modifyTx(id, actor, op, func(tx *txEnv, t *task.Task, _ string) error {
 		column := target(t)
 		if err := s.conf().CheckStatus(column); err != nil {
@@ -209,8 +209,8 @@ func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, ac
 		}
 		wasClosed := s.kindOf(t.Status) == config.Closed
 		nowClosed := s.kindOf(column) == config.Closed
-		if nowClosed && !wasClosed && t.IsEpic() {
-			if err := s.settleLines(t); err != nil {
+		if nowClosed && !wasClosed {
+			if err := s.checkCloseEpic(t); err != nil {
 				return err
 			}
 		}
@@ -218,11 +218,13 @@ func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, ac
 		info, err = s.move(tx, t, column, o, actor, op)
 		if err == nil && wasClosed != nowClosed {
 			ready = s.syncEpics(tx, t.ID, nowClosed)
+			ready, notices = s.childMoved(t, nowClosed, ready)
 		}
 		return err
 	})
 	res.Info = info
 	res.Ready = ready
+	res.Notices = notices
 	return res, err
 }
 

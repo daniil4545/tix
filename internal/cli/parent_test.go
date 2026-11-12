@@ -40,3 +40,39 @@ func TestS28_Show_ManualParent(t *testing.T) {
 	b.ok("", "note", e, "x") // commits the hand edit, so the refusal below adds nothing
 	ensure(t, strings.Contains(b.rule("set", e, "parent="+d), "already has a parent"), "set applies the refusal")
 }
+
+func TestS18_S19_S20_S21_Cli(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	p := b.newTask("Epic", "idea")
+	c1 := b.newTaskIn(b.cwd, "One", "idea", "--parent", p)
+	c2 := b.newTaskIn(b.cwd, "Two", "idea", "--parent", p)
+	ensure(t, strings.Contains(b.rule("done", p, "--force"), c1+", "+c2), "S18 children not named")
+	ensure(t, strings.Contains(b.rule("rm", p), "has children"), "S21")
+	b.ok("", "done", c1, "--force", "-m", "r")
+	ensure(t, strings.Contains(b.ok("", "done", c2, "--force", "-m", "r").out,
+		"epic "+p+": all tasks closed, ready for acceptance"), "S19")
+	b.ok("", "done", p, "--force", "-m", "r")
+	r := b.ok("", "move", c1, "idea")
+	ensure(t, strings.Contains(r.err, "warning: parent "+p+" is closed"), "S20: %q", r.err)
+}
+
+func TestList_ParentMark(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	p := b.newTask("Epic", "idea")
+	c1 := b.newTaskIn(b.cwd, "One", "idea", "--parent", p)
+	b.newTaskIn(b.cwd, "Two", "idea", "--parent", p)
+	b.ok("", "done", c1, "--force", "-m", "r")
+	out := b.ok("", "list").out
+	ensure(t, strings.Contains(out, p+" [epic 1/2] Epic"), "list mark:\n%s", out)
+	js := b.ok("", "list", "--json", "--all").out
+	for _, want := range []string{`"children":2`, `"children_closed":1`, `"parent":"` + p + `"`} {
+		ensure(t, strings.Contains(js, want), "list --json lacks %s:\n%s", want, js)
+	}
+	b.ok("", "move", p, "in_progress")
+	ctx := b.ok("", "ctx", "--project", "personal").out
+	ensure(t, strings.Contains(ctx, p+" [epic 1/2] Epic"), "ctx mark:\n%s", ctx)
+	cj := b.ok("", "ctx", "--project", "personal", "--json").out
+	ensure(t, strings.Contains(cj, `"epic":true`) && strings.Contains(cj, `"children_closed":1`), "ctx json:\n%s", cj)
+}

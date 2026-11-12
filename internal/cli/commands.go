@@ -32,6 +32,9 @@ func (a *app) reply(p *parsed, res core.Result, id, what string) {
 	for _, e := range res.Ready {
 		a.out("epic %s: all tasks closed, ready for acceptance", e)
 	}
+	for _, n := range res.Notices {
+		_, _ = fmt.Fprintln(a.env.Stderr, n)
+	}
 	if res.Warning != "" {
 		a.warn("%s: %s", id, res.Warning)
 	}
@@ -367,6 +370,10 @@ type listItem struct {
 	Rev      string   `json:"rev"`
 	Path     string   `json:"path"`
 	IdleDays int      `json:"idle_days,omitempty"` // only with --stale
+	Parent   string   `json:"parent,omitempty"`
+	// Children and ChildrenClosed are set for a parent only.
+	Children       *int `json:"children,omitempty"`
+	ChildrenClosed *int `json:"children_closed,omitempty"`
 }
 
 func (a *app) cmdList(args []string) error {
@@ -385,7 +392,7 @@ func (a *app) cmdList(args []string) error {
 	}
 	// Empty store: nothing to read, list does not create the folder.
 	if _, statErr := os.Stat(root); errors.Is(statErr, os.ErrNotExist) {
-		return a.printTasks(p, nil, nil, nil)
+		return a.printTasks(p, nil, nil, nil, nil)
 	}
 	if err := a.open(); err != nil {
 		return err
@@ -422,13 +429,13 @@ func (a *app) cmdList(args []string) error {
 	matched = a.filter(matched, proj, p.vals["status"], p.vals["kind"])
 	matched = similar(p.set["like"], lq, matched)
 	if !p.set["stale"] {
-		return a.printTasks(p, matched, nil, notClosed)
+		return a.printTasks(p, matched, tasks, nil, notClosed)
 	}
 	stale, days, err := a.stale(matched)
 	if err != nil {
 		return err
 	}
-	return a.printTasks(p, stale, days, notClosed)
+	return a.printTasks(p, stale, tasks, days, notClosed)
 }
 
 // waitingOn returns the After tasks of t that are not closed; the store is read only when t has After.
@@ -543,7 +550,8 @@ func (a *app) filter(tasks []*task.Task, proj, status, kind string) []*task.Task
 	return out
 }
 
-func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, notClosed map[string]bool) error {
+func (a *app) printTasks(p *parsed, tasks, all []*task.Task, days map[string]int, notClosed map[string]bool) error {
+	counts := task.ChildCounts(all, a.cfg())
 	if p.set["json"] {
 		items := make([]listItem, 0, len(tasks))
 		for _, t := range tasks {
@@ -551,12 +559,16 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, not
 			if tags == nil {
 				tags = []string{}
 			}
-			items = append(items, listItem{
+			it := listItem{
 				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
 				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
 				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
-				IdleDays: days[t.ID],
-			})
+				IdleDays: days[t.ID], Parent: t.Parent,
+			}
+			if c, ok := counts[t.ID]; ok {
+				it.ChildrenClosed, it.Children = &c[0], &c[1]
+			}
+			items = append(items, it)
 		}
 		return a.printJSON(items)
 	}
@@ -567,7 +579,9 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, not
 	for _, t := range tasks {
 		status := a.label(t.Status)
 		line := status + " " + t.ID + " " + t.Title
-		if t.IsEpic() {
+		if c, ok := counts[t.ID]; ok {
+			line = fmt.Sprintf("%s %s [epic %d/%d] %s", status, t.ID, c[0], c[1], t.Title)
+		} else if t.IsEpic() {
 			line = status + " " + t.ID + " [epic] " + t.Title
 		}
 		if d, ok := days[t.ID]; ok {

@@ -114,8 +114,12 @@ func Similar(q Query, tasks []*task.Task) []Result {
 		return nil
 	}
 	var out []Result
+	parents := map[string]bool{}
 	for _, t := range tasks {
-		if t.ID == q.SelfID || t.IsEpic() || (!q.All && q.closed(t)) {
+		parents[t.Parent] = true
+	}
+	for _, t := range tasks {
+		if t.ID == q.SelfID || t.IsEpic() || parents[t.ID] || (!q.All && q.closed(t)) {
 			continue
 		}
 		if q.Project != "" && !strings.EqualFold(t.Project, q.Project) {

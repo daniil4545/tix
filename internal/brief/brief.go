@@ -35,8 +35,9 @@ type Input struct {
 	Path                      string // the project folder; empty - no line
 	Now                       time.Time
 	PerColumn, Limit          int
-	Stale                     []string       // idea and open tasks without a move for 14 days, most idle first
-	Config                    *config.Config // the statuses and their kinds; nil - the default statuses
+	Stale                     []string          // idea and open tasks without a move for 14 days, most idle first
+	Config                    *config.Config    // the statuses and their kinds; nil - the default statuses
+	counts                    map[string][2]int // {closed, all} children per parent, set by Build
 }
 
 // Row - a task line. Detail: "Waiting: ...", "k/n"; own claim - "@you".
@@ -46,6 +47,9 @@ type Row struct {
 	Detail string `json:"detail"`
 	Claim  string `json:"claim"`
 	Epic   bool   `json:"epic,omitempty"`
+	// Children and ChildrenClosed: the progress of a parent; zero for a task without children.
+	Children       int `json:"children,omitempty"`
+	ChildrenClosed int `json:"children_closed,omitempty"`
 }
 
 // Section - a column of tasks; More - how many tasks are hidden.
@@ -96,6 +100,7 @@ func Build(in Input) Brief {
 	if len(known) == 0 {
 		known = in.Tasks
 	}
+	in.counts = task.ChildCounts(known, cfg)
 	for _, st := range statuses {
 		status, kind := st.Name, st.Kind
 		tasks := ranked(in.Tasks, status)
@@ -199,6 +204,9 @@ func nextID(ready []*task.Task, in Input, notClosed map[string]bool) string {
 
 func makeRow(t *task.Task, kind string, in Input) Row {
 	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, kind), Epic: t.IsEpic()}
+	if c, ok := in.counts[t.ID]; ok {
+		r.Epic, r.ChildrenClosed, r.Children = true, c[0], c[1]
+	}
 	if c, ok := liveClaim(t, in.Now); ok {
 		r.Claim = actor.Short(c.Actor)
 		if in.Actor != "" && c.Actor == in.Actor {
@@ -282,7 +290,10 @@ func rowLine(pad string, r Row) string {
 		tail = "  " + r.Claim
 	}
 	text := r.ID + " " + r.Title
-	if r.Epic {
+	switch {
+	case r.Children > 0:
+		text = fmt.Sprintf("%s [epic %d/%d] %s", r.ID, r.ChildrenClosed, r.Children, r.Title)
+	case r.Epic:
 		text = r.ID + " [epic] " + r.Title
 	}
 	if r.Detail != "" {
