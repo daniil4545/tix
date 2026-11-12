@@ -121,8 +121,11 @@ and the task card with its history.
 
 ## Development
 
+Checks: `make lint`
+
 ```sh
-make check    # format, vet, golangci-lint, tests, build
+make lint     # format, vet, golangci-lint, shellcheck
+make check    # lint, tests, build
 make bench    # speed on 1000 tasks
 ```
 

@@ -53,19 +53,23 @@ secrets:
 	mkdir "$$tmp/tree"; git archive "$$tree" | tar -x -C "$$tmp/tree"; \
 	cd "$$tmp/tree" && $(GITLEAKS) dir --no-banner --redact .
 
+SHELLCHECK := uvx --from shellcheck-py==0.11.0.1 shellcheck
+
+# All static checks: gofmt, go vet, golangci-lint v2.15.0, shellcheck. No tests.
 # gosec and the length and nesting limits live in .golangci.yml.
-lint:
+lint: fmt-check vet
 	golangci-lint run --timeout 120s
+	git ls-files -z '*.sh' | xargs -0 $(SHELLCHECK)
 
 # Acceptance: format, vet, linter, tests, build.
-check: fmt-check vet lint test build
+check: lint test build
 
 # Fast local check before a push: the fast tier, minutes.
-pr-check: fmt-check vet lint tidy-check test-fast build
+pr-check: lint tidy-check test-fast build
 
 # PR into main: everything with races, known vulnerabilities and secrets, and the release archive
 # of this system unpacks, starts and keeps a task.
-ci-check: fmt-check vet lint tidy-check secrets test-race vuln build release-smoke
+ci-check: lint tidy-check secrets test-race vuln build release-smoke
 
 release-smoke:
 	goreleaser release --snapshot --clean --skip=publish

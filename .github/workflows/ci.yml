@@ -12,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          install-only: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: make lint
+
   check:
     strategy:
       fail-fast: false
@@ -114,11 +131,12 @@ jobs:
 
   gate:
     if: always()
-    needs: [check, deps, actionlint, typos, shellcheck, yamllint, markdown-lint, checkmake]
+    needs: [lint, check, deps, actionlint, typos, shellcheck, yamllint, markdown-lint, checkmake]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed
         env:
+          LINTJOB: ${{ needs.lint.result }}
           CHECK: ${{ needs.check.result }}
           DEPS: ${{ needs.deps.result }}
           LINT: >-
@@ -128,6 +146,7 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           echo "check: $CHECK, deps: $DEPS, linters: $LINT, event: $EVENT"
+          test "$LINTJOB" = success
           test "$CHECK" = success
           test "$DEPS" = success || { test "$EVENT" = push && test "$DEPS" = skipped; }
           for r in $LINT; do test "$r" = success; done
