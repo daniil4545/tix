@@ -93,17 +93,21 @@ func (m *Model) waitEvent() tea.Cmd {
 // loadCmd rereads all tasks; it does not touch git (the pulse notes are read by notesCmd).
 func (m *Model) loadCmd() tea.Cmd {
 	return m.guard(func() tea.Msg {
+		cfgErr := ""
 		if err := m.d.Store.ReloadConfig(); err != nil {
-			m.log.Warn("config not reloaded", "err", err)
+			cfgErr = err.Error()
 		}
 		tasks, errs := m.d.Store.List()
-		return loaded{tasks: tasks, skipped: len(errs)}
+		return loaded{tasks: tasks, skipped: len(errs), cfgErr: cfgErr}
 	})
 }
 
 // afterLoad applies the list; the open card is updated or closed if the task is gone.
 func (m *Model) afterLoad(msg loaded) tea.Cmd {
 	m.apply(msg.tasks, msg.skipped)
+	if msg.cfgErr != "" {
+		m.setStatus("config not reloaded: "+msg.cfgErr, true)
+	}
 	if !m.showing {
 		return m.notesCmd()
 	}

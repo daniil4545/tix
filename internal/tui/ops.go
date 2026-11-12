@@ -128,12 +128,8 @@ func (m *Model) checkStatus(id, status string) error {
 }
 
 // moveTo moves the task to target with one Move write; opts.Place - the place in it.
-// blocked and closed ask for a reason on the input line. A shared step for drag and grab.
+// blocked and closed kinds ask for a reason on the input line. A shared step for drag and grab.
 func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd {
-	if !m.configured(t.Status) {
-		m.setStatus(t.ID+": status "+t.Status+" is not in the config", true)
-		return nil
-	}
 	if !m.configured(target) {
 		m.setStatus(t.ID+": unknown column", true)
 		return nil
@@ -150,7 +146,8 @@ func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd 
 			return m.d.Store.Move(t.ID, target, o, m.d.Actor)
 		})
 	}
-	if target == from {
+	// a move inside one kind needs no reason or result: the core drops them; from "?" the kind is ""
+	if target == from || (m.kind(from) != "" && m.kind(from) == m.kind(target)) {
 		return move(opts)
 	}
 	ask := func(prompt string, force bool) tea.Cmd {
