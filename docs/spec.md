@@ -49,7 +49,7 @@ Compiled by the agent on 2026-10-20 from the user's decisions (`docs/specs/decis
 | Public repository v0.1.0: the whole repository in English, manifest and scenarios in the README, demo, CI, release (D47) | yes | | |
 | Column `review`, archive of `closed` after 7 days, limit of tasks in progress per project, launching an agent from the board | | later (D65) | |
 | Operations center: launching an agent from a card | | own spec, Galera #165 | in near versions |
-| `blocked_by`, `parent` and task links - investigation after the MVP (D65); `tix sync` for two machines (D61), opening the session of an edit, built-in editor, side panel, view in Obsidian Bases | | if needed | |
+| `blocked_by` and task links - investigation after the MVP (D65); `tix sync` for two machines (D61), opening the session of an edit, built-in editor, side panel, view in Obsidian Bases | | if needed | |
 | `estimate`, `branch`, `links`; editing comments; server, web, several machines; own LLM | | | yes |
 
 ## 2. Architecture
@@ -143,17 +143,17 @@ flowchart TD
 |---|---|
 | `ctx` | rules in brief, project tasks in `in_progress`, `blocked`, `open` (up to 5 per status by `rank`, then "K more"), next task; outside a project (`all`) tasks in `in_progress` and `blocked`, every other status as a count; up to 2000 characters; the line `stale 14d+: N (up to 10 ids)` names idea and open tasks without a move for 14 days: a move is a commit `T-N: new|note|comment|move|take|steal|done|edit|check`, set, release, external edits and mass commits of tix do not count; `list --stale` shows them with the idle days |
 | `list`, `show` | list with filters, without `closed` tasks unless `--all` or `--status closed` names it; `--grep` matches the title, Abstract and criteria, case-insensitive; `--like TEXT|T-N` lists similar tasks of the project by shared 5-letter word stems; `--stale` keeps idea and open tasks without a move for 14 days with their idle days; alias `ls`; the whole task, with `rev` |
-| `new` | new task, in `idea` by default; `--parent T-N` makes it a child (depth one, same refusals as `set parent=`); `--to` takes one of the five statuses, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
+| `new` | new task, in `idea` by default; `--parent T-N` makes it a child (depth one, same refusals as `set parent=`); `--to` takes a configured status, as `move` does; `--body-file FILE` (`-` is stdin) sets the body, stdin is never read without it; the entry check of 2.5 runs on that body before any write, a refusal is code 5 |
 | `take` | into `in_progress` and `claim`, also from `idea` when the task has a criterion; `--steal` takes over (D39); `--release` drops the claim, a task in `in_progress` goes back to the head of `open`; without a number it drops every live claim of the actor in one commit (the SessionEnd hook); for a project with a path it prints `project: NAME /path docs: ...` |
 | `projects` | lists the catalog `[paths]` of config.toml with open counts; `projects add NAME [PATH]` registers a project; once the catalog is not empty `new` and `set project=` refuse an unknown project (code 5) |
 | `status` | lists the statuses with kind and task count; `status add NAME --kind KIND`, `status rename OLD NEW`, `status rm NAME` change the list in config.toml (0.9.0 2.3) |
-| `move` | move with the checks of 2.5; one of the five statuses, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
+| `move` | move with the checks of 2.5; a configured status, an old word (`todo`, `doing`, `done`, `ready`, `active`, `waiting`, `inbox`) is code 6 with the hint "maybe open?"; order `--first` or `--after T-9`, the core computes `rank` under the lock |
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`, `parent`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
-| `uncheck` | clear the check of a criterion; a task of the kind closed and a task line of an epic are refused (code 5) |
-| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`; a failed epic write is a Warning; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
-| `rm` | delete |
+| `uncheck` | clear the check of a criterion; a task of the kind closed is refused (code 5) |
+| `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); closing a parent with an open child is refused, even with `--force`; closing the last open child prints `epic T-M: all tasks closed, ready for acceptance` |
+| `rm` | delete; a task with children is refused (code 5) |
 
 A body line `After: T-1, T-2` keeps the task out of `next` in `ctx` until those tasks close.
 
@@ -193,7 +193,7 @@ idea 2              open 3              in_progress 2       blocked 1           
 arrows select  enter open  space grab  n new  e edit  c comment  del delete  p project  ? help  q quit
 ```
 
-   - a card line: the number (`EPIC` and ticked/all todo lines after it for an epic; `*` before it
+   - a card line: the number (`EPIC` and closed/all children after it for a parent; `*` before it
      for `blocked`), the title, the latest note with its age (2h, 1d), the criteria and the `claim`.
      The latest note comes from the window of the last 300 notes of the whole store
      (`noteLimit`, `gitx/history.go`); a task older than the window has an empty line;
@@ -271,23 +271,38 @@ e edit  c comment  del delete  j k history  left right task  esc back
    - Codex takes `tix` out of the sandbox only for a single command, without `;`, `&&`, pipes, `cd`
      (`docs/api/codex.md`).
 
-### 2.5 Statuses
+### 2.5 Statuses and parent
 
-Five fixed statuses, in board order, one board column each. There are no roles, no `[[column]]` in
-`config.toml` and no custom statuses. A `config.toml` error gives the path and the line.
+A status has a name and a kind. The kinds are fixed: `idea`, `open`, `in_progress`, `blocked`, `closed`.
+The statuses live in `config.toml` as an ordered list `[[status]]` (`name`, `kind`); the list order is the
+board order, one column each. A config with no `[[status]]` means the five defaults, each named as its kind.
+Every rule reads the kind, never the name; the kind is typed only in `tix status add NAME --kind KIND`.
+A task whose status is not in the config shows in the column `?`. Text output prints `name [kind]` when the
+name differs from the kind.
 
-| Status | Check on move |
+| Kind | Check on move |
 |---|---|
-| `idea` | - (the status of a new task) |
-| `open` | at least one criterion; `ctx` takes the next task from here; `take --release` puts an `in_progress` task at its head without the check |
+| `idea` | - (the kind of a new task) |
+| `open` | at least one criterion; `ctx` takes the next task from here; `take --release` puts an `in_progress` task at the head of the default status of this kind without the check |
 | `in_progress` | `take` and `claim` come here; execution time is counted here |
 | `blocked` | `waiting` is required (D41), `-m "reason"` sets it; the board marks the card with `*` |
 | `closed` | all criteria checked, or `--force -m` (D40); `list` hides it |
 
-Migration (on opening a store that still has `[[column]]`, or has no `config.toml` and old statuses): the status of every
-task file is renamed by the role of its column (`inbox` to `idea`, `ready` to `open`, `active` to `in_progress`,
-`waiting` to `blocked`, `closed` to `closed`; without `[[column]]` by the default names `idea todo doing blocked done`),
-and `[[column]]` leaves `config.toml`, in one commit. A status in no column stays as it is and shows in the column `?`.
+Parent (D71): the front matter field `parent: T-N` is the only place of the link. The depth is one: a task
+with a parent has no children, a task with children has no parent. An epic is a task with at least one
+child; there is no epic type and the tag `epic` means nothing. Progress is the children of the kind
+`closed` out of all children. Hand edits are shown as written, a missing parent prints `Parent: T-N (not found)`.
+
+- `set parent=` refuses a missing parent, the task itself, a parent that has a parent, a task that has
+  children, and a closed parent. `new --parent T-N` has the same refusals.
+- Closing a parent with a child that is not of the kind `closed` is refused, `--force` included.
+- Closing the last open child prints `epic T-N: all tasks closed, ready for acceptance`; the user closes
+  the parent. Reopening a child under a closed parent prints `warning: parent T-N is closed`.
+- A task with children is not removed (code 5).
+- `list`, `ctx` and the board mark a parent: `[epic 3/7]` in text, `EPIC 3/7` on the card.
+
+The first write of 0.9.0 moves the old epics (tag `epic` and `- [ ] T-N` lines) to `parent` and writes
+`format = 2`; see the CHANGELOG.
 
 ## 3. Scenarios
 
@@ -356,7 +371,7 @@ The user does not read the code (D33), so acceptance is automatic.
 
 | Entity | States and transitions | Frozen | Writer | Storage |
 |---|---|---|---|---|
-| Task | the five statuses; a transition between any of them with the checks of 2.5; delete | `id`, `created`, file name | core; Obsidian bypassing it | `~/tasks/T-12 <slug>.md` |
+| Task | the configured statuses; a transition between any of them with the checks of 2.5; delete | `id`, `created`, file name | core; Obsidian bypassing it | `~/tasks/T-12 <slug>.md` |
 | Comment | created | everything | core | section in the file |
 | Note | created | everything | core | empty commit |
 | Claim | free; held 3 h with extension; dropped, stolen, expired | - | core | `claim` |

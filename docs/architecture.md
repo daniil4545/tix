@@ -74,7 +74,7 @@ Dependencies point down, with no cycles. `cmd/tix` calls only `cli`; `cmd/tixben
 | cli | parses commands, prints `ok`/`err`/`warn`, maps errors to exit codes | `internal/cli` (`cli.go` common, `agent.go` agent cycle, `commands.go` base commands) | works |
 | core | the only write path: lock, temp, rename, commit, transition rules | `internal/core` (`tx.go` write, `agent.go` take/move/set/check, `rank.go` order, `history.go` `Code:` trailer and gc counter) | works |
 | task | parses and prints the task file, claim, criteria; no IO | `internal/task` | works |
-| config | reads `.tix/config.toml`: project map; the five fixed statuses; the migration map from old columns | `internal/config` | works |
+| config | reads `.tix/config.toml`: project map; the statuses with their kinds (`[[status]]`); the migration map from old columns | `internal/config` | works |
 | brief | builds the `tix ctx` output: text and JSON; no IO | `internal/brief` | works |
 | actor | write identity: sources, name check, shortening | `internal/actor` | works |
 | project | project name by working folder, project HEAD without calling git | `internal/project` (`project.go`, `head.go`) | works |
@@ -155,7 +155,8 @@ The counter lives in `.tix/lock`.
 | Entity | Source of truth | Changed by | Key or constraint |
 |---|---|---|---|
 | Task | file `T-<N> <title>.md` in the store root | `core` under the lock | id `T-<N>`; number from `.tix/next_id`, never reused |
-| Statuses | field `status` of the task | `core` | five fixed: `idea`, `open`, `in_progress`, `blocked`, `closed`; `core.migrateStatuses` converts a store with `[[column]]` once, in one commit |
+| Statuses | field `status` of the task | `core` | a name from `[[status]]` with a kind (`idea`, `open`, `in_progress`, `blocked`, `closed`); rules read the kind; `core.migrateStatuses` converts a store with `[[column]]` once, in one commit |
+| Parent | field `parent` of the task | `core` (`parent.go`): `set`, `new --parent` | `T-N`; depth one; an epic is a task with children, computed in one pass (`Store.Children`, `task.ChildCounts`); `core/migrate_parent.go` moves the old epic lines to `parent` once, in one commit |
 | Project map | `.tix/config.toml` | human; the core creates it on the first write | `[projects]` |
 | Claim | field `claim` in the task frontmatter | `take` (sets), `modifyOnce` (extends), `move` out of `in_progress` and closing (release) | `<actor> until 2006-01-02T15:04`; an expired claim is free |
 | Order in a column | field `rank` | `core.place` | floating-point number; a gap below 1e-6 renumbers the column in one commit |
@@ -233,7 +234,7 @@ There is one environment: the user's machine. The variables `TIX_HOME`, `TIX_LOC
 | Identity sources | `actor.Resolve` | `RULES.md` (section Identity), connectors S3 |
 | A git call | `internal/gitx` | `internal/gitx` tests |
 | gc threshold, `Code:` trailer | `internal/core/history.go`, `gitx.SpawnGC` | `internal/gitx` tests |
-| The statuses | `config.StatusList`, `config.KindOf`, `config.CheckStatus`, `core.migrateStatuses` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
+| The statuses | `config.StatusList`, `config.KindOf`, `config.CheckStatus`, `core.migrateStatuses`; `parent` rules in `core/parent.go` | the board (`internal/tui`), `RULES.md`, `docs/spec.md` 2.5 |
 | `RULES.md` text | `internal/assets/RULES.md` | move the old `assets.RulesHash` into `previousRules`: stores with an untouched copy get the new text |
 
 ## 10. Limits and open items

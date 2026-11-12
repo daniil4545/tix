@@ -92,6 +92,8 @@ func (m *Model) report(msg opDone) {
 		m.setStatus(msg.id+": "+errText(msg.err), true)
 	case msg.res.Warning != "":
 		m.setStatus(msg.id+": "+firstLine(msg.res.Warning), true)
+	case len(msg.res.Notices) > 0:
+		m.setStatus(msg.id+": "+firstLine(msg.res.Notices[0]), true)
 	case msg.res.Info != "":
 		m.setStatus(msg.id+" "+firstLine(msg.res.Info), false)
 	default:

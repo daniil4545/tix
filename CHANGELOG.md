@@ -21,6 +21,7 @@ All notable changes to this project are documented here. The format follows
 - `tix status` lists statuses with task counts; `tix status add NAME --kind KIND`, `rename OLD NEW` and `rm NAME` (refused while the status has tasks or is the last of its kind).
 - `tix list --kind KIND` filters by kind.
 - `tix uncheck T-N N` clears the mark of a criterion.
+- TUI: board columns come from the `[[status]]` list of `config.toml`; a parent card shows `EPIC 3/7` by its children.
 - `parent: T-N` links a task to an epic: `tix new --parent`, `tix set T-N parent=T-M` (`parent=` clears), `Parent:` and `Children: 3/7` in `show`, `[epic 3/7]` in `list` and `ctx`, `parent`, `children` and `children_closed` in `list --json`. Depth is one; a closed parent takes no new children.
 
 ### Changed
@@ -57,7 +58,6 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - `p` in the TUI no longer cycles projects. The board hint line is over 100 characters; on a narrow screen `q quit` is cut.
-- `project.Detect` prefers the longest registered path that contains the folder, then the git lookup.
 - Agents merge their task PRs through `merge-gate` after one review; the release tag stays with the owner.
 
 ## [0.7.1] - 2026-11-02

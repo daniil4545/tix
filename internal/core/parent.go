@@ -110,14 +110,10 @@ func (s *Store) openChildrenOf(id string) []string {
 	return open
 }
 
-// checkCloseEpic is the check before closing t: a child that is not closed refuses it, --force included;
-// an old epic (tag epic) settles its task lines.
+// checkCloseEpic is the check before closing t: a child that is not closed refuses it, --force included.
 func (s *Store) checkCloseEpic(t *task.Task) error {
 	if open := s.openChildrenOf(t.ID); len(open) > 0 {
 		return rule("%s has open children: %s", t.ID, strings.Join(open, ", "))
-	}
-	if t.IsEpic() {
-		return s.settleLines(t)
 	}
 	return nil
 }
