@@ -6,22 +6,35 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/daniil4545/tix/internal/task"
+	"github.com/daniil4545/tix/internal/core"
 )
 
-func TestEpicLabel_CountsTaskLinesOnly(t *testing.T) {
-	src := "---\nid: T-1\ntitle: E\nproject: p\nstatus: open\nrank: 1\ncreated: 2026-11-02T09:00:00\ntags: [epic]\n---\n" +
-		"## Details\n- [x] T-2 first\n- [ ] T-3 second\n- [ ] plain criterion\n"
-	tk, err := task.Parse("T-1.md", []byte(src))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := epicLabel(tk); got != "EPIC 1/2" {
+func TestEpicLabel_FromChildren(t *testing.T) {
+	if got := epicLabel([2]int{1, 2}); got != "EPIC 1/2" {
 		t.Errorf("epicLabel = %q, expected EPIC 1/2", got)
 	}
-	tk.Tags = nil
-	if got := epicLabel(tk); got != "" {
-		t.Errorf("a plain task got the label %q", got)
+	if got := epicLabel([2]int{}); got != "" {
+		t.Errorf("a task without children got the label %q", got)
+	}
+}
+
+// A parent shows EPIC n/m by its children; del on it shows the refusal of the core in the status line.
+func TestBoard_ParentCardShowsProgress_DeleteRefused(t *testing.T) {
+	e := mvNewEnv(t, "")
+	parent := e.create("Parent", "open")
+	c1 := e.create("Child one", "closed")
+	c2 := e.create("Child two", "in_progress")
+	e.set(c1, "parent", parent)
+	e.set(c2, "parent", parent)
+	e.acStartIn("", 160, 30)
+	e.screenHas("EPIC 1/2")
+	e.tm.Send(tea.KeyPressMsg{Code: tea.KeyRight}) // the cursor starts on the empty idea column
+	e.acPressDelete("delete")
+	e.screenHas("delete " + parent + "? y/n")
+	e.key("y")
+	e.screenHas(parent+": ", "children")
+	if _, _, err := e.store.Get(parent); err != nil {
+		t.Fatalf("the parent was removed: %v", err)
 	}
 }
 
@@ -69,5 +82,14 @@ func TestCard_HistoryCollapsedToLastRows_EnterTogglesAll(t *testing.T) {
 	feed(m, tea.KeyPressMsg{Code: tea.KeyEnter})
 	if len(m.card.rows) != historyTail {
 		t.Errorf("second enter: %d rows, expected %d", len(m.card.rows), historyTail)
+	}
+}
+
+// A core notice (a child reopened under a closed parent) goes to the status line.
+func TestReport_NoticeInStatusLine(t *testing.T) {
+	m := &Model{}
+	m.report(opDone{id: "T-2", res: core.Result{Notices: []string{"warning: parent T-1 is closed"}}})
+	if got, _ := m.statusText(); got != "T-2: warning: parent T-1 is closed" {
+		t.Errorf("status = %q", got)
 	}
 }

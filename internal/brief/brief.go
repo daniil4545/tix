@@ -203,7 +203,7 @@ func nextID(ready []*task.Task, in Input, notClosed map[string]bool) string {
 }
 
 func makeRow(t *task.Task, kind string, in Input) Row {
-	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, kind), Epic: t.IsEpic()}
+	r := Row{ID: t.ID, Title: oneLine(t.Title), Detail: detail(t, kind)}
 	if c, ok := in.counts[t.ID]; ok {
 		r.Epic, r.ChildrenClosed, r.Children = true, c[0], c[1]
 	}

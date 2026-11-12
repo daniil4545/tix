@@ -72,9 +72,11 @@ func TestSimilar_Filters(t *testing.T) {
 	closed.Status = "closed"
 	other := tk("T-3", "Дубли карточки", "")
 	other.Project = "q"
+	child := tk("T-5", "Другое", "")
+	child.Parent = "T-4"
 	ts := []*task.Task{
 		tk("T-1", "Дубли карточки", ""), closed, other,
-		tk("T-4", "Дубли карточки", "", "epic"),
+		tk("T-4", "Дубли карточки", ""), child,
 	}
 	q := search.Query{Text: "карточки дубли", Project: "p", SelfID: "T-1"}
 	if got := search.Similar(q, ts); got != nil {

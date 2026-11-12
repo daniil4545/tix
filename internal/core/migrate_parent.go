@@ -93,7 +93,7 @@ func planLinks(tasks []*snapTask) parentPlan {
 		}
 	}
 	for _, st := range tasks {
-		if !st.t.IsEpic() {
+		if !slices.Contains(st.t.Tags, "epic") { // the old epic sign
 			continue
 		}
 		p.epics = append(p.epics, st)

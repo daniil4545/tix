@@ -15,7 +15,7 @@ import (
 type Row struct {
 	ID, Project, Title, Meta string
 	Note                     string
-	Epic                     string // "EPIC 1/8" for an epic: the label and the ticked/all progress of its todo lines
+	Epic                     string // "EPIC 1/8" for a parent: closed of all children
 	Live                     bool   // the task has a live claim; without it the card is grey
 	Star                     bool   // the task is blocked: a human looks at it, "*" before the number
 	Grabbed                  bool   // the card is grabbed: highlight and the "=" marker instead of ">"

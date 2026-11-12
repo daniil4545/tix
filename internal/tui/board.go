@@ -178,6 +178,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	for i, t := range m.tasks {
 		names[i] = t.Project
 	}
+	counts := task.ChildCounts(m.tasks, m.conf)
 	colors := view.ProjectColors(names) // over all tasks: a project keeps its color under any filter
 	for i, t := range ts {
 		project := t.Project
@@ -185,7 +186,7 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 			project = "" // the header names the project
 		}
 		out[i] = view.Row{
-			ProjectColor: colors[strings.ToLower(t.Project)], Epic: epicLabel(t),
+			ProjectColor: colors[strings.ToLower(t.Project)], Epic: epicLabel(counts[t.ID]),
 			ID: t.ID, Project: project, Title: t.Title,
 			Star: m.kind(t.Status) == config.Blocked, Meta: meta(t, now), Live: m.liveClaim(t), Note: m.note(t, now),
 			Grabbed: m.grab != nil && m.grab.id == t.ID,
@@ -194,22 +195,12 @@ func (m *Model) rows(ts []*task.Task) []view.Row {
 	return out
 }
 
-// epicLabel - "EPIC 1/8" for an epic: its todo lines (criteria with a task number) ticked of all; empty otherwise.
-func epicLabel(t *task.Task) string {
-	if !t.IsEpic() {
+// epicLabel - "EPIC 1/8" for a parent: its children closed of all; empty for a task without children.
+func epicLabel(c [2]int) string {
+	if c[1] == 0 {
 		return ""
 	}
-	done, all := 0, 0
-	for _, c := range t.Criteria() {
-		if task.LineTask(c.Text) == "" {
-			continue
-		}
-		all++
-		if c.Done {
-			done++
-		}
-	}
-	return fmt.Sprintf("EPIC %d/%d", done, all)
+	return fmt.Sprintf("EPIC %d/%d", c[0], c[1])
 }
 
 // liveClaim reports whether the task has a claim that is not expired by the model clock.
@@ -221,7 +212,7 @@ func (m *Model) liveClaim(t *task.Task) bool {
 // meta - the short board line: criteria, live claim.
 func meta(t *task.Task, now time.Time) string {
 	var parts []string
-	if crit := t.Criteria(); len(crit) > 0 && !t.IsEpic() { // an epic shows its progress in the label
+	if crit := t.Criteria(); len(crit) > 0 {
 		parts = append(parts, checks(crit))
 	}
 	if c, ok := t.ClaimInfo(); ok && c.Until.After(now) {

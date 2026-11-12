@@ -33,7 +33,7 @@ Status: pre-1.0, the file format may still change before 1.0.
 | Claim | `tix take` claims a task for 3 hours; another session needs `--steal` |
 | Short brief | `tix ctx` prints the in_progress, blocked and open tasks of the project in under 2000 characters; outside a project, in_progress and blocked tasks and counts of the rest |
 | Comments reach the agent | a hook hands your new comments to the agent that holds the task |
-| Five statuses | `idea`, `open`, `in_progress`, `blocked`, `closed`; an epic is a task with a todo list that `tix` ticks |
+| Statuses | five kinds (`idea`, `open`, `in_progress`, `blocked`, `closed`), the names live in the config; an epic is a task with children (`parent`) |
 | Board | `tix` without arguments opens a terminal board: keys, mouse, drag between columns |
 | History | the store is a git repository: `git -C ~/tasks log` and `git -C ~/tasks revert` restore any task |
 

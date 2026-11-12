@@ -270,9 +270,6 @@ func (a *app) cmdShow(args []string) error {
 		if l := a.label(sh.Task.Status); l != sh.Task.Status {
 			a.out("Status: %s", l)
 		}
-		for _, e := range a.store.EpicsOf(id) {
-			a.out("Epic: %s", e)
-		}
 		a.printFamily(id, sh.Task)
 		if after := a.waitingOn(sh.Task); len(after) > 0 {
 			a.out("after %s", strings.Join(after, ", "))
@@ -585,8 +582,6 @@ func (a *app) printTasks(p *parsed, tasks, all []*task.Task, days map[string]int
 		line := status + " " + t.ID + " " + t.Title
 		if c, ok := counts[t.ID]; ok {
 			line = fmt.Sprintf("%s %s [epic %d/%d] %s", status, t.ID, c[0], c[1], t.Title)
-		} else if t.IsEpic() {
-			line = status + " " + t.ID + " [epic] " + t.Title
 		}
 		if d, ok := days[t.ID]; ok {
 			line += fmt.Sprintf(" | idle %dd", d)

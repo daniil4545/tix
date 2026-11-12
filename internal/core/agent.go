@@ -217,8 +217,7 @@ func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, ac
 		var err error
 		info, err = s.move(tx, t, column, o, actor, op)
 		if err == nil && wasClosed != nowClosed {
-			ready = s.syncEpics(tx, t.ID, nowClosed)
-			ready, notices = s.childMoved(t, nowClosed, ready)
+			ready, notices = s.childMoved(t, nowClosed, nil)
 		}
 		return err
 	})
@@ -409,13 +408,12 @@ func (s *Store) setField(t *task.Task, f Field) error {
 	return t.SetField(f.Name, f.Value)
 }
 
-// Check marks criteria with numbers nums. A task line of an epic follows the status of its task and is refused.
+// Check marks criteria with numbers nums.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	return s.mark(id, nums, actor, "check")
 }
 
-// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed and a task line of
-// an epic are refused.
+// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed is refused.
 func (s *Store) Uncheck(id string, nums []int, actor string) (Result, error) {
 	return s.mark(id, nums, actor, "uncheck")
 }
@@ -436,16 +434,8 @@ func (s *Store) mark(id string, nums []int, actor, verb string) (Result, error) 
 	op := &opInfo{kind: verb, subject: verb + " " + strings.Join(parts, " ")}
 	var info string
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
-		crit := t.Criteria()
 		if verb == "uncheck" && s.kindOf(t.Status) == config.Closed {
 			return rule("%s is closed: reopen it first with tix move %s <status>", t.ID, t.ID)
-		}
-		if t.IsEpic() {
-			for _, n := range nums {
-				if n >= 1 && n <= len(crit) && task.LineTask(crit[n-1].Text) != "" {
-					return rule("line %d follows the status of %s", n, task.LineTask(crit[n-1].Text))
-				}
-			}
 		}
 		change := t.Check
 		if verb == "uncheck" {
