@@ -56,3 +56,21 @@ func WaitingOn(t *Task, notClosed map[string]bool) []string {
 	}
 	return open
 }
+
+// ChildCounts returns, for every task that is the parent of some task in all, {closed, all} of its children.
+// A status that is not in cfg counts as not closed.
+func ChildCounts(all []*Task, cfg *config.Config) map[string][2]int {
+	m := map[string][2]int{}
+	for _, t := range all {
+		if t.Parent == "" {
+			continue
+		}
+		c := m[t.Parent]
+		if k, _ := cfg.KindOf(t.Status); k == config.Closed {
+			c[0]++
+		}
+		c[1]++
+		m[t.Parent] = c
+	}
+	return m
+}

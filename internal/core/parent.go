@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -95,4 +96,52 @@ func (s *Store) childOf(r taskRef, id string) *task.Task {
 func (s *Store) HasTask(id string) bool {
 	_, err := s.findPath(strings.TrimSpace(id))
 	return err == nil
+}
+
+// openChildrenOf returns the ids of the children of id that are not of the kind closed.
+func (s *Store) openChildrenOf(id string) []string {
+	kids, _ := s.Children(id)
+	var open []string
+	for _, k := range kids {
+		if s.kindOf(k.Status) != config.Closed {
+			open = append(open, k.ID)
+		}
+	}
+	return open
+}
+
+// checkCloseEpic is the check before closing t: a child that is not closed refuses it, --force included;
+// an old epic (tag epic) settles its task lines.
+func (s *Store) checkCloseEpic(t *task.Task) error {
+	if open := s.openChildrenOf(t.ID); len(open) > 0 {
+		return rule("%s has open children: %s", t.ID, strings.Join(open, ", "))
+	}
+	if t.IsEpic() {
+		return s.settleLines(t)
+	}
+	return nil
+}
+
+// childMoved adds to ready the parent of child t that has no open child left after t is closed, and returns
+// the warning for a child reopened under a closed parent.
+func (s *Store) childMoved(t *task.Task, nowClosed bool, ready []string) (_, notices []string) {
+	if t.Parent == "" {
+		return ready, nil
+	}
+	path, err := s.findPath(t.Parent)
+	if err != nil {
+		return ready, nil
+	}
+	p, err := readTask(path)
+	if err != nil {
+		return ready, nil
+	}
+	closedParent := s.kindOf(p.Status) == config.Closed
+	switch {
+	case !nowClosed && closedParent:
+		notices = append(notices, "warning: parent "+p.ID+" is closed")
+	case nowClosed && !closedParent && !slices.Contains(ready, p.ID) && !slices.ContainsFunc(s.openChildrenOf(p.ID), func(c string) bool { return c != t.ID }):
+		ready = append(ready, p.ID)
+	}
+	return ready, notices
 }
