@@ -131,7 +131,7 @@ func (m *Model) checkStatus(id, status string) error {
 // blocked and closed ask for a reason on the input line. A shared step for drag and grab.
 func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd {
 	if !m.configured(t.Status) {
-		m.setStatus(t.ID+": status "+t.Status+" is not one of the five", true)
+		m.setStatus(t.ID+": status "+t.Status+" is not in the config", true)
 		return nil
 	}
 	if !m.configured(target) {
@@ -161,7 +161,7 @@ func (m *Model) moveTo(t *task.Task, target string, opts core.MoveOpts) tea.Cmd 
 		})
 		return nil
 	}
-	switch target {
+	switch m.kind(target) {
 	case config.Blocked:
 		if strings.TrimSpace(t.Waiting) == "" {
 			return ask("waiting for:", false)

@@ -13,6 +13,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
 	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/task"
@@ -74,6 +75,7 @@ type Model struct {
 	events chan struct{}
 
 	tasks   []*task.Task
+	conf    *config.Config // the config of the last board refresh
 	skipped int
 	project string
 

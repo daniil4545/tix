@@ -22,7 +22,7 @@ type Row struct {
 	ProjectColor             int    // the project label slot in the palette, from ProjectColors
 }
 
-// UnknownColumn - the column name for tasks with a status that is not one of the five.
+// UnknownColumn - the column name for tasks with a status that is not in the config.
 const UnknownColumn = "?"
 
 // Col - a board column.
