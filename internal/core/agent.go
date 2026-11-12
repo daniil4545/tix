@@ -408,13 +408,12 @@ func (s *Store) setField(t *task.Task, f Field) error {
 	return t.SetField(f.Name, f.Value)
 }
 
-// Check marks criteria with numbers nums. A task line of an epic follows the status of its task and is refused.
+// Check marks criteria with numbers nums.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 	return s.mark(id, nums, actor, "check")
 }
 
-// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed and a task line of
-// an epic are refused.
+// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed is refused.
 func (s *Store) Uncheck(id string, nums []int, actor string) (Result, error) {
 	return s.mark(id, nums, actor, "uncheck")
 }
