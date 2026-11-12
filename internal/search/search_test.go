@@ -108,3 +108,22 @@ func TestSimilar_Excerpt(t *testing.T) {
 		t.Errorf("excerpt %+v", r)
 	}
 }
+
+func TestSimilar_SkipsParents(t *testing.T) {
+	parent := tk("T-1", "Дубли карточки", "")
+	child := tk("T-2", "Дубли карточки список", "")
+	child.Parent = "T-1"
+	got := search.Similar(search.Query{Text: "карточки дубли", Project: "p"}, []*task.Task{parent, child})
+	if ids(got) != "T-2" {
+		t.Errorf("got %q, want T-2 only", ids(got))
+	}
+}
+
+// The parent is skipped when its only child is not among the candidates (closed, another project).
+func TestSimilar_SkipsParentsOfHiddenChildren(t *testing.T) {
+	parent := tk("T-1", "Дубли карточки", "")
+	got := search.Similar(search.Query{Text: "карточки дубли", Project: "p", Parents: map[string]bool{"T-1": true}}, []*task.Task{parent})
+	if ids(got) != "" {
+		t.Errorf("got %q, want nothing", ids(got))
+	}
+}

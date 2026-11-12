@@ -74,7 +74,8 @@ type Options struct {
 // Info - the tail of the ok line ("open > in_progress  @claude until 20:40").
 type Result struct {
 	ID, Rev, Commit, Warning, Info string
-	Ready                          []string // epics whose task lines are all ticked after this move
+	Ready                          []string // epics with no open task left after this move
+	Notices                        []string // warnings of a done operation, printed as "warning: ..."
 }
 
 // Store - an open task store.
@@ -368,6 +369,9 @@ func (s *Store) Remove(id, actor string) (Result, error) {
 		path, err := s.findPath(id)
 		if err != nil {
 			return err
+		}
+		if kids, _ := s.Children(id); len(kids) > 0 {
+			return rule("%s has children (%s): clear or move them first", id, kids[0].ID)
 		}
 		// os.Remove, not gitx.Remove: removal from the index writes the operation commit.
 		if err := os.Remove(path); err != nil {

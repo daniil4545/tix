@@ -127,3 +127,87 @@ func TestS17_Children_OrderByNumber(t *testing.T) {
 		t.Errorf("children order %v, want %s %s %s", kids, a, b, c)
 	}
 }
+
+// S18: a parent with an open child is not closed, --force included; the reply names the children.
+func TestS18_CloseParent_OpenChildrenRefused(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	p := mkIn(t, s, "Parent", "in_progress")
+	a, err := s.CreateUnder(p, "A", "proj", "idea", "", "x:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := s.CreateUnder(p, "B", "proj", "idea", "", "x:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := e.count()
+	for _, o := range []core.MoveOpts{{Message: "r"}, {Message: "r", Force: true}} {
+		_, err := s.Close(p, o, "x:1")
+		wantRule(t, "close parent", err, a.ID+", "+b.ID)
+	}
+	if e.count() != n {
+		t.Error("a refusal wrote a commit")
+	}
+}
+
+// S19: closing the last open child reports the parent; the parent stays as it is.
+func TestS19_CloseLastChild_ParentReady(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	p := mkIn(t, s, "Parent", "in_progress")
+	a, _ := s.CreateUnder(p, "A", "proj", "idea", "", "x:1")
+	b, _ := s.CreateUnder(p, "B", "proj", "idea", "", "x:1")
+	r, err := s.Move(a.ID, "closed", core.MoveOpts{Message: "r", Force: true}, "x:1")
+	if err != nil || len(r.Ready) != 0 {
+		t.Fatalf("first child: ready %v, err %v", r.Ready, err)
+	}
+	r, err = s.Move(b.ID, "closed", core.MoveOpts{Message: "r", Force: true}, "x:1")
+	if err != nil || len(r.Ready) != 1 || r.Ready[0] != p {
+		t.Fatalf("last child: ready %v, err %v, want [%s]", r.Ready, err, p)
+	}
+	if got := get(t, s, p).Status; got != "in_progress" {
+		t.Errorf("parent status = %s, tix must not close it", got)
+	}
+}
+
+// S20: a child of a closed parent is reopened with a warning.
+func TestS20_ReopenChild_ClosedParentWarns(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	p := mkIn(t, s, "Parent", "in_progress")
+	a, _ := s.CreateUnder(p, "A", "proj", "idea", "", "x:1")
+	if _, err := s.Move(a.ID, "closed", core.MoveOpts{Message: "r", Force: true}, "x:1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Close(p, core.MoveOpts{Message: "r"}, "x:1"); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Move(a.ID, "idea", core.MoveOpts{}, "x:1")
+	if err != nil {
+		t.Fatalf("reopen refused: %v", err)
+	}
+	if len(r.Notices) != 1 || r.Notices[0] != "warning: parent "+p+" is closed" {
+		t.Errorf("notices = %v", r.Notices)
+	}
+}
+
+// S21: a task with children is not removed.
+func TestS21_Remove_WithChildrenRefused(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	s := e.openAt(newClock())
+	p := mkIn(t, s, "Parent", "idea")
+	a, _ := s.CreateUnder(p, "A", "proj", "idea", "", "x:1")
+	_, err := s.Remove(p, "x:1")
+	wantRule(t, "remove parent", err, "has children")
+	if _, err := s.Remove(a.ID, "x:1"); err != nil {
+		t.Fatalf("remove child: %v", err)
+	}
+	if _, err := s.Remove(p, "x:1"); err != nil {
+		t.Fatalf("remove childless parent: %v", err)
+	}
+}
