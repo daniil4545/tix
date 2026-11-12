@@ -262,6 +262,17 @@ func TestS2_InvalidStatuses_ErrorHasFileAndLine(t *testing.T) {
 	}
 }
 
+func TestS2_ErrorLineIsTheSectionAtFault(t *testing.T) {
+	defer guard(t)
+	src := "[[status]] # first\nname = \"idea\"\nkind = \"idea\"\n\n" + // line 1
+		"[[ status ]]\nname = \"open\"\nkind = \"open\"\n\n" + // line 5
+		"[[status]]\nname = \"Bad-Name\"\nkind = \"open\"\n" // line 9
+	_, p, err := loadSrc(t, src)
+	if err == nil || !strings.HasPrefix(err.Error(), p+":9: ") {
+		t.Fatalf("got %v, want line 9", err)
+	}
+}
+
 func TestLoadRender_SixStatuses_Format2_RoundTrip(t *testing.T) {
 	defer guard(t)
 	src := "format = 2\n\n[projects]\ntracker = \"трекер\"\n\n"

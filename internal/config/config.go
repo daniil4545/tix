@@ -37,6 +37,9 @@ type Status struct {
 
 var reName = regexp.MustCompile(`^[a-z0-9_]{1,20}$`)
 
+// reStatusHead - the head line of a [[status]] section, with spaces and a comment allowed.
+var reStatusHead = regexp.MustCompile(`^\s*\[\[\s*status\s*\]\]\s*(#.*)?$`)
+
 func defaultStatuses() []Status {
 	l := make([]Status, len(Kinds))
 	for i, k := range Kinds {
@@ -149,7 +152,7 @@ func build(f file) *Config {
 func (c *Config) validate(path, text string) error {
 	var lines []int // line of each [[status]] section
 	for i, l := range strings.Split(text, "\n") {
-		if strings.TrimSpace(l) == "[[status]]" {
+		if reStatusHead.MatchString(l) {
 			lines = append(lines, i+1)
 		}
 	}
