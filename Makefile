@@ -2,7 +2,7 @@
 GITLEAKS := go run github.com/zricethezav/gitleaks/v8@v8.30.1
 GOVULNCHECK := go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
 # Needs go and golangci-lint. The project has no DB or network: integration tests run in the same go test.
-.PHONY: build test test-fast test-race vet fmt fmt-check lint tidy-check vuln secrets check pr-check ci-check release-smoke bench e2e-agents
+.PHONY: ci-test build test test-fast test-race vet fmt fmt-check lint tidy-check vuln secrets check pr-check ci-check release-smoke bench e2e-agents
 
 # VERSION=1.2.3 make build sets the version in tix --version; without it the version is dev.
 VERSION ?= dev
@@ -54,14 +54,28 @@ secrets:
 	cd "$$tmp/tree" && $(GITLEAKS) dir --no-banner --redact .
 
 SHELLCHECK := uvx --from shellcheck-py==0.11.0.1 shellcheck
+ACTIONLINT := go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+TYPOS := uvx typos==1.52.0
+YAMLLINT := uvx yamllint==1.38.0
+MARKDOWNLINT := npx --yes markdownlint-cli2@0.24.0
+CHECKMAKE := go run github.com/mrtazz/checkmake/cmd/checkmake@0.2.2
 
-# All static checks: gofmt, go vet, golangci-lint v2.15.0, shellcheck. No tests.
+# All static checks, the same set locally and in CI: gofmt, go vet, golangci-lint v2.15.0, shellcheck,
+# actionlint, typos, yamllint, markdownlint (root *.md), checkmake. No tests.
 # gosec and the length and nesting limits live in .golangci.yml.
 lint: fmt-check vet
 	golangci-lint run --timeout 120s
 	git ls-files -z '*.sh' | xargs -0 $(SHELLCHECK)
+	$(ACTIONLINT)
+	$(TYPOS)
+	$(YAMLLINT) -c .yamllint.yml .
+	$(MARKDOWNLINT) '*.md'
+	$(CHECKMAKE) --config=checkmake.ini Makefile
 
-# Acceptance: format, vet, linter, tests, build.
+# Everything but lint, for the CI job that runs next to the lint job.
+ci-test: tidy-check secrets test-race vuln build release-smoke
+
+# Acceptance: lint, tests, build.
 check: lint test build
 
 # Fast local check before a push: the fast tier, minutes.
@@ -69,7 +83,7 @@ pr-check: lint tidy-check test-fast build
 
 # PR into main: everything with races, known vulnerabilities and secrets, and the release archive
 # of this system unpacks, starts and keeps a task.
-ci-check: lint tidy-check secrets test-race vuln build release-smoke
+ci-check: lint ci-test
 
 release-smoke:
 	goreleaser release --snapshot --clean --skip=publish
