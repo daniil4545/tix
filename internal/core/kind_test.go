@@ -254,3 +254,20 @@ func TestS4_S6_S7_DefaultNamesFromConfig_InfoAndKeptFields(t *testing.T) {
 	mustMove(t, s, r.ID, "wontfix", core.MoveOpts{})
 	ensure(t, strings.Contains(e.text(r.ID), "Result: all done"), "result lost on a move inside the kind")
 }
+
+func TestS25_Uncheck_ClearsMarksRefusesRangeAndClosed(t *testing.T) {
+	_, s := kindStore(t)
+	id := mkCrit(t, s, "a", "in_progress")
+	if _, err := s.Check(id, []int{1, 2}, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	r, err := s.Uncheck(id, []int{2}, "tester")
+	ensure(t, err == nil && r.Info == "1/3", "Uncheck 2: info %q, err %v, want 1/3", r.Info, err)
+	_, err = s.Uncheck(id, []int{9}, "tester")
+	ensure(t, err != nil, "Uncheck of a nonexistent criterion accepted")
+	mustMove(t, s, id, "review", core.MoveOpts{})
+	_, err = s.Close(id, core.MoveOpts{Message: "r", Force: true}, "tester")
+	ensure(t, err == nil, "Close: %v", err)
+	_, err = s.Uncheck(id, []int{1}, "tester")
+	wantRule(t, "uncheck in closed", err, "reopen")
+}

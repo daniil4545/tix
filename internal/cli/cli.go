@@ -31,7 +31,7 @@ type Env struct {
 const (
 	defaultLockTimeout = 5 * time.Second
 	personalProject    = "personal"
-	usage              = "tix ctx|inbox|take|move|set|check|done|new|list|show|edit|comment|note|rm|projects; " +
+	usage              = "tix ctx|inbox|take|move|set|check|uncheck|done|new|list|show|edit|comment|note|rm|projects; " +
 		"flags: -v, --as, --json; text starting with a dash goes after --"
 )
 
@@ -148,8 +148,8 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 		return a.cmdMove(args)
 	case "set":
 		return a.cmdSet(args)
-	case "check":
-		return a.cmdCheck(args)
+	case "check", "uncheck":
+		return a.cmdMark(a.cmd, args)
 	case "done":
 		return a.cmdDone(args)
 	case "projects":
@@ -166,7 +166,7 @@ func (a *app) dispatch(ctx context.Context, args []string) error {
 
 // usageCmds - the commands of the usage line in usage order.
 var usageCmds = []string{
-	"ctx", "inbox", "take", "move", "set", "check", "done",
+	"ctx", "inbox", "take", "move", "set", "check", "uncheck", "done",
 	"new", "list", "show", "edit", "comment", "note", "rm", "projects",
 }
 
@@ -223,6 +223,7 @@ var commandHelp = map[string]string{
 	"move":     "move <id> <status> [--first|--after T-9] [-m text] [--force]",
 	"set":      "set <id> field=value...; fields: title project waiting tags external abstract",
 	"check":    "check <id> N...",
+	"uncheck":  "uncheck <id> N...",
 	"projects": "projects | projects add NAME [PATH]",
 	"done":     "done <id> [-m result] [--force]",
 }

@@ -6,7 +6,7 @@ Tasks are `T-*.md` files in `~/tasks`, under git. Change them only with `tix`. R
 
 1. `tix take T-12`: the task moves to in_progress and you hold it for 3 hours.
 2. Work. Log progress with `tix note T-12 "text"` (see Progress). Any other write of yours to the task extends the hold; `note` does not.
-3. `tix check T-12 1 2`: mark finished criteria.
+3. `tix check T-12 1 2`: mark finished criteria; `tix uncheck T-12 2` clears a mark.
 4. `tix comment T-12 "text"`: the human's channel. You write notes, not comments; comments are only appended.
 5. `tix done T-12 -m "result"`: closes the task and releases it. All criteria are checked: close the task now, do not keep it open for follow-up work.
 

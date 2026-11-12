@@ -150,6 +150,7 @@ flowchart TD
 | `set` | only `title`, `project`, `waiting`, `tags`, `external`, `abstract`; any other field is refused |
 | `edit` | body from stdin with `--base <rev>`; does not touch comments; `## Comments` in the new body - refusal |
 | `check`, `note`, `comment` | check a criterion; a step into history; a comment |
+| `uncheck` | clear the check of a criterion; a task of the kind closed and a task line of an epic are refused (code 5) |
 | `done` | close; the result `-m` goes as the comment "Result: ..."; `--force` (D40); the task line `- [ ] T-N` in every epic (tag `epic`) is ticked in the same commit; a move out of closed (CLI or TUI) clears it; prints `epic T-M: all tasks closed, ready for acceptance` when that was the last line; closing an epic ticks the lines of closed tasks and refuses a line of an open or missing task, even with `--force`; a failed epic write is a Warning; `check` refuses a task line; `show` prints `Epic: T-M` for each epic of the task, `list` and `ctx` mark an epic with `[epic]` |
 | `rm` | delete |
 
