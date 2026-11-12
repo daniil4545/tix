@@ -24,7 +24,7 @@ func (s *Store) codeTrailer() gitx.Trailer {
 	if err != nil {
 		return gitx.Trailer{}
 	}
-	name, ok := project.Detect(cwd, s.root, s.cfg)
+	name, ok := project.Detect(cwd, s.root, s.conf())
 	if !ok {
 		return gitx.Trailer{}
 	}
