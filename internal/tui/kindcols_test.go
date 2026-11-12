@@ -5,6 +5,9 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/charmbracelet/x/exp/teatest/v2"
 
 	"github.com/daniil4545/tix/internal/core"
 )
@@ -37,6 +40,13 @@ kind = "blocked"
 name = "closed"
 kind = "closed"
 `
+
+// stopProgram ends the program, so the test owns the model and may call it directly.
+func (e *mvEnv) stopProgram() {
+	e.t.Helper()
+	_ = e.tm.Quit()
+	e.tm.WaitFinished(e.t, teatest.WithFinalTimeout(5*time.Second))
+}
 
 func colNames(m *Model) []string {
 	var out []string
@@ -86,6 +96,7 @@ func TestMoveTo_SameKindNoAsk_FromUnknownAllowed(t *testing.T) {
 	a := e.create("Closed one", "idea")
 	b := e.create("Odd", "idea")
 	e.acStartIn("", 160, 30)
+	e.stopProgram()
 	e.model.Update(e.model.loadCmd()())
 	if _, err := e.store.Move(a, "closed", core.MoveOpts{Force: true, Message: "x"}, "t"); err != nil {
 		t.Fatal(err)
@@ -107,6 +118,7 @@ func TestBoard_BrokenConfig_StatusLineErrorOldColumns(t *testing.T) {
 	e := mvNewEnv(t, sixStatuses)
 	e.create("Plain", "idea")
 	e.acStartIn("", 160, 30)
+	e.stopProgram()
 	before := colNames(e.model)
 	if err := os.WriteFile(e.root+"/.tix/config.toml", []byte("[[status]\nbroken"), 0o600); err != nil {
 		t.Fatal(err)
