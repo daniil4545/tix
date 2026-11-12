@@ -302,3 +302,33 @@ func TestLoadRender_SixStatuses_Format2_RoundTrip(t *testing.T) {
 		t.Errorf("round trip lost data:\n%s", c.Render())
 	}
 }
+
+func TestStatusEdit_AddRenameRemove(t *testing.T) {
+	defer guard(t)
+	list := func(c *config.Config) string { return strings.Join(names(c), " ") }
+	c := config.Default()
+	if err := c.AddStatus("review", config.InProgress); err != nil {
+		t.Fatal(err)
+	}
+	if got := list(c); got != "idea open in_progress review blocked closed" {
+		t.Errorf("after add: %s", got)
+	}
+	if c.DefaultOf(config.InProgress) != "in_progress" {
+		t.Error("add moved the default of the kind")
+	}
+	if err := c.RenameStatus("review", "qa"); err != nil || list(c) != "idea open in_progress qa blocked closed" {
+		t.Errorf("rename: %v, %s", err, list(c))
+	}
+	if err := c.RemoveStatus("qa"); err != nil || list(c) != "idea open in_progress blocked closed" {
+		t.Errorf("remove: %v, %s", err, list(c))
+	}
+	if err := c.RemoveStatus("closed"); err == nil || !strings.Contains(err.Error(), "last of the kind closed") {
+		t.Errorf("remove last of kind: %v", err)
+	}
+	if err := c.RenameStatus("closed", "open"); err == nil || !strings.Contains(err.Error(), "kind word") {
+		t.Errorf("rename to a kind word of another kind: %v", err)
+	}
+	if err := c.RenameStatus("nope", "x"); err == nil || !strings.Contains(err.Error(), "unknown status") {
+		t.Errorf("rename unknown: %v", err)
+	}
+}
