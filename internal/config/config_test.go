@@ -193,3 +193,112 @@ func TestLoadLowersPathKeys(t *testing.T) {
 		t.Fatalf("paths: %v", c.Paths)
 	}
 }
+
+func loadSrc(t *testing.T, src string) (*config.Config, string, error) {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(p, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(p)
+	return c, p, err
+}
+
+func names(c *config.Config) []string {
+	var n []string
+	for _, s := range c.StatusList() {
+		n = append(n, s.Name)
+	}
+	return n
+}
+
+func TestS1_NoStatusSection_FiveDefaults_RenderSilent(t *testing.T) {
+	defer guard(t)
+	c, _, err := loadSrc(t, "[projects]\ntracker = \"трекер\"\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(names(c), config.Statuses) {
+		t.Errorf("statuses %v", names(c))
+	}
+	for _, k := range config.Kinds {
+		if c.DefaultOf(k) != k {
+			t.Errorf("default of %s = %q", k, c.DefaultOf(k))
+		}
+		if got, ok := c.KindOf(k); !ok || got != k {
+			t.Errorf("kind of %s = %q %v", k, got, ok)
+		}
+	}
+	if _, ok := c.KindOf("review"); ok {
+		t.Error("review should not exist")
+	}
+	out := string(c.Render())
+	if strings.Contains(out, "status") || strings.Contains(out, "format") {
+		t.Errorf("render added a section:\n%s", out)
+	}
+}
+
+func TestS2_InvalidStatuses_ErrorHasFileAndLine(t *testing.T) {
+	defer guard(t)
+	st := func(n, k string) string { return "[[status]]\nname = \"" + n + "\"\nkind = \"" + k + "\"\n\n" }
+	base := st("idea", "idea") + st("open", "open") + st("in_progress", "in_progress") + st("blocked", "blocked")
+	cases := map[string]string{
+		"kind without status": base + st("shut", "idea"),
+		"duplicate name":      base + st("closed", "closed") + st("closed", "closed"),
+		"closed of kind open": base + st("closed", "open") + st("fin", "closed"),
+		"bad name":            base + st("closed", "closed") + st("Bad-Name", "open"),
+		"long name":           base + st("closed", "closed") + st("abcdefghijklmnopqrstu", "open"),
+		"unknown kind":        base + st("closed", "closed") + st("x", "weird"),
+	}
+	for name, src := range cases {
+		_, p, err := loadSrc(t, src)
+		if err == nil {
+			t.Errorf("%s: no error", name)
+			continue
+		}
+		if !regexp.MustCompile("^" + regexp.QuoteMeta(p) + `:\d+: `).MatchString(err.Error()) {
+			t.Errorf("%s: %v, want path:line", name, err)
+		}
+	}
+}
+
+func TestS2_ErrorLineIsTheSectionAtFault(t *testing.T) {
+	defer guard(t)
+	src := "[[status]] # first\nname = \"idea\"\nkind = \"idea\"\n\n" + // line 1
+		"[[ status ]]\nname = \"open\"\nkind = \"open\"\n\n" + // line 5
+		"[[status]]\nname = \"Bad-Name\"\nkind = \"open\"\n" // line 9
+	_, p, err := loadSrc(t, src)
+	if err == nil || !strings.HasPrefix(err.Error(), p+":9: ") {
+		t.Fatalf("got %v, want line 9", err)
+	}
+}
+
+func TestLoadRender_SixStatuses_Format2_RoundTrip(t *testing.T) {
+	defer guard(t)
+	src := "format = 2\n\n[projects]\ntracker = \"трекер\"\n\n"
+	for _, s := range [][2]string{{"idea", "idea"}, {"open", "open"}, {"in_progress", "in_progress"},
+		{"review", "in_progress"}, {"blocked", "blocked"}, {"closed", "closed"}} {
+		src += "[[status]]\nname = \"" + s[0] + "\"\nkind = \"" + s[1] + "\"\n\n"
+	}
+	c, _, err := loadSrc(t, src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"idea", "open", "in_progress", "review", "blocked", "closed"}
+	if c.Format != 2 || !reflect.DeepEqual(names(c), want) {
+		t.Fatalf("format %d, names %v", c.Format, names(c))
+	}
+	if k, _ := c.KindOf("review"); k != "in_progress" || c.DefaultOf("in_progress") != "in_progress" {
+		t.Errorf("review kind %q, default %q", k, c.DefaultOf("in_progress"))
+	}
+	if err := c.CheckStatus("nope"); err == nil || !strings.Contains(err.Error(), "review") {
+		t.Errorf("CheckStatus: %v", err)
+	}
+	c2, _, err := loadSrc(t, string(c.Render()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c2.Format != 2 || !reflect.DeepEqual(c2.StatusList(), c.StatusList()) || c2.Projects["tracker"] != "трекер" {
+		t.Errorf("round trip lost data:\n%s", c.Render())
+	}
+}
