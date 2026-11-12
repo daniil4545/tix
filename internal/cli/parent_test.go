@@ -76,3 +76,14 @@ func TestList_ParentMark(t *testing.T) {
 	cj := b.ok("", "ctx", "--project", "personal", "--json").out
 	ensure(t, strings.Contains(cj, `"epic":true`) && strings.Contains(cj, `"children_closed":1`), "ctx json:\n%s", cj)
 }
+
+// A parent whose only child is closed stays out of `list --like` (spec 3.3).
+func TestList_LikeSkipsParentOfClosedChild(t *testing.T) {
+	defer guard(t)
+	b := newBox(t)
+	p := b.newTask("Card duplicates cleanup", "idea")
+	c := b.newTaskIn(b.cwd, "Other thing", "idea", "--parent", p)
+	b.ok("", "done", c, "--force", "-m", "r")
+	out := b.ok("", "list", "--like", "card duplicates cleanup").out
+	ensure(t, !strings.Contains(out, p+" "), "parent listed:\n%s", out)
+}

@@ -140,7 +140,7 @@ func (s *Store) childMoved(t *task.Task, nowClosed bool, ready []string) (_, not
 	switch {
 	case !nowClosed && closedParent:
 		notices = append(notices, "warning: parent "+p.ID+" is closed")
-	case nowClosed && !closedParent && !slices.ContainsFunc(s.openChildrenOf(p.ID), func(c string) bool { return c != t.ID }):
+	case nowClosed && !closedParent && !slices.Contains(ready, p.ID) && !slices.ContainsFunc(s.openChildrenOf(p.ID), func(c string) bool { return c != t.ID }):
 		ready = append(ready, p.ID)
 	}
 	return ready, notices
