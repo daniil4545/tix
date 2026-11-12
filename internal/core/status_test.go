@@ -42,6 +42,55 @@ func TestS10_AddStatus_AfterLastOfKind_DefaultKept(t *testing.T) {
 		t.Errorf("dirty tree:\n%s", st)
 	}
 	ensure(t, s2.Statuses()[2].Tasks == 1, "counts %v", s2.Statuses())
+	id := mkCrit(t, s2, "b", "open")
+	if _, err := s2.Take(id, core.Take, "agent:a"); err != nil {
+		t.Fatal(err)
+	}
+	ensure(t, get(t, s2, id).Status == "in_progress", "take went to %q, want the old default in_progress", get(t, s2, id).Status)
+}
+
+func TestS10_AddStatus_KindNotContiguous_AfterLast(t *testing.T) {
+	e := newEnv(t)
+	e.writeConfig(strings.Replace(sevenStatuses, "[[status]]\nname = \"wontfix\"\nkind = \"closed\"\n", "[[status]]\nname = \"wip\"\nkind = \"in_progress\"\n", 1))
+	s := e.open(5e9)
+	if _, err := s.AddStatus("qa", "in_progress", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	ensure(t, statusNames(s) == "idea open in_progress review blocked closed wip qa", "names %s", statusNames(s))
+}
+
+func TestStatusOps_KeepPathsFormatAndForeignSections(t *testing.T) {
+	e := newEnv(t)
+	e.writeConfig("format = 2\n\n[projects]\nwork = \"w\"\n\n[paths]\nw = \"/tmp/w\"\n\n[adapter]\nkey = \"v\"\n")
+	s := e.open(5e9)
+	if _, err := s.AddStatus("review", "in_progress", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.RenameStatus("review", "qa", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := os.ReadFile(filepath.Join(e.root, ".tix", "config.toml"))
+	for _, k := range []string{"format = 2", `work = "w"`, `w = "/tmp/w"`, "[adapter]", `key = "v"`, `"qa"`} {
+		ensure(t, strings.Contains(string(cfg), k), "config lacks %s:\n%s", k, cfg)
+	}
+}
+
+func TestS14_Rename_StatusLineNotFound_RefusedBeforeAnyWrite(t *testing.T) {
+	e, s := kindStore(t)
+	a := mkCrit(t, s, "a", "open")
+	b := mkCrit(t, s, "b", "open")
+	mustMove(t, s, a, "review", core.MoveOpts{})
+	mustMove(t, s, b, "review", core.MoveOpts{})
+	data, _ := os.ReadFile(e.file(b))
+	if err := os.WriteFile(e.file(b), []byte(strings.Replace(string(data), "\nstatus: review", "\n'status': review", 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	before := e.text(a)
+	n := e.count()
+	_, err := s.RenameStatus("review", "qa", "tester")
+	wantRule(t, "rename", err, "T-2 b.md")
+	ensure(t, e.text(a) == before && e.count() <= n+1, "a task was written before the refusal")
+	ensure(t, statusNames(s) == "idea open in_progress review blocked closed wontfix", "config changed: %s", statusNames(s))
 }
 
 func TestS11_RenameStatus_AllTasksOneCommitClaimKept(t *testing.T) {
@@ -81,6 +130,9 @@ func TestS12_RenameInterrupted_SameCommandFinishes(t *testing.T) {
 	b := mkCrit(t, s, "b", "open")
 	mustMove(t, s, a, "review", core.MoveOpts{})
 	mustMove(t, s, b, "review", core.MoveOpts{})
+	if _, err := s.Take(b, core.Take, "agent:b"); err != nil {
+		t.Fatal(err)
+	}
 	// the run died after the first task file: a carries qa, the config still says review
 	data, _ := os.ReadFile(e.file(a))
 	if err := os.WriteFile(e.file(a), []byte(strings.Replace(string(data), "status: review", "status: qa", 1)), 0o600); err != nil {
@@ -94,6 +146,11 @@ func TestS12_RenameInterrupted_SameCommandFinishes(t *testing.T) {
 		ensure(t, get(t, s, id).Status == "qa", "%s status %q", id, get(t, s, id).Status)
 	}
 	ensure(t, s.Statuses()[3].Name == "qa" && s.Statuses()[3].Tasks == 2, "counts %v", s.Statuses())
+	c, has := get(t, s, b).ClaimInfo()
+	ensure(t, has && c.Actor == "agent:b", "claim lost: %v %v", c, has)
+	if st := e.git("status", "--porcelain"); strings.TrimSpace(st) != "" {
+		t.Errorf("dirty tree after the repeat:\n%s", st)
+	}
 }
 
 func TestS13_RemoveStatus_WithTasksAndLastOfKind_Refused(t *testing.T) {
@@ -116,12 +173,15 @@ func TestS13_RemoveStatus_WithTasksAndLastOfKind_Refused(t *testing.T) {
 
 func TestS14_RenameAndRemove_UnparsedFile_Refused(t *testing.T) {
 	e, s := kindStore(t)
-	mkCrit(t, s, "a", "open")
+	a := mkCrit(t, s, "a", "open")
+	mustMove(t, s, a, "review", core.MoveOpts{})
+	before := e.text(a)
 	if err := os.WriteFile(filepath.Join(e.root, "T-99 broken.md"), []byte("not a task\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	_, err := s.RenameStatus("review", "qa", "tester")
 	wantRule(t, "rename", err, "T-99 broken.md")
+	ensure(t, e.text(a) == before, "task in OLD was rewritten before the refusal")
 	_, err = s.RemoveStatus("wontfix", "tester")
 	wantRule(t, "rm", err, "T-99 broken.md")
 	ensure(t, statusNames(s) == "idea open in_progress review blocked closed wontfix", "config changed: %s", statusNames(s))

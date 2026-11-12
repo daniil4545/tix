@@ -65,7 +65,7 @@ func (s *Store) RenameStatus(oldName, newName, actor string) (Result, error) {
 		if _, bad := s.statusCounts(); len(bad) > 0 {
 			return nil, unparsed(bad)
 		}
-		return s.renameStatuses(map[string]string{oldName: newName})
+		return s.rewriteStatus(oldName, newName)
 	})
 }
 
@@ -84,6 +84,48 @@ func (s *Store) RemoveStatus(name, actor string) (Result, error) {
 		}
 		return nil, asRule(cfg.RemoveStatus(name))
 	})
+}
+
+// rewriteStatus rewrites the raw status line of every task in OLD. All files are planned before the first
+// write: a file whose status line cannot be found refuses the whole rename.
+func (s *Store) rewriteStatus(oldName, newName string) ([]gitx.File, error) {
+	type plan struct {
+		path     string
+		old, out []byte
+	}
+	refs, err := s.taskFiles()
+	if err != nil {
+		return nil, err
+	}
+	var plans []plan
+	var odd []string
+	for _, ref := range refs {
+		data, err := os.ReadFile(ref.path) //nolint:gosec // the path is built by the core
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", ref.path, err)
+		}
+		t, err := task.Parse(ref.path, data)
+		if err != nil || t.Status != oldName {
+			continue
+		}
+		out, ok := setRawStatus(data, newName)
+		if !ok {
+			odd = append(odd, filepath.Base(ref.path))
+			continue
+		}
+		plans = append(plans, plan{ref.path, data, out})
+	}
+	if len(odd) > 0 {
+		return nil, rule("no plain `status:` line in %s; edit the files by hand", strings.Join(odd, " "))
+	}
+	var files []gitx.File
+	for _, p := range plans {
+		if ok, err := s.replace(p.path, p.old, p.out); err != nil || !ok {
+			return nil, errors.Join(err, fmt.Errorf("%s changed during the rename; files written so far stay, repeat the command", filepath.Base(p.path)))
+		}
+		files = append(files, gitx.File{Path: filepath.Base(p.path), Data: p.out})
+	}
+	return files, nil
 }
 
 func asRule(err error) error {
@@ -121,7 +163,11 @@ func (s *Store) statusOp(actor, what string, edit func(*config.Config) ([]gitx.F
 		}
 		out := cfg.Render()
 		if ok, err := s.replace(cfgPath, old, out); err != nil || !ok {
-			return errors.Join(err, errors.New("config.toml changes during write, retry the command"))
+			msg := "config.toml changes during write, retry the command"
+			if len(files) > 0 {
+				msg = "config.toml changed during the write; the task files are already rewritten, repeat the same command"
+			}
+			return errors.Join(err, errors.New(msg))
 		}
 		s.cfg.Store(cfg)
 		files = append(files, gitx.File{Path: cfgRel, Data: out})

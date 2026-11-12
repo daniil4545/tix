@@ -28,29 +28,32 @@ func (a *app) cmdStatus(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	var line, commit string
+	var line, commit, warning string
 	switch p.pos[0] {
 	case "add":
 		r, err := a.store.AddStatus(p.pos[1], p.vals["kind"], who)
 		if err != nil {
 			return err
 		}
-		line, commit = "ok status add "+p.pos[1]+" "+p.vals["kind"], r.Commit
+		warning, line, commit = r.Warning, "ok status add "+p.pos[1]+" "+p.vals["kind"], r.Commit
 	case "rename":
 		r, err := a.store.RenameStatus(p.pos[1], p.pos[2], who)
 		if err != nil {
 			return err
 		}
-		line, commit = "ok status rename "+p.pos[1]+" "+p.pos[2], r.Commit
+		warning, line, commit = r.Warning, "ok status rename "+p.pos[1]+" "+p.pos[2], r.Commit
 	default:
 		r, err := a.store.RemoveStatus(p.pos[1], who)
 		if err != nil {
 			return err
 		}
-		line, commit = "ok status rm "+p.pos[1], r.Commit
+		warning, line, commit = r.Warning, "ok status rm "+p.pos[1], r.Commit
 	}
 	if p.set["v"] && commit != "" {
 		line += " " + commit
+	}
+	if warning != "" {
+		a.warn("%s", warning)
 	}
 	a.out("%s", line)
 	return nil
