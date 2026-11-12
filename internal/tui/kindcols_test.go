@@ -50,16 +50,13 @@ func colNames(m *Model) []string {
 func TestBoard_ConfigEditedOutside_NewColumn(t *testing.T) {
 	e := mvNewEnv(t, sixStatuses)
 	e.create("Plain", "idea")
-	e.acStartIn("", 160, 30)
+	e.acStartIn("", 240, 30)
 	cfg := e.root + "/.tix/config.toml"
 	if err := os.WriteFile(cfg, []byte(sixStatuses+"\n[[status]]\nname = \"wontfix\"\nkind = \"closed\"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	msg := e.model.loadCmd()()
-	e.model.Update(msg)
-	if got := colNames(e.model); got[len(got)-1] != "wontfix" {
-		t.Fatalf("columns %v, want wontfix last", got)
-	}
+	e.tm.Send(e.model.loadCmd()()) // through the program: the model belongs to its goroutine
+	e.screenHas("wontfix")
 }
 
 // S27: six statuses of the config in config order, and `?` for a status that is not in it.
