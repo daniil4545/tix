@@ -443,7 +443,7 @@ func similar(on bool, q search.Query, tasks []*task.Task) []*task.Task {
 // T-N takes the title and, without --project, the project of that task.
 func likeQuery(p *parsed, cfg *config.Config, proj string, tasks []*task.Task) (search.Query, string, error) {
 	arg := p.vals["like"]
-	q := search.Query{Text: arg, Project: proj, All: p.set["all"] || p.set["status"], Config: cfg}
+	q := search.Query{Text: arg, Project: proj, All: p.set["all"] || p.set["status"] || p.set["kind"], Config: cfg}
 	if !p.set["like"] || !strings.HasPrefix(arg, "T-") {
 		return q, proj, nil
 	}

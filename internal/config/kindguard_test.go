@@ -11,6 +11,9 @@ import (
 	"testing"
 )
 
+// The test is a simple parse: it does not follow a status through a function call or a
+// slices.Contains / strings.EqualFold argument, nor through a "var x = t.Status" declaration.
+
 // kindConsts - the kind constants of package config (spec 0.9.0 section 6).
 var kindConsts = map[string]bool{"Idea": true, "Open": true, "InProgress": true, "Blocked": true, "Closed": true}
 

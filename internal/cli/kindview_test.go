@@ -135,3 +135,96 @@ func TestS6_DoneUsesTheClosedKind(t *testing.T) {
 		t.Errorf("move to nope: %q, want the configured names", r.err)
 	}
 }
+
+const namedConfig = `format = 2
+
+[[status]]
+name = "backlog"
+kind = "idea"
+
+[[status]]
+name = "todo"
+kind = "open"
+
+[[status]]
+name = "ready"
+kind = "open"
+
+[[status]]
+name = "doing"
+kind = "in_progress"
+
+[[status]]
+name = "blocked"
+kind = "blocked"
+
+[[status]]
+name = "shipped"
+kind = "closed"
+
+[[status]]
+name = "wontfix"
+kind = "closed"
+`
+
+func namedBox(t *testing.T) *box {
+	t.Helper()
+	b := newBox(t)
+	if err := os.MkdirAll(filepath.Join(b.home, ".tix"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(b.home, ".tix", "config.toml"), []byte(namedConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+// namedTask creates a task in backlog with criteria and moves it to the status to.
+func namedTask(b *box, title, to string) string {
+	b.t.Helper()
+	id := strings.Fields(b.ok("", "new", title).out)[1]
+	b.edit(id, critBody)
+	b.ok("", "move", id, to)
+	return id
+}
+
+func TestS15_NewGoesToFirstIdeaStatus_ListFollowsConfigOrder(t *testing.T) {
+	defer guard(t)
+	b := namedBox(t)
+	a := b.ok("", "new", "Alpha thing").out
+	if !strings.Contains(a, "backlog") {
+		t.Errorf("new: %q, want backlog", a)
+	}
+	id := namedTask(b, "Beta thing", "ready")
+	first := namedTask(b, "Gamma thing", "todo")
+	lines := strings.Split(strings.TrimSpace(b.ok("", "list").out), "\n")
+	if len(lines) != 3 || !strings.Contains(lines[0], "backlog [idea]") ||
+		!strings.Contains(lines[1], "todo [open] "+first) || !strings.Contains(lines[2], "ready [open] "+id) {
+		t.Errorf("list order: %q", lines)
+	}
+}
+
+func TestS15_CtxNextFromSecondOpenStatus(t *testing.T) {
+	defer guard(t)
+	b := namedBox(t)
+	dep := strings.Fields(b.ok("", "new", "Dependency").out)[1]
+	todo := namedTask(b, "Waiting one", "todo")
+	b.edit(todo, critBody+"After: "+dep+"\n")
+	ready := namedTask(b, "Free one", "ready")
+	if out := b.ok("", "ctx", "--project", "personal").out; !strings.Contains(out, "next "+ready) {
+		t.Errorf("ctx: %q, want next %s", out, ready)
+	}
+}
+
+func TestS29_LikeWithKindClosedFindsWontfix(t *testing.T) {
+	defer guard(t)
+	b := namedBox(t)
+	id := namedTask(b, "Duplicate cards report", "todo")
+	b.ok("", "move", id, "wontfix", "-m", "no", "--force")
+	if out := b.ok("", "list", "--like", "duplicate cards report", "--kind", "closed").out; !strings.Contains(out, "wontfix") {
+		t.Errorf("--like with --kind closed: %q, want the wontfix task", out)
+	}
+	if out := b.ok("", "list", "--like", "duplicate cards report").out; strings.Contains(out, id) {
+		t.Errorf("--like alone: %q, a wontfix task counts as closed", out)
+	}
+}
