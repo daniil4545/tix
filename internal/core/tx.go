@@ -71,7 +71,7 @@ func (s *Store) withLock(create bool, fn func(tx *txEnv) error) error {
 	if err != nil {
 		return err
 	}
-	s.cfg = cfg
+	s.cfg.Store(cfg)
 	err = fn(tx)
 	due := s.countCommits(tx.commits)
 	release()
@@ -137,7 +137,7 @@ func (s *Store) prepare(repo gitx.Repo) (*txEnv, error) {
 		data []byte
 	}{
 		{".gitignore", []byte(gitignore)},
-		{filepath.ToSlash(filepath.Join(tixDir, configFile)), s.cfg.Render()},
+		{filepath.ToSlash(filepath.Join(tixDir, configFile)), s.conf().Render()},
 		{rulesFile, []byte(assets.Rules)},
 	}
 	for _, f := range files {

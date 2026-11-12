@@ -184,3 +184,73 @@ func TestS28_UnknownNameListsConfigured_UnknownStatusMovesOutWithoutClaim(t *tes
 	_, has := tk.ClaimInfo()
 	ensure(t, tk.Status == "open" && !has, "status %q claim %v, want open with no claim", tk.Status, has)
 }
+
+// renamedStatuses: the default status of every kind is not named as the kind word.
+const renamedStatuses = `format = 2
+
+[projects]
+
+[[status]]
+name = "idea"
+kind = "idea"
+
+[[status]]
+name = "todo2"
+kind = "open"
+
+[[status]]
+name = "doing"
+kind = "in_progress"
+
+[[status]]
+name = "review"
+kind = "in_progress"
+
+[[status]]
+name = "blocked"
+kind = "blocked"
+
+[[status]]
+name = "parked"
+kind = "blocked"
+
+[[status]]
+name = "shipped"
+kind = "closed"
+
+[[status]]
+name = "wontfix"
+kind = "closed"
+`
+
+func TestS4_S6_S7_DefaultNamesFromConfig_InfoAndKeptFields(t *testing.T) {
+	e := newEnv(t)
+	e.writeConfig(renamedStatuses)
+	s := e.open(5e9)
+	r, err := s.Create("a", "proj", "", "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ensure(t, get(t, s, r.ID).Status == "idea", "new task in %q", get(t, s, r.ID).Status)
+	_, err = s.Take(r.ID, core.Take, "agent:a")
+	wantRule(t, "take without criteria", err, "tix move "+r.ID+" todo2")
+	r, err = s.Edit(r.ID, r.Rev, critBody, "tester")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustMove(t, s, r.ID, "todo2", core.MoveOpts{})
+	tr, err := s.Take(r.ID, core.Take, "agent:a")
+	ensure(t, err == nil && strings.HasPrefix(tr.Info, "todo2 [open] > doing [in_progress]  @"), "take info %q %v", tr.Info, err)
+	_, err = s.Take(r.ID, core.Release, "agent:a")
+	ensure(t, err == nil && get(t, s, r.ID).Status == "todo2", "release: %v status %q", err, get(t, s, r.ID).Status)
+	mustMove(t, s, r.ID, "blocked", core.MoveOpts{Message: "waits for X"})
+	mustMove(t, s, r.ID, "parked", core.MoveOpts{})
+	ensure(t, get(t, s, r.ID).Waiting == "waits for X", "waiting %q lost on a move inside the kind", get(t, s, r.ID).Waiting)
+	mustMove(t, s, r.ID, "todo2", core.MoveOpts{})
+	if _, err := s.Close(r.ID, core.MoveOpts{Message: "all done", Force: true}, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	ensure(t, get(t, s, r.ID).Status == "shipped", "close went to %q", get(t, s, r.ID).Status)
+	mustMove(t, s, r.ID, "wontfix", core.MoveOpts{})
+	ensure(t, strings.Contains(e.text(r.ID), "Result: all done"), "result lost on a move inside the kind")
+}

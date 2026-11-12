@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -78,7 +79,7 @@ type Result struct {
 
 // Store - an open task store.
 type Store struct {
-	cfg  *config.Config
+	cfg  atomic.Pointer[config.Config] // replaced under the lock, read anywhere: use conf()
 	root string
 	wait time.Duration
 	bin  string
@@ -109,7 +110,8 @@ func Open(root string, o Options) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Store{cfg: cfg, root: abs, wait: o.LockTimeout, bin: o.GitBin, log: o.Log, now: o.Now}
+	s := &Store{root: abs, wait: o.LockTimeout, bin: o.GitBin, log: o.Log, now: o.Now}
+	s.cfg.Store(cfg)
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -127,12 +129,14 @@ func Open(root string, o Options) (*Store, error) {
 
 // kindOf returns the kind of a status by the current config; "" for a name that is not in it.
 func (s *Store) kindOf(name string) string {
-	k, _ := s.cfg.KindOf(name)
+	k, _ := s.conf().KindOf(name)
 	return k
 }
 
 // Config returns the store config.
-func (s *Store) Config() *config.Config { return s.cfg }
+func (s *Store) Config() *config.Config { return s.conf() }
+
+func (s *Store) conf() *config.Config { return s.cfg.Load() }
 
 // git finds the git binary once per Store.
 func (s *Store) git() (gitx.Repo, error) {
@@ -183,9 +187,9 @@ func (s *Store) CreateWithBody(title, project, column, body, actor string) (Resu
 
 func (s *Store) create(tx *txEnv, title, project, column, body, actor string) (Result, error) {
 	if column == "" {
-		column = s.cfg.DefaultOf(config.Idea)
+		column = s.conf().DefaultOf(config.Idea)
 	}
-	if err := s.cfg.CheckStatus(column); err != nil {
+	if err := s.conf().CheckStatus(column); err != nil {
 		return Result{}, rule("%v", err)
 	}
 	t := &task.Task{Title: title, Project: project, Status: column}

@@ -109,7 +109,7 @@ func (s *Store) release(t *task.Task, actor string) (string, error) {
 	if s.kindOf(t.Status) != config.InProgress {
 		return "released", nil
 	}
-	from, to := t.Status, s.cfg.DefaultOf(config.Open)
+	from, to := t.Status, s.conf().DefaultOf(config.Open)
 	pl, err := s.place(t, to, Place{First: true})
 	if err != nil {
 		return "", err
@@ -127,9 +127,9 @@ func (s *Store) take(t *task.Task, actor string, steal bool, op *opInfo) (string
 	if !canTake {
 		if len(t.Criteria()) == 0 {
 			return "", rule("%s is in %s and has no criteria; add `- [ ]` lines under ## Details with tix edit, "+
-				"then run: tix move %s open, then tix take %s", t.ID, t.Status, t.ID, t.ID)
+				"then run: tix move %s %s, then tix take %s", t.ID, t.Status, t.ID, s.conf().DefaultOf(config.Open), t.ID)
 		}
-		return "", rule("%s is in %s; run: tix move %s open", t.ID, t.Status, t.ID)
+		return "", rule("%s is in %s; run: tix move %s %s", t.ID, t.Status, t.ID, s.conf().DefaultOf(config.Open))
 	}
 	claim, has := t.ClaimInfo()
 	live := has && claim.Until.After(s.now())
@@ -147,7 +147,7 @@ func (s *Store) take(t *task.Task, actor string, steal bool, op *opInfo) (string
 		}
 	}
 	if kind != config.InProgress {
-		to := s.cfg.DefaultOf(config.InProgress)
+		to := s.conf().DefaultOf(config.InProgress)
 		pl, err := s.place(t, to, Place{})
 		if err != nil {
 			return "", err
@@ -189,7 +189,7 @@ func (s *Store) Close(id string, o MoveOpts, actor string) (Result, error) {
 		if s.kindOf(t.Status) == config.Closed {
 			return t.Status
 		}
-		return s.cfg.DefaultOf(config.Closed)
+		return s.conf().DefaultOf(config.Closed)
 	}, o, actor)
 }
 
@@ -204,7 +204,7 @@ func (s *Store) moveTo(id string, target func(*task.Task) string, o MoveOpts, ac
 	var ready []string
 	res, err := s.modifyTx(id, actor, op, func(tx *txEnv, t *task.Task, _ string) error {
 		column := target(t)
-		if err := s.cfg.CheckStatus(column); err != nil {
+		if err := s.conf().CheckStatus(column); err != nil {
 			return rule("%v", err)
 		}
 		wasClosed := s.kindOf(t.Status) == config.Closed
