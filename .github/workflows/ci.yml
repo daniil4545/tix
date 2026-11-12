@@ -1,8 +1,8 @@
 name: ci
 
-# GitHub flow: every PR into main and every push to main run ci-check on Linux and macOS and six
-# linters. `gate` is the one CI check required by main: red unless every job succeeded (deps runs
-# on PRs only).
+# GitHub flow: every PR into main and every push to main run `make lint` once and the rest
+# of ci-check (`make ci-test`) on Linux and macOS. `gate` is the one CI check required by
+# main: red unless every job succeeded (deps runs on PRs only).
 on:
   push:
     branches: [main]
@@ -12,6 +12,23 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+        with:
+          version: v2.15.0
+          install-only: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - run: make lint
+
   check:
     strategy:
       fail-fast: false
@@ -26,17 +43,12 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          # Pinned: a linter built with an older Go refuses to read the module.
-          version: v2.15.0
-          # make runs the linter itself; the action only installs it.
-          install-only: true
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           version: "~> v2"
           install-only: true
-      - run: make ci-check
+      # Lint runs in its own job.
+      - run: make ci-test
 
   # New or changed dependencies of a PR: known vulnerabilities and licenses outside the list.
   deps:
@@ -49,85 +61,19 @@ jobs:
           fail-on-severity: high
           allow-licenses: MIT, BSD-2-Clause, BSD-3-Clause, Apache-2.0, ISC, MPL-2.0
 
-  # The linters below: a checkout and one action pinned by hash, after zerocracy/judges-action.
-  actionlint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: reviewdog/action-actionlint@619a81ec64ff8c0211cd6146eb2b21e8f1d7f440 # v1.81.1
-        with:
-          # The action's default is none: findings are reported and the job stays green.
-          fail_level: error
-
-  typos:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: crate-ci/typos@4c8b7f51ca60df14e3c5ca82770dfbbe6c3dae85 # v1.52.0
-
-  shellcheck:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca # master
-
-  yamllint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
-        with:
-          config_file: .yamllint.yml
-
-  # Checks the markdown files of the repository root only, the default of the action.
-  markdown-lint:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
-
-  checkmake:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: Uno-Takashi/checkmake-action@bc11ee86274ceaf5710dbcd80871d7cd7ecc78ce # v2
-        with:
-          config: checkmake.ini
-
   gate:
     if: always()
-    needs: [check, deps, actionlint, typos, shellcheck, yamllint, markdown-lint, checkmake]
+    needs: [lint, check, deps]
     runs-on: ubuntu-latest
     steps:
       - name: every job passed
         env:
+          LINTJOB: ${{ needs.lint.result }}
           CHECK: ${{ needs.check.result }}
           DEPS: ${{ needs.deps.result }}
-          LINT: >-
-            ${{ needs.actionlint.result }} ${{ needs.typos.result }}
-            ${{ needs.shellcheck.result }} ${{ needs.yamllint.result }}
-            ${{ needs.markdown-lint.result }} ${{ needs.checkmake.result }}
           EVENT: ${{ github.event_name }}
         run: |
-          echo "check: $CHECK, deps: $DEPS, linters: $LINT, event: $EVENT"
+          echo "lint: $LINTJOB, check: $CHECK, deps: $DEPS, event: $EVENT"
+          test "$LINTJOB" = success
           test "$CHECK" = success
           test "$DEPS" = success || { test "$EVENT" = push && test "$DEPS" = skipped; }
-          for r in $LINT; do test "$r" = success; done
