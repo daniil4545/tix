@@ -11,13 +11,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Upgrade from 0.8.x
 
-- Copy the store (`~/tasks`) before installing. The first write of 0.9.0 moves the old epics to `parent` in one commit `migrate: epic lines to parent` and writes `format = 2`. Tasks an epic lists get `parent: T-N`, their lines leave the epic.
+- Copy the store (`~/tasks`) before installing. The first write of 0.9.0 moves the old epics to `parent` in one commit `migrate: epic lines to parent` and writes `format = 2`. Tasks an epic lists get `parent: T-N` and their lines leave the epic; a line that names a missing task or another epic stays a criterion.
 - 0.8 does not read `parent`. To go back: `git revert` the migration commit in the store and install the 0.8 binary. 0.9.0 migrates a reverted store again on its next write.
 - Skills and rules that write `- [ ] T-N` epic lines (`spec`, `orchestrate`, `RULES.md`) must be updated first: after the migration such a line is an ordinary criterion.
 
 ### Added
 
-- Statuses have a kind and live in `config.toml` as `[[status]]` (`name`, `kind`, `format = 2`). A config with no `[[status]]` means the five defaults. Rules read the kind; text output prints `review [in_progress]` when the name differs from the kind; `--json` has `kind`.
+- Statuses have a kind and live in `config.toml` as `[[status]]` (`name`, `kind`) next to the top-level `format = 2`. A config with no `[[status]]` means the five defaults. Rules read the kind; text output prints `review [in_progress]` when the name differs from the kind; `--json` has `kind`.
 - `tix status` lists statuses with task counts; `tix status add NAME --kind KIND`, `rename OLD NEW` and `rm NAME` (refused while the status has tasks or is the last of its kind).
 - `tix list --kind KIND` filters by kind.
 - `tix uncheck T-N N` clears the mark of a criterion.
