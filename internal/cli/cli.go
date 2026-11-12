@@ -213,7 +213,7 @@ var commandHelp = map[string]string{
 	"ctx":      "ctx [--project P] [--json] [--hook]",
 	"inbox":    "inbox [--hook]",
 	"new":      "new <title> [--to status] [--project P] [--body-file FILE|-]",
-	"list":     "list [--project P] [--status status] [--all] [--grep TEXT] [--like TEXT|T-N] [--stale] [--json]; alias: ls",
+	"list":     "list [--project P] [--status status] [--kind kind] [--all] [--grep TEXT] [--like TEXT|T-N] [--stale] [--json]; alias: ls",
 	"show":     "show <id> [-v] [--json]; notes from the history follow the file (last 5, all with -v)",
 	"edit":     "edit <id> --base <rev> < body.md",
 	"comment":  "comment <id> <text>",

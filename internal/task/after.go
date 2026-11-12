@@ -34,11 +34,12 @@ func (t *Task) After() []string {
 	return ids
 }
 
-// NotClosed is the set of ids of the tasks that are not closed.
-func NotClosed(all []*Task) map[string]bool {
+// NotClosed is the set of ids of the tasks that are not of the kind closed; a status that is not
+// in cfg counts as not closed.
+func NotClosed(all []*Task, cfg *config.Config) map[string]bool {
 	m := make(map[string]bool, len(all))
 	for _, t := range all {
-		if t.Status != config.Closed {
+		if k, _ := cfg.KindOf(t.Status); k != config.Closed {
 			m[t.ID] = true
 		}
 	}
