@@ -13,7 +13,6 @@ All notable changes to this project are documented here. The format follows
 
 - Copy the store (`~/tasks`) before installing. The first write of 0.9.0 moves the old epics to `parent` in one commit `migrate: epic lines to parent` and writes `format = 2`. Tasks an epic lists get `parent: T-N`, their lines leave the epic.
 - 0.8 does not read `parent`. To go back: `git revert` the migration commit in the store and install the 0.8 binary. 0.9.0 migrates a reverted store again on its next write.
-- Do not run a build of `main` before the release on the real store; use a copy.
 - Skills and rules that write `- [ ] T-N` epic lines (`spec`, `orchestrate`, `RULES.md`) must be updated first: after the migration such a line is an ordinary criterion.
 
 ### Added
@@ -22,7 +21,7 @@ All notable changes to this project are documented here. The format follows
 - `tix status` lists statuses with task counts; `tix status add NAME --kind KIND`, `rename OLD NEW` and `rm NAME` (refused while the status has tasks or is the last of its kind).
 - `tix list --kind KIND` filters by kind.
 - `tix uncheck T-N N` clears the mark of a criterion.
-- `parent: T-N` links a task to an epic: `tix new --parent`, `tix set T-N parent=T-M` (`parent=` clears), `Parent:` and `Children: 3/7` in `show`, `[epic 3/7]` in `list` and `ctx`, `parent` and `children` in `list --json`. Depth is one; a closed parent takes no new children.
+- `parent: T-N` links a task to an epic: `tix new --parent`, `tix set T-N parent=T-M` (`parent=` clears), `Parent:` and `Children: 3/7` in `show`, `[epic 3/7]` in `list` and `ctx`, `parent`, `children` and `children_closed` in `list --json`. Depth is one; a closed parent takes no new children.
 
 ### Changed
 
