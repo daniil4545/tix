@@ -1,8 +1,8 @@
 name: ci
 
-# GitHub flow: every PR into main and every push to main run `make lint` once and the rest of
-# ci-check (`make ci-test`) on Linux and macOS. `gate` is the one CI check required by main: red unless every job succeeded (deps runs
-# on PRs only).
+# GitHub flow: every PR into main and every push to main run `make lint` once and the rest
+# of ci-check (`make ci-test`) on Linux and macOS. `gate` is the one CI check required by
+# main: red unless every job succeeded (deps runs on PRs only).
 on:
   push:
     branches: [main]
