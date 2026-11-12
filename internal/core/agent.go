@@ -403,21 +403,35 @@ func (s *Store) setField(t *task.Task, f Field) error {
 
 // Check marks criteria with numbers nums. A task line of an epic follows the status of its task and is refused.
 func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
+	return s.mark(id, nums, actor, "check")
+}
+
+// Uncheck clears the marks of criteria with numbers nums. A task of the kind closed and a task line of
+// an epic are refused.
+func (s *Store) Uncheck(id string, nums []int, actor string) (Result, error) {
+	return s.mark(id, nums, actor, "uncheck")
+}
+
+// mark is Check (verb "check") or Uncheck (verb "uncheck").
+func (s *Store) mark(id string, nums []int, actor, verb string) (Result, error) {
 	actor, err := checkActor(actor)
 	if err != nil {
 		return Result{}, err
 	}
 	if len(nums) == 0 {
-		return Result{}, errors.New("check needs criterion numbers")
+		return Result{}, fmt.Errorf("%s needs criterion numbers", verb)
 	}
 	parts := make([]string, len(nums))
 	for i, n := range nums {
 		parts[i] = strconv.Itoa(n)
 	}
-	op := &opInfo{kind: "check", subject: "check " + strings.Join(parts, " ")}
+	op := &opInfo{kind: verb, subject: verb + " " + strings.Join(parts, " ")}
 	var info string
 	res, err := s.modifyTx(id, actor, op, func(_ *txEnv, t *task.Task, _ string) error {
 		crit := t.Criteria()
+		if verb == "uncheck" && s.kindOf(t.Status) == config.Closed {
+			return rule("%s is closed: reopen it first with tix move %s <status>", t.ID, t.ID)
+		}
 		if t.IsEpic() {
 			for _, n := range nums {
 				if n >= 1 && n <= len(crit) && task.LineTask(crit[n-1].Text) != "" {
@@ -425,21 +439,29 @@ func (s *Store) Check(id string, nums []int, actor string) (Result, error) {
 				}
 			}
 		}
-		if _, err := t.Check(nums...); err != nil {
+		change := t.Check
+		if verb == "uncheck" {
+			change = t.Uncheck
+		}
+		if _, err := change(nums...); err != nil {
 			return err
 		}
-		crit = t.Criteria()
-		done := 0
-		for _, c := range crit {
-			if c.Done {
-				done++
-			}
-		}
-		info = fmt.Sprintf("%d/%d", done, len(crit))
+		info = progress(t.Criteria())
 		return nil
 	})
 	res.Info = info
 	return res, err
+}
+
+// progress - "done/all" of the criteria.
+func progress(crit []task.Criterion) string {
+	done := 0
+	for _, c := range crit {
+		if c.Done {
+			done++
+		}
+	}
+	return fmt.Sprintf("%d/%d", done, len(crit))
 }
 
 // ReleaseAll drops every live claim of the actor in one commit: an in_progress task goes back to the head

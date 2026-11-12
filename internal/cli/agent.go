@@ -492,7 +492,7 @@ func (a *app) cmdSet(args []string) error {
 	return nil
 }
 
-func (a *app) cmdCheck(args []string) error {
+func (a *app) cmdMark(verb string, args []string) error {
 	p, err := parseArgs(args, withCommon(nil))
 	if err != nil {
 		return err
@@ -502,7 +502,7 @@ func (a *app) cmdCheck(args []string) error {
 		return err
 	}
 	if len(p.pos) < 2 {
-		return &idError{ID: id, Err: inputf("usage: tix check <id> N...")}
+		return &idError{ID: id, Err: inputf("usage: tix %s <id> N...", verb)}
 	}
 	nums := make([]int, 0, len(p.pos)-1)
 	for _, arg := range p.pos[1:] {
@@ -519,12 +519,19 @@ func (a *app) cmdCheck(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	res, err := a.store.Check(id, nums, who)
+	res, err := a.mark(verb, id, nums, who)
 	if err != nil {
 		return wrap(id, err)
 	}
-	a.reply(p, res, id, what(res, "check"))
+	a.reply(p, res, id, what(res, verb))
 	return nil
+}
+
+func (a *app) mark(verb, id string, nums []int, who string) (core.Result, error) {
+	if verb == "uncheck" {
+		return a.store.Uncheck(id, nums, who)
+	}
+	return a.store.Check(id, nums, who)
 }
 
 func (a *app) cmdDone(args []string) error {

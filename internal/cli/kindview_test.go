@@ -228,3 +228,19 @@ func TestS29_LikeWithKindClosedFindsWontfix(t *testing.T) {
 		t.Errorf("--like alone: %q, a wontfix task counts as closed", out)
 	}
 }
+
+func TestS25_UncheckEndToEnd(t *testing.T) {
+	defer guard(t)
+	b, rev, _ := kindBox(t)
+	b.ok("", "check", rev, "1", "2")
+	if out := b.ok("", "uncheck", rev, "2").out; !strings.Contains(out, "ok "+rev+" 1/") {
+		t.Errorf("uncheck: %q, want `ok %s 1/N`", out, rev)
+	}
+	if r := b.tix("", "uncheck", rev, "99"); r.code == 0 {
+		t.Errorf("uncheck 99 accepted")
+	}
+	b.ok("", "done", rev, "--force", "-m", "ok")
+	if r := b.tix("", "uncheck", rev, "1"); r.code != 5 || !strings.Contains(r.err, "reopen") {
+		t.Errorf("uncheck in closed: code %d %q, want 5 and the hint", r.code, r.err)
+	}
+}
