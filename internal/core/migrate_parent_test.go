@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/daniil4545/tix/internal/core"
 )
 
 // putTask writes a task file by hand, like an old 0.8 store.
@@ -202,4 +204,34 @@ func TestMigrateParent_UnparsedSkipped(t *testing.T) {
 	ensure(t, string(got) == "no frontmatter\n", "bad file rewritten")
 	ensure(t, strings.Contains(e.log.String(), "skipped files: T-8"), "report: %s", e.log.String())
 	ensure(t, strings.Contains(e.text("T-5"), "parent: T-2"), "the rest not migrated")
+}
+
+// The first write of an old store can be any operation: the migration commit comes first, the
+// operation then works on the migrated files.
+func TestMigrateParent_FirstWriteNote(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	e.oldStore()
+	if _, err := e.open(2*time.Second).Note("T-1", "hello", "tester"); err != nil {
+		t.Fatal(err)
+	}
+	log := strings.Split(strings.TrimSpace(e.git("log", "--format=%s", "-3")), "\n")
+	ensure(t, strings.Contains(log[0], "note hello") && log[1] == "migrate: epic lines to parent", "commits: %v", log)
+	ensure(t, !strings.Contains(e.text("T-1"), "T-5 ") && strings.Contains(e.text("T-5"), "parent: T-2"), "not migrated")
+	cfg, _ := os.ReadFile(filepath.Join(e.root, ".tix", "config.toml"))
+	ensure(t, strings.Contains(string(cfg), "format = 2"), "config: %s", cfg)
+}
+
+func TestMigrateParent_FirstWriteMove(t *testing.T) {
+	defer guard(t)
+	e := newEnv(t)
+	e.oldStore()
+	if _, err := e.open(2*time.Second).Move("T-6", "closed", core.MoveOpts{Force: true, Message: "x"}, "tester"); err != nil {
+		t.Fatal(err)
+	}
+	log := strings.Split(strings.TrimSpace(e.git("log", "--format=%s", "-3")), "\n")
+	ensure(t, log[1] == "migrate: epic lines to parent", "commits: %v", log)
+	got := e.text("T-6")
+	ensure(t, strings.Contains(got, "parent: T-1") && strings.Contains(got, "status: closed"), "move lost the parent:\n%s", got)
+	ensure(t, !strings.Contains(e.text("T-1"), "T-6 "), "line of T-6 came back:\n%s", e.text("T-1"))
 }

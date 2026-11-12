@@ -72,7 +72,7 @@ func (s *Store) withLock(create bool, fn func(tx *txEnv) error) error {
 		return err
 	}
 	s.cfg.Store(cfg)
-	if create && cfg.Format < formatParent {
+	if cfg.Format < formatParent {
 		if err = s.migrateParent(tx); err != nil {
 			return err
 		}
