@@ -115,7 +115,7 @@ func (a *app) cmdCtx(args []string) error {
 		proj, _ = a.detectProject()
 	}
 	all := tasks
-	tasks = a.filter(tasks, proj, "")
+	tasks = a.filter(tasks, proj, "", "")
 	if len(tasks) == 0 && !p.set["json"] {
 		a.out("no tasks")
 		return nil
@@ -124,7 +124,7 @@ func (a *app) cmdCtx(args []string) error {
 		Tasks: tasks, All: all, Project: proj,
 		RulesPath: tilde(filepath.Join(a.root, rulesFile), a.env.Getenv("HOME")),
 		Now:       now, PerColumn: ctxPerColumn,
-		Path: a.store.Config().Paths[strings.ToLower(proj)],
+		Path: a.store.Config().Paths[strings.ToLower(proj)], Config: a.store.Config(),
 	}
 	if who != unknownActor {
 		in.Actor = who
@@ -169,7 +169,7 @@ func (a *app) staleIDs(m movesResult, tasks []*task.Task, now time.Time) []strin
 		return nil
 	}
 	var ids []string
-	for _, it := range idleTasks(tasks, m.moves, now) {
+	for _, it := range idleTasks(tasks, m.moves, now, a.cfg()) {
 		ids = append(ids, it.t.ID)
 	}
 	return ids
@@ -189,10 +189,10 @@ type idle struct {
 
 // idleTasks returns the idea and open tasks without a move for staleAfter, most idle first. The last move is
 // the newest of moves and created: a task created by hand has no commit of its own.
-func idleTasks(tasks []*task.Task, moves map[string]time.Time, now time.Time) []idle {
+func idleTasks(tasks []*task.Task, moves map[string]time.Time, now time.Time, cfg *config.Config) []idle {
 	var out []idle
 	for _, t := range tasks {
-		if t.Status != config.Idea && t.Status != config.Open {
+		if k, _ := cfg.KindOf(t.Status); k != config.Idea && k != config.Open {
 			continue
 		}
 		last := t.Created
@@ -420,15 +420,15 @@ func (a *app) cmdMove(args []string) error {
 	if err != nil {
 		return &idError{ID: id, Err: err}
 	}
-	if err := checkStatus(p.pos[1]); err != nil {
-		return &idError{ID: id, Err: err}
-	}
 	who, err := a.actorOf(p)
 	if err != nil {
 		return err
 	}
 	if err := a.open(); err != nil {
 		return err
+	}
+	if err := a.checkStatus(p.pos[1]); err != nil {
+		return &idError{ID: id, Err: err}
 	}
 	res, err := a.store.Move(id, p.pos[1], opts, who)
 	if err != nil {
@@ -543,18 +543,10 @@ func (a *app) cmdDone(args []string) error {
 	if err := a.open(); err != nil {
 		return err
 	}
-	res, err := a.store.Move(id, config.Closed, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
+	res, err := a.store.Close(id, core.MoveOpts{Message: p.vals["m"], Force: p.set["force"]}, who)
 	if err != nil {
 		return wrap(id, err)
 	}
 	a.reply(p, res, id, what(res, "done"))
-	return nil
-}
-
-// checkStatus refuses a word that is not one of the five statuses; an old column word gets a hint. Exit code 6.
-func checkStatus(name string) error {
-	if err := config.Check(name); err != nil {
-		return inputf("%v", err)
-	}
 	return nil
 }

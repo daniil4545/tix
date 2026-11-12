@@ -108,12 +108,39 @@ func (a *app) newBody(path string) (string, error) {
 	return string(data), nil
 }
 
-// column returns the status of a new task: --to, else idea.
+// cfg returns the config of the store; before the store is open - the default one.
+func (a *app) cfg() *config.Config {
+	if a.store == nil {
+		return config.Default()
+	}
+	return a.store.Config()
+}
+
+// checkStatus refuses a name that is not a configured status; an old column word gets a hint. Exit code 6.
+func (a *app) checkStatus(name string) error {
+	if err := a.cfg().CheckStatus(name); err != nil {
+		return inputf("%v", err)
+	}
+	return nil
+}
+
+// label prints a status as its name, or "name [kind]" when the name is not the kind word; "?" for none.
+func (a *app) label(status string) string {
+	if status == "" {
+		return "?"
+	}
+	if k, ok := a.cfg().KindOf(status); ok && k != status {
+		return status + " [" + k + "]"
+	}
+	return status
+}
+
+// column returns the status of a new task: --to, else the default status of the kind idea.
 func (a *app) column(p *parsed) (string, error) {
 	if !p.set["to"] {
-		return config.Idea, nil
+		return a.cfg().DefaultOf(config.Idea), nil
 	}
-	return p.vals["to"], checkStatus(p.vals["to"])
+	return p.vals["to"], a.checkStatus(p.vals["to"])
 }
 
 func (a *app) cmdText(args []string) error {
@@ -237,6 +264,9 @@ func (a *app) cmdShow(args []string) error {
 		}
 		// The file as is: Obsidian may have written it in a non-canonical form.
 		a.out("rev %s", sh.Rev)
+		if l := a.label(sh.Task.Status); l != sh.Task.Status {
+			a.out("Status: %s", l)
+		}
 		for _, e := range a.store.EpicsOf(id) {
 			a.out("Epic: %s", e)
 		}
@@ -307,6 +337,7 @@ type listItem struct {
 	Title    string   `json:"title"`
 	Project  string   `json:"project"`
 	Status   string   `json:"status"`
+	Kind     string   `json:"kind"`
 	External string   `json:"external"`
 	Waiting  string   `json:"waiting"`
 	Claim    string   `json:"claim"`
@@ -320,7 +351,7 @@ type listItem struct {
 
 func (a *app) cmdList(args []string) error {
 	p, err := parseArgs(args, withCommon(flagSpec{
-		"project": true, "status": true, "json": false, "all": false, "grep": true, "like": true, "stale": false,
+		"project": true, "status": true, "kind": true, "json": false, "all": false, "grep": true, "like": true, "stale": false,
 	}))
 	if err != nil {
 		return err
@@ -343,26 +374,24 @@ func (a *app) cmdList(args []string) error {
 	for _, e := range errs {
 		a.warn("%s", firstLine(e.Error()))
 	}
-	notClosed := task.NotClosed(tasks)
+	notClosed := task.NotClosed(tasks, a.cfg())
 	proj := p.vals["project"]
 	if !p.set["project"] {
 		proj, _ = a.detectProject()
 	}
-	if p.set["status"] {
-		if err := checkStatus(p.vals["status"]); err != nil {
-			return err
-		}
+	if err := a.checkFilters(p); err != nil {
+		return err
 	}
-	// an explicit --status shows its status even when it is closed
-	hide := !p.set["all"] && !p.set["status"]
-	lq, proj, err := likeQuery(p, proj, tasks)
+	// an explicit --status or --kind shows its tasks even when they are closed
+	hide := !p.set["all"] && !p.set["status"] && !p.set["kind"]
+	lq, proj, err := likeQuery(p, a.cfg(), proj, tasks)
 	if err != nil {
 		return err
 	}
 	needle := strings.ToLower(p.vals["grep"])
 	var matched []*task.Task
 	for _, t := range tasks {
-		if hide && t.Status == config.Closed {
+		if hide && a.kindOf(t.Status) == config.Closed {
 			continue
 		}
 		if !t.Matches(needle) {
@@ -370,7 +399,7 @@ func (a *app) cmdList(args []string) error {
 		}
 		matched = append(matched, t)
 	}
-	matched = a.filter(matched, proj, p.vals["status"])
+	matched = a.filter(matched, proj, p.vals["status"], p.vals["kind"])
 	matched = similar(p.set["like"], lq, matched)
 	if !p.set["stale"] {
 		return a.printTasks(p, matched, nil, notClosed)
@@ -391,7 +420,7 @@ func (a *app) waitingOn(t *task.Task) []string {
 	for _, e := range errs {
 		a.warn("%s", firstLine(e.Error()))
 	}
-	return task.WaitingOn(t, task.NotClosed(all))
+	return task.WaitingOn(t, task.NotClosed(all, a.cfg()))
 }
 
 // similar keeps the tasks resembling the query, most similar first; off - tasks as they are.
@@ -412,9 +441,9 @@ func similar(on bool, q search.Query, tasks []*task.Task) []*task.Task {
 
 // likeQuery turns --like into a query (zero without the flag) and the project to list:
 // T-N takes the title and, without --project, the project of that task.
-func likeQuery(p *parsed, proj string, tasks []*task.Task) (search.Query, string, error) {
+func likeQuery(p *parsed, cfg *config.Config, proj string, tasks []*task.Task) (search.Query, string, error) {
 	arg := p.vals["like"]
-	q := search.Query{Text: arg, Project: proj, All: p.set["all"] || p.set["status"]}
+	q := search.Query{Text: arg, Project: proj, All: p.set["all"] || p.set["status"], Config: cfg}
 	if !p.set["like"] || !strings.HasPrefix(arg, "T-") {
 		return q, proj, nil
 	}
@@ -436,7 +465,7 @@ func (a *app) stale(tasks []*task.Task) ([]*task.Task, map[string]int, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	its := idleTasks(tasks, moves, time.Now())
+	its := idleTasks(tasks, moves, time.Now(), a.cfg())
 	out, days := make([]*task.Task, 0, len(its)), make(map[string]int, len(its))
 	for _, it := range its {
 		out = append(out, it.t)
@@ -445,18 +474,39 @@ func (a *app) stale(tasks []*task.Task) ([]*task.Task, map[string]int, error) {
 	return out, days, nil
 }
 
-// filter keeps the tasks of the project and column (an empty value means no filter)
-// and sorts: statuses in board order, within a status by rank, then by number.
-func (a *app) filter(tasks []*task.Task, proj, status string) []*task.Task {
+// checkFilters refuses a --status that is not a configured name and a --kind that is not a kind.
+func (a *app) checkFilters(p *parsed) error {
+	if p.set["status"] {
+		if err := a.checkStatus(p.vals["status"]); err != nil {
+			return err
+		}
+	}
+	if p.set["kind"] && !slices.Contains(config.Kinds, p.vals["kind"]) {
+		return inputf("unknown kind %q; kinds: %s", p.vals["kind"], strings.Join(config.Kinds, " "))
+	}
+	return nil
+}
+
+// kindOf returns the kind of a status; "" for a name that is not in the config.
+func (a *app) kindOf(status string) string {
+	k, _ := a.cfg().KindOf(status)
+	return k
+}
+
+// filter keeps the tasks of the project, status name and kind (an empty value means no filter)
+// and sorts: statuses in config order, within a status by rank, then by number.
+func (a *app) filter(tasks []*task.Task, proj, status, kind string) []*task.Task {
+	list := a.cfg().StatusList()
 	pos := func(s string) int {
-		if i := slices.Index(config.Statuses, s); i >= 0 {
+		if i := slices.IndexFunc(list, func(x config.Status) bool { return x.Name == s }); i >= 0 {
 			return i
 		}
-		return len(config.Statuses)
+		return len(list)
 	}
 	var out []*task.Task
 	for _, t := range tasks {
-		if (proj == "" || strings.EqualFold(t.Project, proj)) && (status == "" || t.Status == status) {
+		if (proj == "" || strings.EqualFold(t.Project, proj)) && (status == "" || t.Status == status) &&
+			(kind == "" || a.kindOf(t.Status) == kind) {
 			out = append(out, t)
 		}
 	}
@@ -482,7 +532,7 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, not
 				tags = []string{}
 			}
 			items = append(items, listItem{
-				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status,
+				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
 				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
 				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
 				IdleDays: days[t.ID],
@@ -495,10 +545,7 @@ func (a *app) printTasks(p *parsed, tasks []*task.Task, days map[string]int, not
 		return nil
 	}
 	for _, t := range tasks {
-		status := t.Status
-		if status == "" {
-			status = "?"
-		}
+		status := a.label(t.Status)
 		line := status + " " + t.ID + " " + t.Title
 		if t.IsEpic() {
 			line = status + " " + t.ID + " [epic] " + t.Title
