@@ -99,7 +99,7 @@ label has its own muted color.
 In a card, `j` and `k` step through the history, `enter` unfolds an entry or
 toggles a criterion, `h` and `l` open the previous or next task of the column,
 `e` and `c` work as on the board, and `esc` goes back. The title and the fields
-(tags, project, external, waiting, abstract) are changed with `tix set`.
+(tags, project, external, waiting, abstract, parent) are changed with `tix set`.
 
 The mouse does the same. Click a card to select it and double click to open
 it. Drag a card to another column to move it. Click `+` in a column name for a
