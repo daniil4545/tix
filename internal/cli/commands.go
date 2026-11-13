@@ -625,34 +625,39 @@ func (a *app) latestNotes() map[string]gitx.Note {
 	return nil
 }
 
+// listItems builds the rows of `list --json`; the last notes are read only for a non-empty list.
+func (a *app) listItems(tasks []*task.Task, counts map[string][2]int, days map[string]int) []listItem {
+	items := make([]listItem, 0, len(tasks))
+	var notes map[string]gitx.Note
+	if len(tasks) > 0 {
+		notes = a.latestNotes()
+	}
+	for _, t := range tasks {
+		tags := t.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+		it := listItem{
+			ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
+			External: t.External, Waiting: t.Waiting, Claim: t.Claim,
+			Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
+			IdleDays: days[t.ID], Parent: t.Parent,
+		}
+		if c, ok := counts[t.ID]; ok {
+			it.ChildrenClosed, it.Children = &c[0], &c[1]
+		}
+		if n, ok := notes[t.ID]; ok {
+			it.LastNote = &lastNote{At: n.At.Format(task.CreatedLayout), Text: n.Text}
+		}
+		items = append(items, it)
+	}
+	return items
+}
+
 func (a *app) printTasks(p *parsed, tasks, all []*task.Task, days map[string]int, notClosed map[string]bool) error {
 	counts := task.ChildCounts(all, a.cfg())
 	if p.set["json"] {
-		items := make([]listItem, 0, len(tasks))
-		var notes map[string]gitx.Note
-		if len(tasks) > 0 {
-			notes = a.latestNotes()
-		}
-		for _, t := range tasks {
-			tags := t.Tags
-			if tags == nil {
-				tags = []string{}
-			}
-			it := listItem{
-				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
-				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
-				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
-				IdleDays: days[t.ID], Parent: t.Parent,
-			}
-			if c, ok := counts[t.ID]; ok {
-				it.ChildrenClosed, it.Children = &c[0], &c[1]
-			}
-			if n, ok := notes[t.ID]; ok {
-				it.LastNote = &lastNote{At: n.At.Format(task.CreatedLayout), Text: n.Text}
-			}
-			items = append(items, it)
-		}
-		return a.printJSON(items)
+		return a.printJSON(a.listItems(tasks, counts, days))
 	}
 	if len(tasks) == 0 {
 		a.out("no tasks")
