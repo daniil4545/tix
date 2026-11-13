@@ -629,7 +629,10 @@ func (a *app) printTasks(p *parsed, tasks, all []*task.Task, days map[string]int
 	counts := task.ChildCounts(all, a.cfg())
 	if p.set["json"] {
 		items := make([]listItem, 0, len(tasks))
-		notes := a.latestNotes()
+		var notes map[string]gitx.Note
+		if len(tasks) > 0 {
+			notes = a.latestNotes()
+		}
 		for _, t := range tasks {
 			tags := t.Tags
 			if tags == nil {
