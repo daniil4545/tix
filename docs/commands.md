@@ -57,10 +57,12 @@ refuses a body that contains its heading, so cut it before pasting a task back.
 Exit codes: 0 success, 1 other error, 2 busy, 3 conflict, 4 no such task,
 5 rule refused, 6 bad input.
 
-Five fixed statuses, in board order. An old word (`todo`, `doing`, `done`, `ready`, `active`,
-`waiting`, `inbox`) is refused with exit code 6 and a hint such as "maybe open?".
+Statuses live in `config.toml` as `[[status]]` with a `name` and a `kind`, in board order; with no
+`[[status]]` the five below are used. `tix status` changes the list. Rules follow the kind, so a status
+`review` of kind `in_progress` behaves as `in_progress`. A word that is not a status (`todo`, `doing`,
+`done`, `ready`, `active`, `waiting`, `inbox`) is refused with exit code 6 and a hint such as "maybe open?".
 
-| Status | Rule on entering |
+| Kind | Rule on entering |
 |---|---|
 | `idea` | none; a new task starts here |
 | `open` | at least one criterion |
@@ -86,7 +88,7 @@ label has its own muted color.
 | `h j k l`, arrows | select a column and a card |
 | `space` | grab the card; arrows move it, `space` or `enter` drops it, `esc` cancels |
 | `enter` | open the card |
-| `n` | new task in the selected column (in `idea` if that status needs criteria): asks for a title, then opens `$EDITOR` |
+| `n` | new task in the selected column (in the first status of kind `idea` if that status needs criteria): asks for a title, then opens `$EDITOR` |
 | `e`, `c` | edit the body in `$VISUAL` or `$EDITOR`, add a comment |
 | `p` | project list: letters narrow it (substring, any case), arrows select, `enter` sets the filter, `esc` keeps the old one; `all` is first, projects of tasks and of the catalog follow with their open counts |
 | `f` | search: letters are the query (substring of the title, Abstract and criteria, any case, same as `tix list --grep`); rows show number, title and an excerpt; `tab` switches the board project and all projects, `ctrl+t` shows closed tasks, arrows select, `enter` opens the card, `esc` returns to the board as it was |
@@ -97,7 +99,7 @@ label has its own muted color.
 In a card, `j` and `k` step through the history, `enter` unfolds an entry or
 toggles a criterion, `h` and `l` open the previous or next task of the column,
 `e` and `c` work as on the board, and `esc` goes back. The title and the fields
-(tags, project, external, waiting, abstract) are changed with `tix set`.
+(tags, project, external, waiting, abstract, parent) are changed with `tix set`.
 
 The mouse does the same. Click a card to select it and double click to open
 it. Drag a card to another column to move it. Click `+` in a column name for a

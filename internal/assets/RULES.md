@@ -30,7 +30,7 @@ The name is `agent:session-id`: `--as`, then `CLAUDE_CODE_SESSION_ID`, `CODEX_TH
 
 - Another live hold refuses `take` and names the owner and the time. Take over only on purpose: `tix take T-12 --steal`.
 - An expired hold is free.
-- The five statuses: idea, open, in_progress, blocked, closed. No others, no aliases: an old word (todo, doing, done, ready, active, waiting, inbox) is refused with exit code 6.
+- Statuses are the ones `tix status` lists; the default five are idea, open, in_progress, blocked, closed. Any other word (todo, doing, done, ready, active, waiting, inbox) is refused with exit code 6.
 - `take` prints `project: NAME /path docs: ...` for a project with a path; read those docs before the work, and `tix ctx` shows the same `path:`. `take` works from open, blocked and in_progress, and from idea when the task has a criterion. From closed move the task first: `tix move T-12 open`. `tix <command> --help` prints the flags of a command.
 
 ## Checks
