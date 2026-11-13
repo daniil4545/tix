@@ -14,6 +14,7 @@ import (
 
 	"github.com/daniil4545/tix/internal/config"
 	"github.com/daniil4545/tix/internal/core"
+	"github.com/daniil4545/tix/internal/gitx"
 	"github.com/daniil4545/tix/internal/search"
 	"github.com/daniil4545/tix/internal/task"
 )
@@ -278,18 +279,76 @@ func (a *app) cmdShow(args []string) error {
 		a.printNotes(id, sh, p.set["v"])
 		return nil
 	}
-	t, rev, _, err := a.store.Show(id)
+	sh, err := a.store.ShowNotes(id)
 	if err != nil {
 		return wrap(id, err)
 	}
-	t.Rev = rev
-	if t.Tags == nil {
-		t.Tags = []string{}
+	t := sh.Task
+	t.Rev = sh.Rev
+	it := showItem{
+		ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
+		External: t.External, Waiting: t.Waiting, Claim: t.Claim, Parent: t.Parent, Rank: t.Rank,
+		Created: t.Created.Format(task.CreatedLayout), Tags: t.Tags, Body: t.Body, Comments: t.Comments,
+		Rev: t.Rev, Path: t.Path, Notes: []noteItem{},
 	}
-	if t.Comments == nil {
-		t.Comments = []task.Comment{}
+	if it.Tags == nil {
+		it.Tags = []string{}
 	}
-	return a.printJSON(t)
+	if it.Comments == nil {
+		it.Comments = []task.Comment{}
+	}
+	if kids, closed := a.store.Children(id); len(kids) > 0 {
+		n := len(kids)
+		it.Children, it.ChildrenClosed = &n, &closed
+	}
+	if sh.NotesErr != nil {
+		a.warn("notes of %s not read: %s", id, firstLine(sh.NotesErr.Error()))
+	}
+	notes := sh.Notes
+	if !p.set["v"] && len(notes) > showNotesDefault {
+		notes = notes[len(notes)-showNotesDefault:]
+	}
+	for _, n := range notes {
+		it.Notes = append(it.Notes, noteItem{At: n.At.Format(task.CreatedLayout), Actor: n.Actor, Text: n.Text})
+	}
+	return a.printJSON(it)
+}
+
+// noteItem - a note in `show --json`: author time (local, like created), author and text.
+type noteItem struct {
+	At    string `json:"at"`
+	Actor string `json:"actor"`
+	Text  string `json:"text"`
+}
+
+// lastNote - the newest note of a task in `list --json`: time and text, as on the TUI card.
+type lastNote struct {
+	At   string `json:"at"`
+	Text string `json:"text"`
+}
+
+// showItem - a task in `show --json`: the Task fields plus kind, children counts and notes.
+// Written out by field because Task has its own MarshalJSON.
+type showItem struct {
+	ID             string         `json:"id"`
+	Title          string         `json:"title"`
+	Project        string         `json:"project"`
+	Status         string         `json:"status"`
+	Kind           string         `json:"kind"`
+	External       string         `json:"external"`
+	Waiting        string         `json:"waiting"`
+	Claim          string         `json:"claim"`
+	Parent         string         `json:"parent,omitempty"`
+	Children       *int           `json:"children,omitempty"`
+	ChildrenClosed *int           `json:"children_closed,omitempty"`
+	Rank           float64        `json:"rank"`
+	Created        string         `json:"created"`
+	Tags           []string       `json:"tags"`
+	Body           string         `json:"body"`
+	Comments       []task.Comment `json:"comments"`
+	Notes          []noteItem     `json:"notes"`
+	Rev            string         `json:"rev"`
+	Path           string         `json:"path"`
 }
 
 // printFamily prints the parent line of a child and the children of a parent, as written, one step deep.
@@ -369,8 +428,9 @@ type listItem struct {
 	IdleDays int      `json:"idle_days,omitempty"` // only with --stale
 	Parent   string   `json:"parent,omitempty"`
 	// Children and ChildrenClosed are set for a parent only.
-	Children       *int `json:"children,omitempty"`
-	ChildrenClosed *int `json:"children_closed,omitempty"`
+	Children       *int      `json:"children,omitempty"`
+	ChildrenClosed *int      `json:"children_closed,omitempty"`
+	LastNote       *lastNote `json:"last_note,omitempty"`
 }
 
 func (a *app) cmdList(args []string) error {
@@ -551,27 +611,53 @@ func (a *app) filter(tasks []*task.Task, proj, status, kind string) []*task.Task
 	return out
 }
 
+// latestNotes reads the newest note of every task with one git call, like the TUI pulse.
+// A git failure is a warning: the list goes on without notes.
+func (a *app) latestNotes() map[string]gitx.Note {
+	bin, err := gitx.Resolve(a.env.Getenv("TIX_GIT"))
+	if err == nil {
+		var notes map[string]gitx.Note
+		if notes, err = (gitx.Repo{Dir: a.root, Bin: bin}).Notes(); err == nil {
+			return notes
+		}
+	}
+	a.warn("notes not read: %s", firstLine(gitx.Detail(err)))
+	return nil
+}
+
+// listItems builds the rows of `list --json`; the last notes are read only for a non-empty list.
+func (a *app) listItems(tasks []*task.Task, counts map[string][2]int, days map[string]int) []listItem {
+	items := make([]listItem, 0, len(tasks))
+	var notes map[string]gitx.Note
+	if len(tasks) > 0 {
+		notes = a.latestNotes()
+	}
+	for _, t := range tasks {
+		tags := t.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+		it := listItem{
+			ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
+			External: t.External, Waiting: t.Waiting, Claim: t.Claim,
+			Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
+			IdleDays: days[t.ID], Parent: t.Parent,
+		}
+		if c, ok := counts[t.ID]; ok {
+			it.ChildrenClosed, it.Children = &c[0], &c[1]
+		}
+		if n, ok := notes[t.ID]; ok {
+			it.LastNote = &lastNote{At: n.At.Format(task.CreatedLayout), Text: n.Text}
+		}
+		items = append(items, it)
+	}
+	return items
+}
+
 func (a *app) printTasks(p *parsed, tasks, all []*task.Task, days map[string]int, notClosed map[string]bool) error {
 	counts := task.ChildCounts(all, a.cfg())
 	if p.set["json"] {
-		items := make([]listItem, 0, len(tasks))
-		for _, t := range tasks {
-			tags := t.Tags
-			if tags == nil {
-				tags = []string{}
-			}
-			it := listItem{
-				ID: t.ID, Title: t.Title, Project: t.Project, Status: t.Status, Kind: a.kindOf(t.Status),
-				External: t.External, Waiting: t.Waiting, Claim: t.Claim,
-				Rank: t.Rank, Created: t.Created.Format(task.CreatedLayout), Tags: tags, Rev: t.Rev, Path: t.Path,
-				IdleDays: days[t.ID], Parent: t.Parent,
-			}
-			if c, ok := counts[t.ID]; ok {
-				it.ChildrenClosed, it.Children = &c[0], &c[1]
-			}
-			items = append(items, it)
-		}
-		return a.printJSON(items)
+		return a.printJSON(a.listItems(tasks, counts, days))
 	}
 	if len(tasks) == 0 {
 		a.out("no tasks")

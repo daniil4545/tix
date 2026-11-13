@@ -79,7 +79,7 @@ func TestCLI_Show_Notes_PrefixIDCommentsExcluded(t *testing.T) {
 	}
 }
 
-func TestCLI_Show_Notes_AfterFileAndAfterDone_NotInJSON(t *testing.T) {
+func TestCLI_Show_Notes_AfterFileAndAfterDone(t *testing.T) {
 	defer guard(t)
 	b := newBox(t)
 	b.ok("", "new", "Alpha")
@@ -95,8 +95,8 @@ func TestCLI_Show_Notes_AfterFileAndAfterDone_NotInJSON(t *testing.T) {
 		t.Errorf("note lost after done:\n%s", text)
 	}
 	js := b.ok("", "show", "T-1", "--json").out
-	if strings.Contains(js, "decision one") || strings.Contains(js, `"notes"`) {
-		t.Errorf("--json must not carry notes:\n%s", js)
+	if !strings.Contains(js, "decision one") || !strings.Contains(js, `"notes"`) {
+		t.Errorf("--json must carry notes:\n%s", js)
 	}
 }
 
