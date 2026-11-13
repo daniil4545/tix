@@ -7,13 +7,14 @@ All notable changes to this project are documented here. The format follows
 <!-- An entry stays one line: the release notes are cut from this file as they are. -->
 <!-- markdownlint-disable MD013 -->
 
-## [Unreleased]
+## [0.9.0] - 2026-11-13
 
 ### Upgrade from 0.8.x
 
 - Copy the store (`~/tasks`) before installing. The first write of 0.9.0 moves the old epics to `parent` in one commit `migrate: epic lines to parent` and writes `format = 2`. Tasks an epic lists get `parent: T-N` and their lines leave the epic; a line that names a missing task or another epic stays a criterion.
 - 0.8 does not read `parent`. To go back: `git revert` the migration commit in the store and install the 0.8 binary. 0.9.0 migrates a reverted store again on its next write.
-- Skills and rules that write `- [ ] T-N` epic lines (`spec`, `orchestrate`, `RULES.md`) must be updated first: after the migration such a line is an ordinary criterion.
+- After work on 0.9 the revert can stop on conflicts: in a task whose `status`, `claim` or `rank` changed next to the new `parent:` line, and in `config.toml` after `tix status` or `tix projects add`. Keep the other fields, drop the `parent:` line and the `format = 2` line. A `T-N: external edit` commit right before the migration commit means the migration was cut off: revert that commit too.
+- Skills and rules that write `- [ ] T-N` epic lines (`spec`, `orchestrate`, `RULES.md`) must be updated first: after the migration such a line is an ordinary criterion. Scripts that read status names should read `kind`.
 
 ### Added
 
@@ -27,6 +28,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - An epic is a task with children. Closing it is refused while a child is open (`--force` too); closing the last child prints `epic T-N: all tasks closed, ready for acceptance`; deleting a parent with children is refused. The tag `epic` means nothing.
+- Text output for scripts: `show` prints `Parent:` and `Children:` instead of `Epic: T-M`; `[epic]` in `list` and `ctx` is `[epic n/m]`; a task with the tag `epic` and no children is an ordinary task. `check` ticks a `- [ ] T-N` line like any criterion and `done` no longer ticks lines in epics.
 
 ## [0.8.1] - 2026-11-03
 
@@ -57,31 +59,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- `make bench` target for `show` is 20 ms (was 15): the 1000-task bench measured 19 ms on 0.7.1 and 0.8.0 alike.
 - `p` in the TUI no longer cycles projects. The board hint line is over 100 characters; on a narrow screen `q quit` is cut.
+- `project.Detect` prefers the longest registered path that contains the folder, then the git lookup.
 - Agents merge their task PRs through `merge-gate` after one review; the release tag stays with the owner.
 
 ## [0.7.1] - 2026-11-02
 
-### Upgrade from 0.7.0
-
-- An untouched `RULES.md` in the store is replaced by the new text on the first write; one you edited yourself stays.
-- Reinstall the agent skill (`scripts/connect.sh apply --force`) or add the `stale 14d+` line to your own copy: it tells the agent to offer the review and never close or delete by itself.
-- `tix ctx` now runs one `git log` over the last 14 days: about 17 ms on the 1000-task bench (target 25 ms, was 15) and longer on a store with thousands of recent commits.
-
-### Added
-
-- `tix ctx` prints `stale 14d+: N (T-1, ...)` (up to 10 ids, most idle first) for idea and open tasks without a move for 14 days; `--json` has `stale`. A move is a `new`, `note`, `comment`, `move`, `take`, `steal`, `done`, `edit` or `check` commit; `set`, `release`, external edits and mass commits of tix do not count.
-- `tix list --stale` keeps those tasks with `| idle Nd`; `--json` has `idle_days`.
-
-### Changed
-
-- `tix list --grep` matches the title, the `## Abstract` section and the criteria, ignoring case. Notes, comments and history are not searched.
-- CI runs `make ci-check` on Linux and macOS for every PR into `main` and every push to it; `main` is the only long branch.
-
-### Fixed
-
-- Closing an epic checks the task status behind a ticked line too: a line ticked by hand for an open or missing task refuses the close, `--force` included.
-- A move that renumbers ranks no longer drops the epic line edit when the epic is one of the renumbered neighbours.
+See the [release notes](https://github.com/daniil4545/tix/releases/tag/v0.7.1).
 
 ## [0.7.0] - 2026-11-02
 
@@ -115,7 +100,8 @@ See the [release notes](https://github.com/daniil4545/tix/releases/tag/v0.1.1).
 
 See the [release notes](https://github.com/daniil4545/tix/releases/tag/v0.1.0).
 
-[Unreleased]: https://github.com/daniil4545/tix/compare/v0.8.0...HEAD
+[0.9.0]: https://github.com/daniil4545/tix/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/daniil4545/tix/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/daniil4545/tix/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/daniil4545/tix/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/daniil4545/tix/compare/v0.6.0...v0.7.0
