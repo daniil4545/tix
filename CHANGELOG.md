@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 <!-- An entry stays one line: the release notes are cut from this file as they are. -->
 <!-- markdownlint-disable MD013 -->
 
+## [0.9.1] - 2026-11-13
+
+### Added
+
+- `tix show --json` has `kind`, `parent`, for a parent `children` and `children_closed`, and `notes` (`at`, `actor`, `text`; the last 5, all with `-v`). `tix list --json` has `last_note` (`at`, `text`) for tasks with notes.
+
 ## [0.9.0] - 2026-11-13
 
 ### Upgrade from 0.8.x
